@@ -9,10 +9,19 @@ Notes for running the authority side: generating keys, publishing snapshots, and
 - `mdb_copy` — from [LMDB](https://github.com/LMDB/lmdb), usually installed as `lmdb-utils` or `lmdb` package
 - `zstd` — [Facebook zstd](https://facebook.github.io/zstd/), widely available
 - Python 3.12+
-- Python packages: `pynacl`, `bencodepy`, `libtorrent`
+- `uv` — [Astral uv](https://github.com/astral-sh/uv) package manager
 
 ```bash
-pip install pynacl bencodepy
+# Install uv (macOS/Linux)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create and activate a virtual environment
+uv venv .venv --python 3.12
+source .venv/bin/activate
+
+# Install Python dependencies
+uv pip install pynacl bencodepy
+
 # libtorrent is C++ and must be installed separately — see mirror/Dockerfile for build instructions
 ```
 

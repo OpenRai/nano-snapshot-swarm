@@ -8,7 +8,7 @@ Decentralized Nano ledger snapshot distribution using BitTorrent BEP 46 (Mutable
 
 ```bash
 # Install dependencies (producer development)
-pip install pynacl bencodepy pytest ruff
+uv pip install pynacl bencodepy pytest ruff
 
 # Run tests
 PYTHONPATH=$(pwd) pytest tests/ -v
