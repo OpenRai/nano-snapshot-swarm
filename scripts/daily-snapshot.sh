@@ -16,23 +16,23 @@ WORK_DIR="${OUTPUT_DIR}/tmp"
 mkdir -p "$WORK_DIR"
 
 # --- Guard: prevent concurrent runs and stale downloads ---
-RUNNING_PID=$(pgrep -f "curl.*nano-snapshot" 2>/dev/null | head -1 || true)
+RUNNING_PID=$(pgrep -f "rclone copyurl.*nano-snapshot" 2>/dev/null | head -1 || true)
 if [ -n "$RUNNING_PID" ]; then
     RUNTIME_SECS=$(ps -o etimes= -p "$RUNNING_PID" 2>/dev/null | tr -d " " || echo "0")
     RUNTIME_HOURS=$((RUNTIME_SECS / 3600))
     if [ "$RUNTIME_HOURS" -lt "$MAX_RUNTIME_HOURS" ]; then
-        log "An curl instance is already running (PID $RUNNING_PID, ${RUNTIME_HOURS}h < ${MAX_RUNTIME_HOURS}h) — exiting"
+        log "An rclone instance is already running (PID $RUNNING_PID, ${RUNTIME_HOURS}h < ${MAX_RUNTIME_HOURS}h) — exiting"
         exit 0
     else
-        log "Stale curl instance running for ${RUNTIME_HOURS}h — killing PID $RUNNING_PID"
+        log "Stale rclone instance running for ${RUNTIME_HOURS}h — killing PID $RUNNING_PID"
         kill "$RUNNING_PID" 2>/dev/null || true
         sleep 2
     fi
 fi
 
 # Clean up any stale processes
-for PID in $(pgrep -f "curl.*$WORK_DIR" 2>/dev/null || true); do
-    log "Killing orphaned curl PID $PID"
+for PID in $(pgrep -f "rclone.*$WORK_DIR" 2>/dev/null || true); do
+    log "Killing orphaned rclone PID $PID"
     kill "$PID" 2>/dev/null || true
 done
 sleep 1
@@ -79,15 +79,9 @@ else
     log "Starting new download: $LATEST_URL"
 fi
 
-# --- Step 3: Download with curl (resumable via Range header) ---
-# Use curl with progress bar for visibility
-if [ -f "$TARGET_FILE" ] && [ -s "$TARGET_FILE" ]; then
-    CURRENT_SIZE=$(stat -c%s "$TARGET_FILE")
-    log "Resuming from byte $CURRENT_SIZE"
-    curl -# -A "$AGENT" -H "Range: bytes=$CURRENT_SIZE-" -o "$TARGET_FILE" "$LATEST_URL"
-else
-    curl -# -A "$AGENT" -o "$TARGET_FILE" "$LATEST_URL"
-fi
+# --- Step 3: Download with rclone (resumable) ---
+log "Downloading with rclone"
+rclone copyurl --progress --no-check-certificate --s3-acl public-read "$LATEST_URL" "$TARGET_FILE"
 
 if [ ! -f "$TARGET_FILE" ]; then
     log "ERROR: Download failed — file not found"
