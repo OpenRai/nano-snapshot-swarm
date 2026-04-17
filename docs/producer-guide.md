@@ -32,7 +32,8 @@ uv pip install pynacl bencodepy
 The producer needs an Ed25519 key pair. The **private key** (hex) is used to sign DHT mutable items. The **public key** (hex) is what mirrors use as `AUTHORITY_PUBKEY`.
 
 ```bash
-python3 -c "
+cd /opt/nano-bootstrap-swarm
+.venv/bin/python3 -c "
 from nacl.signing import SigningKey
 sk = SigningKey.generate()
 print(f'Private key (DHT_PRIVATE_KEY): {sk.encode().hex()}')
@@ -139,11 +140,11 @@ docker run --rm -e AUTHORITY_PUBKEY=<pubkey> -e DHT_SALT=weekly ghcr.io/openrai/
 
 ## Scheduling with systemd
 
-Daily snapshots run automatically via a systemd timer on the producer server.
+Snapshots run automatically via a **user-level** systemd timer on the producer server.
 
-**Unit files:** `/etc/systemd/system/nano-snapshot.service` and `/etc/systemd/system/nano-snapshot.timer` (deployed from `systemd/` in this repo).
+**Unit files:** Symlinked from `systemd/` in this repo to `~/.config/systemd/user/`.
 
-**Schedule:** 02:00 UTC daily, with up to 5 minutes of random jitter and `Persistent=true` (catches up if the server was offline).
+**Schedule:** Hourly, with up to 5 minutes of random jitter and `Persistent=true` (catches up if the server was offline).
 
 **Credentials:** The service reads `/home/openrai/.env` (EnvironmentFile), so keys are never in the unit file itself.
 
@@ -151,20 +152,20 @@ Daily snapshots run automatically via a systemd timer on the producer server.
 
 ```bash
 # Check timer status
-systemctl status nano-snapshot.timer
-systemctl list-timers nano-snapshot
+systemctl --user status nano-snapshot.timer
+systemctl --user list-timers nano-snapshot
 
 # View live logs
-journalctl -u nano-snapshot -f
+journalctl --user -u nano-snapshot -f
 
 # Manual trigger (e.g., after server downtime)
-systemctl start nano-snapshot.service
+systemctl --user start nano-snapshot.service
 
 # The pipeline log is also written to:
 # /opt/nano-snapshots/nano-snapshot.log
 ```
 
-The service runs as `User=openrai` with `TimeoutStopSec=3600` (1 hour) to accommodate large downloads.
+The service runs with `TimeoutStopSec=3600` (1 hour) to accommodate large downloads.
 
 ---
 
