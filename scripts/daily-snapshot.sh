@@ -81,8 +81,8 @@ fi
 
 # --- Step 3: Download with rclone (resumable) ---
 log "Downloading with rclone (see $LOG_FILE for progress)"
-# Run rclone in background, writing stats to a separate file that we can tail
-stdbuf -oL -eL rclone --stats 20s --stats-one-line copyurl --no-check-certificate --s3-acl public-read "$LATEST_URL" "$TARGET_FILE" >> "$LOG_FILE" 2>&1 &
+# Run rclone in background, writing both stdout and stderr to log file
+stdbuf -oL -eL rclone --stats 20s --stats-one-line copyurl --no-check-certificate --s3-acl public-read "$LATEST_URL" "$TARGET_FILE" 2>&1 >> "$LOG_FILE" &
 
 # Wait for download to complete
 wait $!
