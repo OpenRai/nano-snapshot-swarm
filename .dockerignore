@@ -1,0 +1,17 @@
+.git
+.gitignore
+*.md
+.env
+.env.local
+*.ldb
+*.ldb.zst
+*.torrent
+*.pyc
+__pycache__
+.pytest_cache
+*.log
+.github
+tests
+producer/__pycache__
+mirror/__pycache__
+shared/__pycache__
