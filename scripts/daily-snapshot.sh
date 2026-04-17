@@ -80,13 +80,13 @@ else
 fi
 
 # --- Step 3: Download with curl (resumable via Range header) ---
-# Use curl with resume capability
+# Use curl with progress bar for visibility
 if [ -f "$TARGET_FILE" ] && [ -s "$TARGET_FILE" ]; then
     CURRENT_SIZE=$(stat -c%s "$TARGET_FILE")
     log "Resuming from byte $CURRENT_SIZE"
-    curl -sSL -A "$AGENT" -H "Range: bytes=$CURRENT_SIZE-" -o "$TARGET_FILE" "$LATEST_URL"
+    curl -# -A "$AGENT" -H "Range: bytes=$CURRENT_SIZE-" -o "$TARGET_FILE" "$LATEST_URL"
 else
-    curl -sSL -A "$AGENT" -o "$TARGET_FILE" "$LATEST_URL"
+    curl -# -A "$AGENT" -o "$TARGET_FILE" "$LATEST_URL"
 fi
 
 if [ ! -f "$TARGET_FILE" ]; then
