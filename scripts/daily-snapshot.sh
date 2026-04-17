@@ -16,22 +16,23 @@ WORK_DIR="${OUTPUT_DIR}/tmp"
 mkdir -p "$WORK_DIR"
 
 # --- Guard: prevent concurrent runs and stale downloads ---
-RUNNING_PID=$(pgrep -f "rclone copyurl.*daily-snapshot" 2>/dev/null | head -1 || true)
+RUNNING_PID=$(pgrep -f "curl.*nano-snapshot" 2>/dev/null | head -1 || true)
 if [ -n "$RUNNING_PID" ]; then
     RUNTIME_SECS=$(ps -o etimes= -p "$RUNNING_PID" 2>/dev/null | tr -d " " || echo "0")
     RUNTIME_HOURS=$((RUNTIME_SECS / 3600))
     if [ "$RUNTIME_HOURS" -lt "$MAX_RUNTIME_HOURS" ]; then
-        log "An rclone instance is already running (PID $RUNNING_PID, ${RUNTIME_HOURS}h < ${MAX_RUNTIME_HOURS}h) — exiting"
+        log "An curl instance is already running (PID $RUNNING_PID, ${RUNTIME_HOURS}h < ${MAX_RUNTIME_HOURS}h) — exiting"
         exit 0
     else
-        log "Stale rclone instance running for ${RUNTIME_HOURS}h — killing PID $RUNNING_PID"
+        log "Stale curl instance running for ${RUNTIME_HOURS}h — killing PID $RUNNING_PID"
         kill "$RUNNING_PID" 2>/dev/null || true
         sleep 2
     fi
 fi
 
-for PID in $(pgrep -f "rclone.*$WORK_DIR" 2>/dev/null || true); do
-    log "Killing orphaned rclone PID $PID"
+# Clean up any stale processes
+for PID in $(pgrep -f "curl.*$WORK_DIR" 2>/dev/null || true); do
+    log "Killing orphaned curl PID $PID"
     kill "$PID" 2>/dev/null || true
 done
 sleep 1
@@ -58,26 +59,35 @@ log "Resolved: ${FILENAME}"
 TARGET_FILE="${WORK_DIR}/${FILENAME}"
 
 # --- Step 2: Decide whether to resume or start fresh ---
+# Always clean up any stale files to ensure a fresh start
+for STALE_FILE in "$WORK_DIR"/*.7z; do
+    [ -f "$STALE_FILE" ] || continue
+    if [ "$(basename "$STALE_FILE")" != "$FILENAME" ]; then
+        log "Removing stale file from different snapshot: $STALE_FILE"
+        rm -f "$STALE_FILE"
+    fi
+done
+
+# Clean up previous extraction/compaction artifacts
+rm -rf "${WORK_DIR:?}/compacted"
+rm -f "${WORK_DIR}/data.ldb"
+
+# Check for existing download
 if [ -f "$TARGET_FILE" ] && [ -s "$TARGET_FILE" ]; then
-    log "Found existing partial download: $TARGET_FILE"
-    log "Attempting to resume: $LATEST_URL -> $TARGET_FILE"
+    log "Found existing download: $TARGET_FILE"
 else
-    # Check for any stale 7z files from a different snapshot
-    for STALE_FILE in "$WORK_DIR"/*.7z; do
-        [ -f "$STALE_FILE" ] || continue
-        if [ "$(basename "$STALE_FILE")" != "$FILENAME" ]; then
-            log "Removing stale file from different snapshot: $STALE_FILE"
-            rm -f "$STALE_FILE"
-        fi
-    done
-    # Clean up compacted dir if it exists (will need fresh extraction)
-    rm -rf "${WORK_DIR:?}/compacted"
-    rm -f "${WORK_DIR}/data.ldb"
     log "Starting new download: $LATEST_URL"
 fi
 
-# --- Step 3: Download with rclone (resumable) ---
-rclone copyurl --stats 20s --stats-one-line "$LATEST_URL" "$TARGET_FILE"
+# --- Step 3: Download with curl (resumable via Range header) ---
+# Use curl with resume capability
+if [ -f "$TARGET_FILE" ] && [ -s "$TARGET_FILE" ]; then
+    CURRENT_SIZE=$(stat -c%s "$TARGET_FILE")
+    log "Resuming from byte $CURRENT_SIZE"
+    curl -sSL -A "$AGENT" -H "Range: bytes=$CURRENT_SIZE-" -o "$TARGET_FILE" "$LATEST_URL"
+else
+    curl -sSL -A "$AGENT" -o "$TARGET_FILE" "$LATEST_URL"
+fi
 
 if [ ! -f "$TARGET_FILE" ]; then
     log "ERROR: Download failed — file not found"

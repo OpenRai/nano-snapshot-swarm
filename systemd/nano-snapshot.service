@@ -13,3 +13,4 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=nano-snapshot
 TimeoutStopSec=3600
+PrivateTmp=true
