@@ -81,8 +81,8 @@ fi
 
 # --- Step 3: Download with rclone (resumable) ---
 log "Downloading with rclone"
-# rclone stats go to stderr, so redirect stderr to stdout to capture in log
-rclone copyurl --stats 20s --stats-one-line --no-check-certificate --s3-acl public-read "$LATEST_URL" "$TARGET_FILE" 2>&1 | while read line; do log "rclone: $line"; done
+# rclone stats go to stderr, use stdbuf to disable buffering for real-time output
+stdbuf -oL -eL rclone copyurl --stats 20s --stats-one-line --no-check-certificate --s3-acl public-read "$LATEST_URL" "$TARGET_FILE" 2>&1 | while IFS= read -r line; do log "rclone: $line"; done
 
 if [ ! -f "$TARGET_FILE" ]; then
     log "ERROR: Download failed — file not found"
