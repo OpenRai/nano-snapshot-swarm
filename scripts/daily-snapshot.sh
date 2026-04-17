@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="${OUTPUT_DIR:-/opt/nano-snapshots}"
-LEDGER_OUTPUT="${OUTPUT_DIR}/data.ldb"
 WEB_SEED_URL="${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
 AGENT="nano-bootstrap-swarm/1.0"
 
@@ -52,25 +51,38 @@ fi
 EXTRACTED_SIZE=$(stat -c%s "${TMPDIR}/data.ldb")
 log "Extracted data.ldb (${EXTRACTED_SIZE} bytes)"
 
-# --- Step 3: Compress with zstd rsyncable ---
+# --- Step 3: Compact with mdb_copy (removes LMDB free pages) ---
+log "Compacting with mdb_copy"
+mkdir -p "${TMPDIR}/compacted"
+mdb_copy "${TMPDIR}/data.ldb" "${TMPDIR}/compacted"
+
+COMPACTED_FILE="${TMPDIR}/compacted/data.ldb"
+if [ ! -f "$COMPACTED_FILE" ]; then
+    log "ERROR: mdb_copy failed — compacted file not found"
+    exit 1
+fi
+
+COMPACTED_SIZE=$(stat -c%s "$COMPACTED_FILE")
+SAVINGS=$(( (EXTRACTED_SIZE - COMPACTED_SIZE) * 100 / EXTRACTED_SIZE ))
+log "Compacted: ${COMPACTED_SIZE} bytes (saved ${SAVINGS}%)"
+
+# --- Step 4: Compress with zstd --rsyncable ---
 COMPRESSED_OUTPUT="${OUTPUT_DIR}/nano-daily.ldb.zst"
 log "Compressing with zstd -3 --rsyncable"
-zstd -3 --rsyncable -f "${TMPDIR}/data.ldb" -o "$COMPRESSED_OUTPUT"
+zstd -3 --rsyncable -f "$COMPACTED_FILE" -o "$COMPRESSED_OUTPUT"
 
 COMP_SIZE=$(stat -c%s "$COMPRESSED_OUTPUT")
 SHA256=$(sha256sum "$COMPRESSED_OUTPUT" | cut -d' ' -f1)
 log "Compressed to ${COMPRESSED_OUTPUT} (${COMP_SIZE} bytes, sha256=${SHA256})"
 
-# --- Step 4: Create torrent ---
-TORRENT_OUTPUT="${OUTPUT_DIR}/nano-daily.ldb.torrent"
-log "Creating torrent"
+# --- Step 5: Create torrent and publish ---
+log "Creating torrent and publishing to DHT"
 
 cd /opt/nano-bootstrap-swarm
 source .venv/bin/activate
 source /home/openrai/.env
 
 python -m producer.cli publish \
-    --ledger-path "$COMPRESSED_OUTPUT" \
     --private-key "$DHT_PRIVATE_KEY" \
     --output-dir "$OUTPUT_DIR" \
     --web-seed-url "$WEB_SEED_URL"
