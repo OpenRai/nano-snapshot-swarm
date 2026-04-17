@@ -36,36 +36,43 @@ for PID in $(pgrep -f "rclone.*$WORK_DIR" 2>/dev/null || true); do
 done
 sleep 1
 
-# --- Step 1: Resolve latest snapshot URL via HTTP Location header ---
+# --- Step 1: Resolve latest snapshot URL from S3 listing ---
 log "Resolving latest snapshot URL"
 
-LATEST_URL=$(curl -sSL -A "$AGENT" -I "$WEB_SEED_URL" 2>/dev/null | grep -i "^Location:" | tr -d "" | cut -d" " -f2 | tr -d '"')
-if [ -z "$LATEST_URL" ]; then
+RAW_URL=$(curl -sSL -A "$AGENT" "$WEB_SEED_URL" | tr -d '"\r')
+if [ -z "$RAW_URL" ]; then
     log "ERROR: Could not resolve latest snapshot URL from $WEB_SEED_URL"
     exit 1
 fi
 
-FILENAME=$(basename "$LATEST_URL")
+# S3 listing returns a full URL — extract just the filename
+FILENAME=$(basename "$RAW_URL")
+LATEST_URL="$RAW_URL"
+
+# If the listing returned a relative path, construct full URL
+if [[ "$LATEST_URL" != http* ]]; then
+    LATEST_URL="https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/${FILENAME}"
+fi
+
+log "Resolved: ${FILENAME}"
 TARGET_FILE="${WORK_DIR}/${FILENAME}"
 
 # --- Step 2: Decide whether to resume or start fresh ---
 if [ -f "$TARGET_FILE" ] && [ -s "$TARGET_FILE" ]; then
-    EXISTING_FILE_IN_DIR=$(ls "$WORK_DIR"/*.7z 2>/dev/null | head -1 || true)
-    if [ -n "$EXISTING_FILE_IN_DIR" ] && [ "$(basename "$EXISTING_FILE_IN_DIR")" = "$FILENAME" ]; then
-        log "Found existing partial download: $EXISTING_FILE_IN_DIR"
-        log "Attempting to resume: $LATEST_URL -> $TARGET_FILE"
-    else
-        log "Filename mismatch or stale file in $WORK_DIR — removing all tmp files"
-        rm -rf "${WORK_DIR:?}"/*
-        mkdir -p "$WORK_DIR"
-        log "Starting fresh download: $LATEST_URL"
-    fi
+    log "Found existing partial download: $TARGET_FILE"
+    log "Attempting to resume: $LATEST_URL -> $TARGET_FILE"
 else
-    if [ -d "$WORK_DIR" ] && [ "$(ls -A "$WORK_DIR" 2>/dev/null)" ]; then
-        log "No matching file found in $WORK_DIR — clearing tmp"
-        rm -rf "${WORK_DIR:?}"/*
-        mkdir -p "$WORK_DIR"
-    fi
+    # Check for any stale 7z files from a different snapshot
+    for STALE_FILE in "$WORK_DIR"/*.7z; do
+        [ -f "$STALE_FILE" ] || continue
+        if [ "$(basename "$STALE_FILE")" != "$FILENAME" ]; then
+            log "Removing stale file from different snapshot: $STALE_FILE"
+            rm -f "$STALE_FILE"
+        fi
+    done
+    # Clean up compacted dir if it exists (will need fresh extraction)
+    rm -rf "${WORK_DIR:?}/compacted"
+    rm -f "${WORK_DIR}/data.ldb"
     log "Starting new download: $LATEST_URL"
 fi
 
@@ -106,7 +113,7 @@ if [ ! -f "$COMPACTED_FILE" ]; then
 fi
 
 COMPACTED_SIZE=$(stat -c%s "$COMPACTED_FILE")
-SAVINGS=$(($(expr $EXTRACTED_SIZE - $COMPACTED_SIZE) \* 100 / $EXTRACTED_SIZE))
+SAVINGS=$(( (EXTRACTED_SIZE - COMPACTED_SIZE) * 100 / EXTRACTED_SIZE ))
 log "Compacted: ${COMPACTED_SIZE} bytes (saved ${SAVINGS}%)"
 
 # --- Step 6: Compress with zstd --rsyncable ---
@@ -115,7 +122,7 @@ log "Compressing with zstd -3 --rsyncable"
 zstd -3 --rsyncable -f "$COMPACTED_FILE" -o "$COMPRESSED_OUTPUT"
 
 COMP_SIZE=$(stat -c%s "$COMPRESSED_OUTPUT")
-SHA256=$(sha256sum "$COMPRESSED_OUTPUT" | cut -d" " -f1)
+SHA256=$(sha256sum "$COMPRESSED_OUTPUT" | cut -d' ' -f1)
 log "Compressed to ${COMPRESSED_OUTPUT} (${COMP_SIZE} bytes, sha256=${SHA256})"
 
 # --- Step 7: Create torrent and publish ---
@@ -125,6 +132,9 @@ cd /opt/nano-bootstrap-swarm
 source .venv/bin/activate
 source /home/openrai/.env
 
-python -m producer.cli publish     --private-key "$DHT_PRIVATE_KEY"     --output-dir "$OUTPUT_DIR"     --web-seed-url "$WEB_SEED_URL"
+python -m producer.cli publish \
+    --private-key "$DHT_PRIVATE_KEY" \
+    --output-dir "$OUTPUT_DIR" \
+    --web-seed-url "$WEB_SEED_URL"
 
 log "=== Daily snapshot pipeline complete ==="
