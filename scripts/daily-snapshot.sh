@@ -16,7 +16,7 @@ WORK_DIR="${OUTPUT_DIR}/tmp"
 mkdir -p "$WORK_DIR"
 
 # --- Guard: prevent concurrent runs and stale downloads ---
-RUNNING_PID=$(pgrep -f "rclone copyurl.*nano-snapshot" 2>/dev/null | head -1 || true)
+RUNNING_PID=$(pgrep -f "rclone copyurl" 2>/dev/null | head -1 || true)
 if [ -n "$RUNNING_PID" ]; then
     RUNTIME_SECS=$(ps -o etimes= -p "$RUNNING_PID" 2>/dev/null | tr -d " " || echo "0")
     RUNTIME_HOURS=$((RUNTIME_SECS / 3600))
@@ -30,8 +30,8 @@ if [ -n "$RUNNING_PID" ]; then
     fi
 fi
 
-# Clean up any stale processes
-for PID in $(pgrep -f "rclone.*$WORK_DIR" 2>/dev/null || true); do
+# Clean up any stale rclone processes
+for PID in $(pgrep -f "rclone" 2>/dev/null || true); do
     log "Killing orphaned rclone PID $PID"
     kill "$PID" 2>/dev/null || true
 done
@@ -81,7 +81,8 @@ fi
 
 # --- Step 3: Download with rclone (resumable) ---
 log "Downloading with rclone"
-rclone copyurl --progress --no-check-certificate --s3-acl public-read "$LATEST_URL" "$TARGET_FILE"
+# Use rclone with periodic logging (every 20s) instead of continuous progress
+rclone copyurl --stats 20s --stats-one-line --no-check-certificate --s3-acl public-read "$LATEST_URL" "$TARGET_FILE"
 
 if [ ! -f "$TARGET_FILE" ]; then
     log "ERROR: Download failed — file not found"
