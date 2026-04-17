@@ -12,8 +12,8 @@ log() {
     echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"
 }
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+WORK_DIR="${OUTPUT_DIR}/tmp"
+mkdir -p "$WORK_DIR"
 
 log "=== Starting daily snapshot pipeline ==="
 
@@ -27,43 +27,46 @@ if [ -z "$LATEST_URL" ]; then
 fi
 
 FILENAME=$(basename "$LATEST_URL")
-log "Downloading $LATEST_URL"
+TARGET_FILE="${WORK_DIR}/${FILENAME}"
+log "Downloading $LATEST_URL -> $TARGET_FILE"
 
-curl -sSL -A "$AGENT" -o "${TMPDIR}/${FILENAME}" "$LATEST_URL"
+rclone copyurl --progress "$LATEST_URL" "$TARGET_FILE"
 
-if [ ! -f "${TMPDIR}/${FILENAME}" ]; then
+if [ ! -f "$TARGET_FILE" ]; then
     log "ERROR: Download failed — file not found"
     exit 1
 fi
 
-ORIG_SIZE=$(stat -c%s "${TMPDIR}/${FILENAME}")
+ORIG_SIZE=$(stat -c%s "$TARGET_FILE")
 log "Downloaded ${FILENAME} (${ORIG_SIZE} bytes)"
 
 # --- Step 2: Extract ---
 log "Extracting ${FILENAME}"
-7z x -y -o"${TMPDIR}" "${TMPDIR}/${FILENAME}" > /dev/null
+7z x -y -o"$WORK_DIR" "$TARGET_FILE" > /dev/null
 
-if [ ! -f "${TMPDIR}/data.ldb" ]; then
+EXTRACTED_FILE="${WORK_DIR}/data.ldb"
+if [ ! -f "$EXTRACTED_FILE" ]; then
     log "ERROR: Extraction failed — data.ldb not found"
     exit 1
 fi
 
-EXTRACTED_SIZE=$(stat -c%s "${TMPDIR}/data.ldb")
+EXTRACTED_SIZE=$(stat -c%s "$EXTRACTED_FILE")
 log "Extracted data.ldb (${EXTRACTED_SIZE} bytes)"
 
 # --- Step 3: Compact with mdb_copy (removes LMDB free pages) ---
 log "Compacting with mdb_copy"
-mkdir -p "${TMPDIR}/compacted"
-mdb_copy "${TMPDIR}/data.ldb" "${TMPDIR}/compacted"
+COMPACTED_DIR="${WORK_DIR}/compacted"
+mkdir -p "$COMPACTED_DIR"
+mdb_copy "$EXTRACTED_FILE" "$COMPACTED_DIR"
 
-COMPACTED_FILE="${TMPDIR}/compacted/data.ldb"
+COMPACTED_FILE="${COMPACTED_DIR}/data.ldb"
 if [ ! -f "$COMPACTED_FILE" ]; then
     log "ERROR: mdb_copy failed — compacted file not found"
     exit 1
 fi
 
 COMPACTED_SIZE=$(stat -c%s "$COMPACTED_FILE")
-SAVINGS=$(( (EXTRACTED_SIZE - COMPACTED_SIZE) * 100 / EXTRACTED_SIZE ))
+SAVINGS=$(($(expr $EXTRACTED_SIZE - $COMPACTED_SIZE) \* 100 / $EXTRACTED_SIZE))
 log "Compacted: ${COMPACTED_SIZE} bytes (saved ${SAVINGS}%)"
 
 # --- Step 4: Compress with zstd --rsyncable ---
@@ -82,9 +85,6 @@ cd /opt/nano-bootstrap-swarm
 source .venv/bin/activate
 source /home/openrai/.env
 
-python -m producer.cli publish \
-    --private-key "$DHT_PRIVATE_KEY" \
-    --output-dir "$OUTPUT_DIR" \
-    --web-seed-url "$WEB_SEED_URL"
+python -m producer.cli publish     --private-key "$DHT_PRIVATE_KEY"     --output-dir "$OUTPUT_DIR"     --web-seed-url "$WEB_SEED_URL"
 
 log "=== Daily snapshot pipeline complete ==="
