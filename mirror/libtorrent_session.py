@@ -92,8 +92,11 @@ class LibtorrentSession:
             params = {
                 "ti": info,
                 "save_path": save_path,
-                "flags": (lt.torrent_flags.auto_managed | lt.torrent_flags.update_subscribe),
             }
+            flags = lt.torrent_flags.auto_managed
+            if hasattr(lt.torrent_flags, "update_subscribe"):
+                flags |= lt.torrent_flags.update_subscribe
+            params["flags"] = flags
             handle = self._session.add_torrent(params)
         else:
             magnet_uri = f"magnet:?xt=urn:btmh:{info_hash}"
@@ -102,8 +105,9 @@ class LibtorrentSession:
                     magnet_uri += f"&ws={ws}"
             params = lt.parse_magnet_uri(magnet_uri)
             params.save_path = save_path
-            params.flags |= lt.torrent_flags.auto_managed
-            params.flags |= lt.torrent_flags.update_subscribe
+            params.flags = lt.torrent_flags.auto_managed
+            if hasattr(lt.torrent_flags, "update_subscribe"):
+                params.flags |= lt.torrent_flags.update_subscribe
             handle = self._session.add_torrent(params)
 
         self._handles[info_hash] = handle
@@ -141,8 +145,8 @@ class LibtorrentSession:
         deadline = time.time() + timeout
         while time.time() < deadline:
             self._alert_event.wait(timeout=1.0)
-            self._alert_event.clear()
             with self._alert_lock:
+                self._alert_event.clear()
                 for alert in self._alerts:
                     if isinstance(alert, alert_type):
                         self._alerts.remove(alert)

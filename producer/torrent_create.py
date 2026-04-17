@@ -24,7 +24,6 @@ def create_torrent(
 
     if web_seed_url:
         url_list = [f"{web_seed_url.rstrip('/')}/{filename}"]
-        ct.add_url_seed(url_list[0]) if hasattr(ct, "add_url_seed") else None
         ct.set_web_seeds(url_list)
 
     lt.set_piece_hashes(ct, os.path.dirname(filepath) or ".")

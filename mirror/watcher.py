@@ -15,7 +15,6 @@ from shared.nano_identity import public_key_to_nano_address
 
 logger = logging.getLogger("mirror.watcher")
 
-DHT_SALT = "daily"
 DEFAULT_DATA_DIR = os.environ.get("DATA_DIR", "/data")
 DEFAULT_POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "600"))
 STATE_FILENAME = "mirror_state.json"
@@ -72,7 +71,7 @@ class MirrorWatcher:
         poll_interval: int = DEFAULT_POLL_INTERVAL,
         web_seed_url: str = WEB_SEED_URL,
     ):
-        self.authority_pubkey_hex = authority_pubkey_hex.replace(":", "").strip()
+        self.authority_pubkey_hex = authority_pubkey_hex
         self.data_dir = data_dir
         self.poll_interval = poll_interval
         self.web_seed_url = web_seed_url
@@ -260,15 +259,16 @@ def main() -> None:
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
 
-    pubkey = args.authority_pubkey
+    pubkey = args.authority_pubkey.replace(":", "").strip()
     if not pubkey:
         print("ERROR: AUTHORITY_PUBKEY is required (env or --authority-pubkey)", file=sys.stderr)
         sys.exit(1)
 
     try:
-        bytes.fromhex(pubkey)
-        assert len(bytes.fromhex(pubkey)) == 32
-    except (ValueError, AssertionError):
+        pubkey_bytes = bytes.fromhex(pubkey)
+        if len(pubkey_bytes) != 32:
+            raise ValueError
+    except ValueError:
         print(
             "ERROR: AUTHORITY_PUBKEY must be a 32-byte hex string (64 hex characters)",
             file=sys.stderr,

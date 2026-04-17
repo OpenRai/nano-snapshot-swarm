@@ -4,12 +4,9 @@ import hashlib
 from typing import Tuple
 
 try:
-    from nacl.exceptions import BadSignatureError
-    from nacl.signing import SigningKey, VerifyKey
+    from nacl.signing import SigningKey
 except ImportError:
     SigningKey = None
-    VerifyKey = None
-    BadSignatureError = Exception
 
 NANO_PREFIX = "nano_"
 NANO_ALPHABET = "13456789abcdefghijkmnopqrstuwxyz"

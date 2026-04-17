@@ -5,6 +5,9 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
+import bencodepy
+import libtorrent as lt
+
 from shared.bep46 import parse_dht_value, verify_mutable_item
 from shared.nano_identity import compute_bep46_target_id
 
@@ -29,8 +32,6 @@ def discover_latest_snapshot(
     authority_pubkey_hex: str,
     timeout: float = DHT_TIMEOUT,
 ) -> Optional[DHTDiscoveryResult]:
-    import libtorrent as lt
-
     pub_key_bytes = bytes.fromhex(authority_pubkey_hex)
     target_id = compute_bep46_target_id(pub_key_bytes, DHT_SALT)
 
@@ -77,8 +78,6 @@ def _process_mutable_item_alert(
     try:
         value_data = alert.value
         if isinstance(value_data, dict):
-            import bencodepy
-
             value_bytes = bencodepy.encode(value_data)
         elif isinstance(value_data, (bytes, bytearray)):
             value_bytes = bytes(value_data)

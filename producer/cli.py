@@ -26,7 +26,6 @@ def cmd_snapshot(args: argparse.Namespace) -> None:
     result = subprocess.run(
         ["bash", str(snapshot_script)],
         env=env,
-        check=True,
     )
     if result.returncode != 0:
         print(f"ERROR: snapshot.sh exited with code {result.returncode}", file=sys.stderr)

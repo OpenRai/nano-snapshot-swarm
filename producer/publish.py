@@ -6,6 +6,8 @@ import sys
 import time
 from pathlib import Path
 
+import libtorrent as lt
+
 from shared.bep46 import build_dht_value, sign_mutable_item
 from shared.nano_identity import compute_bep46_target_id, derive_nano_address
 
@@ -27,6 +29,10 @@ def save_state(state: dict, state_path: str = STATE_FILE) -> None:
         json.dump(state, f, indent=2)
 
 
+class PublishError(Exception):
+    pass
+
+
 def publish_to_dht(
     private_key_hex: str,
     info_hash_hex: str,
@@ -34,8 +40,6 @@ def publish_to_dht(
     state_path: str = STATE_FILE,
     dry_run: bool = False,
 ) -> dict:
-    import libtorrent as lt
-
     state = load_state(state_path)
     seq = state.get("last_seq", 0) + 1
 
@@ -50,8 +54,7 @@ def publish_to_dht(
     signature, derived_pub = sign_mutable_item(private_key_hex, value_bytes, seq, salt=DHT_SALT)
 
     if derived_pub != pub_key_bytes:
-        print("ERROR: Derived public key mismatch", file=sys.stderr)
-        sys.exit(1)
+        raise PublishError("Derived public key mismatch")
 
     print(f"Signature: {signature.hex()}")
     print(f"Value size: {len(value_bytes)} bytes")
@@ -150,14 +153,18 @@ def main() -> None:
         print("ERROR: DHT_PRIVATE_KEY not set (env or --private-key)", file=sys.stderr)
         sys.exit(1)
 
-    result = publish_to_dht(
-        private_key_hex=private_key,
-        info_hash_hex=args.info_hash,
-        piece_size=args.piece_size,
-        state_path=args.state_file,
-        dry_run=args.dry_run,
-    )
-    print(json.dumps(result, indent=2))
+    try:
+        result = publish_to_dht(
+            private_key_hex=private_key,
+            info_hash_hex=args.info_hash,
+            piece_size=args.piece_size,
+            state_path=args.state_file,
+            dry_run=args.dry_run,
+        )
+        print(json.dumps(result, indent=2))
+    except PublishError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

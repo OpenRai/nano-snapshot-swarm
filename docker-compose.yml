@@ -1,17 +1,27 @@
 services:
   nano-mirror:
     image: ghcr.io/openrai/nano-p2p-mirror:latest
-    container_name: nano-p2p-mirror
     environment:
-      - AUTHORITY_PUBKEY=85431095c5913b9c9e7ce1e3b6a66b91e9e9e4c44d6f9e7e6e5d4c3b2a109876
+      AUTHORITY_PUBKEY: "${AUTHORITY_PUBKEY:?AUTHORITY_PUBKEY is required}"
+      DATA_DIR: /data
+      POLL_INTERVAL: "600"
+      LOG_LEVEL: INFO
     volumes:
-      - /mnt/storage/nano-data:/data
+      - nano-data:/data
     ports:
-      - "6881:6881"
+      - "6881:6881/tcp"
       - "6881:6881/udp"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import libtorrent; libtorrent.session({'enable_dht': False})"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  nano-data:
