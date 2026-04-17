@@ -31,6 +31,29 @@ uv pip install pynacl bencodepy
 
 The producer needs an Ed25519 key pair. The **private key** (hex) is used to sign DHT mutable items. The **public key** (hex) is what mirrors use as `AUTHORITY_PUBKEY`.
 
+### Option A: Derive from your Nano secret key (recommended)
+
+Your Nano secret key (64-char hex, 32 bytes) is already an Ed25519 seed. The same seed produces both your Nano address and the BEP 46 signing key.
+
+```bash
+cd /opt/nano-bootstrap-swarm
+.venv/bin/python3 -c "
+from nacl.signing import SigningKey
+from shared.nano_identity import public_key_to_nano_address
+
+# Replace with your Nano secret key (64-char hex, 32 bytes)
+NANO_SECRET = 'YOUR_64_CHAR_NANO_SECRET_KEY_HEX'
+sk = SigningKey(bytes.fromhex(NANO_SECRET))
+pub_hex = sk.verify_key.encode().hex()
+nano_addr = public_key_to_nano_address(sk.verify_key.encode())
+print(f'Nano address: {nano_addr}')
+print(f'DHT_PRIVATE_KEY: {NANO_SECRET}')
+print(f'AUTHORITY_PUBKEY:  {pub_hex}')
+"
+```
+
+### Option B: Generate a fresh random key
+
 ```bash
 cd /opt/nano-bootstrap-swarm
 .venv/bin/python3 -c "
