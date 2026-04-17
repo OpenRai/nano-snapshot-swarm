@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # nano-snapshot start — manually trigger the snapshot pipeline
+# Run on the server as the openrai user.
 set -euo pipefail
 
 ME="${0##*/}"
@@ -7,6 +8,8 @@ ME="${0##*/}"
 usage() {
     cat <<EOF
 Usage: $ME [--follow]
+
+Run on the server as the openrai user.
 
 Options:
   --follow   Tail journal logs after starting
@@ -22,15 +25,13 @@ while [[ "${1:-}" == --* ]]; do
     esac
 done
 
-REMOTE="openrai@185.208.206.54"
-
 echo "=== Starting nano-snapshot.service ==="
-ssh "$REMOTE" "systemctl --user start nano-snapshot.service"
+systemctl --user start nano-snapshot.service
 
 if $FOLLOW; then
     echo "=== Tailing logs (Ctrl-C to detach) ==="
-    ssh -t "$REMOTE" "journalctl --user -u nano-snapshot -f"
+    journalctl --user -u nano-snapshot -f
 else
     echo "=== Recent logs ==="
-    ssh "$REMOTE" "journalctl --user -u nano-snapshot -n 20 --no-pager"
+    journalctl --user -u nano-snapshot -n 20 --no-pager
 fi

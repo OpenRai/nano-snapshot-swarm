@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # nano-snapshot restart — git pull + daemon-reload + restart timer
+# Run on the server as the openrai user.
 set -euo pipefail
 
 ME="${0##*/}"
@@ -7,6 +8,8 @@ ME="${0##*/}"
 usage() {
     cat <<EOF
 Usage: $ME [--service]
+
+Run on the server as the openrai user.
 
 Options:
   --service   Also restart the .service unit (clears stale state)
@@ -22,21 +25,19 @@ while [[ "${1:-}" == --* ]]; do
     esac
 done
 
-REMOTE="openrai@185.208.206.54"
-
 echo "=== Pulling latest from git ==="
-ssh "$REMOTE" "cd /opt/nano-bootstrap-swarm && git pull"
+cd /opt/nano-bootstrap-swarm && git pull
 
 echo "=== Reloading systemd ==="
-ssh "$REMOTE" "systemctl --user daemon-reload"
+systemctl --user daemon-reload
 
 echo "=== Restarting timer ==="
-ssh "$REMOTE" "systemctl --user restart nano-snapshot.timer"
+systemctl --user restart nano-snapshot.timer
 
 if $RESTART_SERVICE; then
     echo "=== Restarting service ==="
-    ssh "$REMOTE" "systemctl --user restart nano-snapshot.service"
+    systemctl --user restart nano-snapshot.service
 fi
 
 echo "=== Done ==="
-ssh "$REMOTE" "systemctl --user list-timers nano-snapshot --no-pager"
+systemctl --user list-timers nano-snapshot --no-pager

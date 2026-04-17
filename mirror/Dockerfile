@@ -1,3 +1,4 @@
+ARG AUTHORITY_PUBKEY
 FROM python:3 AS builder-cpp
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -49,6 +50,8 @@ ENV PYTHONPATH=/app
 ENV DATA_DIR=/data
 ENV POLL_INTERVAL=600
 ENV LOG_LEVEL=INFO
+ARG AUTHORITY_PUBKEY
+ENV AUTHORITY_PUBKEY=${AUTHORITY_PUBKEY}
 
 VOLUME ["/data"]
 
