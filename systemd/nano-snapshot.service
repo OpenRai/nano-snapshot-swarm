@@ -5,10 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-EnvironmentFile=-/home/openrai/.env
-Environment=OUTPUT_DIR=/opt/nano-snapshots
+EnvironmentFile=-%h/.env
+Environment=OUTPUT_DIR=%h/nano-snapshots
 Environment=WEB_SEED_URL=https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest
-ExecStart=/opt/nano-bootstrap-swarm/scripts/daily-snapshot.sh
+# Adjust ExecStart if the repo is cloned to a different location
+ExecStart=%h/nano-bootstrap-swarm/scripts/daily-snapshot.sh
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=nano-snapshot

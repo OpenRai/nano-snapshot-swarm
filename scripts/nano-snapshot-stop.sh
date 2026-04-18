@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # nano-snapshot stop — stop a running snapshot pipeline
-# Run on the server as the openrai user.
+# Run on the server as the deploy user.
 set -euo pipefail
 
 ME="${0##*/}"

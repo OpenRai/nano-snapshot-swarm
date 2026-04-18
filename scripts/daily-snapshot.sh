@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OUTPUT_DIR="${OUTPUT_DIR:-/opt/nano-snapshots}"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
 WEB_SEED_URL="${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
 AGENT="nano-bootstrap-swarm/1.0"
 MAX_RUNTIME_HOURS=12
@@ -193,10 +194,10 @@ log "Compressed to ${COMPRESSED_OUTPUT} (${COMP_SIZE} bytes, sha256=${SHA256})"
 # --- Step 7: Create torrent and publish ---
 log "Creating torrent and publishing to DHT"
 
-cd /opt/nano-bootstrap-swarm
+cd "$REPO_DIR"
 source .venv/bin/activate
-if [ -z "${DHT_PRIVATE_KEY:-}" ] && [ -f /home/openrai/.env ]; then
-    source /home/openrai/.env
+if [ -z "${DHT_PRIVATE_KEY:-}" ] && [ -f "$HOME/.env" ]; then
+    source "$HOME/.env"
 fi
 
 python -m producer.cli publish \

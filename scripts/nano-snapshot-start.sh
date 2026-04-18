@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # nano-snapshot start — manually trigger the snapshot pipeline
-# Run on the server as the openrai user.
+# Run on the server as the deploy user.
 set -euo pipefail
 
 ME="${0##*/}"
@@ -9,7 +9,7 @@ usage() {
     cat <<EOF
 Usage: $ME [--follow]
 
-Run on the server as the openrai user.
+Run on the server as the deploy user.
 
 Options:
   --follow   Tail journal logs after starting

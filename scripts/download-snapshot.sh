@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OUTPUT_DIR="${OUTPUT_DIR:-/opt/nano-snapshots}"
+OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
 LEDGER_OUTPUT="${OUTPUT_DIR}/data.ldb"
 WEB_SEED_URL="${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
 AGENT="nano-bootstrap-swarm/1.0"

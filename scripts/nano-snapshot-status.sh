@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # nano-snapshot status — check timer state and recent journal entries
-# Run on the server as the openrai user.
+# Run on the server as the deploy user.
 set -euo pipefail
 
 ME="${0##*/}"
@@ -9,7 +9,7 @@ usage() {
     cat <<EOF
 Usage: $ME [log-lines]
 
-Run on the server as the openrai user.
+Run on the server as the deploy user.
 
 Examples:
   $ME          # timer status + last 20 log lines

@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # nano-snapshot restart — git pull + daemon-reload + restart timer
-# Run on the server as the openrai user.
+# Run on the server as the deploy user.
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ME="${0##*/}"
 
 usage() {
     cat <<EOF
 Usage: $ME [--service]
 
-Run on the server as the openrai user.
+Run on the server as the deploy user.
 
 Options:
   --service   Also restart the .service unit (clears stale state)
@@ -26,7 +27,7 @@ while [[ "${1:-}" == --* ]]; do
 done
 
 echo "=== Pulling latest from git ==="
-cd /opt/nano-bootstrap-swarm && git pull
+cd "$REPO_DIR" && git pull
 
 echo "=== Reloading systemd ==="
 systemctl --user daemon-reload

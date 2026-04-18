@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # nano-snapshot logs — tail the journal for nano-snapshot
-# Run on the server as the openrai user.
+# Run on the server as the deploy user.
 set -euo pipefail
 
 ME="${0##*/}"

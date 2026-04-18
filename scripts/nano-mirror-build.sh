@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # nano-mirror-build — build the mirror Docker image with authority pubkey baked in
-# Run on the server as the openrai user.
+# Run on the server as the deploy user.
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ME="${0##*/}"
 
 usage() {
@@ -10,9 +11,9 @@ usage() {
 Usage: $ME [--push]
 
 Build the mirror image and optionally push to GHCR.
-Reads AUTHORITY_PUBKEY from /home/openrai/.env.
+Reads AUTHORITY_PUBKEY from \$HOME/.env.
 
-Run on the server as the openrai user.
+Run on the server as the deploy user.
 
 Options:
   --push   Build and push to GHCR (ghcr.io/openrai/nano-p2p-mirror:latest)
@@ -28,8 +29,8 @@ while [[ "${1:-}" == --* ]]; do
     esac
 done
 
-echo "=== Reading AUTHORITY_PUBKEY from /home/openrai/.env ==="
-PUBKEY_FULL=$(grep '^AUTHORITY_PUBKEY=' /home/openrai/.env)
+echo "=== Reading AUTHORITY_PUBKEY from $HOME/.env ==="
+PUBKEY_FULL=$(grep '^AUTHORITY_PUBKEY=' "$HOME/.env")
 if [[ "$PUBKEY_FULL" =~ ^AUTHORITY_PUBKEY=([a-f0-9]+) ]]; then
     PUBKEY="${BASH_REMATCH[1]}"
     echo "Found pubkey: ${PUBKEY:0:16}..."
@@ -39,7 +40,7 @@ else
 fi
 
 echo "=== Building mirror image ==="
-cd /opt/nano-bootstrap-swarm
+cd "$REPO_DIR"
 IMG_TAG="ghcr.io/openrai/nano-p2p-mirror:latest"
 docker build \
     --build-arg AUTHORITY_PUBKEY="$PUBKEY" \
