@@ -99,8 +99,9 @@ ORIG_SIZE=$(stat -c%s "$TARGET_FILE")
 log "Downloaded ${FILENAME} (${ORIG_SIZE} bytes)"
 
 # --- Step 4: Extract ---
+# Use single-threaded extraction to minimize memory usage on limited systems
 log "Extracting ${FILENAME}"
-7z x -y -o"$WORK_DIR" "$TARGET_FILE" > /dev/null
+7z x -mmt=1 -y -o"$WORK_DIR" "$TARGET_FILE" > /dev/null
 
 EXTRACTED_FILE="${WORK_DIR}/data.ldb"
 if [ ! -f "$EXTRACTED_FILE" ]; then
