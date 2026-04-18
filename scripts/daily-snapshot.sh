@@ -16,23 +16,23 @@ WORK_DIR="${OUTPUT_DIR}/tmp"
 mkdir -p "$WORK_DIR"
 
 # --- Guard: prevent concurrent runs and stale downloads ---
-RUNNING_PID=$(pgrep -f "rclone copyurl" 2>/dev/null | head -1 || true)
+RUNNING_PID=$(pgrep -f "curl.*nano-snapshot" 2>/dev/null | head -1 || true)
 if [ -n "$RUNNING_PID" ]; then
     RUNTIME_SECS=$(ps -o etimes= -p "$RUNNING_PID" 2>/dev/null | tr -d " " || echo "0")
     RUNTIME_HOURS=$((RUNTIME_SECS / 3600))
     if [ "$RUNTIME_HOURS" -lt "$MAX_RUNTIME_HOURS" ]; then
-        log "An rclone instance is already running (PID $RUNNING_PID, ${RUNTIME_HOURS}h < ${MAX_RUNTIME_HOURS}h) — exiting"
+        log "A curl instance is already running (PID $RUNNING_PID, ${RUNTIME_HOURS}h < ${MAX_RUNTIME_HOURS}h) — exiting"
         exit 0
     else
-        log "Stale rclone instance running for ${RUNTIME_HOURS}h — killing PID $RUNNING_PID"
+        log "Stale curl instance running for ${RUNTIME_HOURS}h — killing PID $RUNNING_PID"
         kill "$RUNNING_PID" 2>/dev/null || true
         sleep 2
     fi
 fi
 
-# Clean up any stale rclone processes
-for PID in $(pgrep -f "rclone" 2>/dev/null || true); do
-    log "Killing orphaned rclone PID $PID"
+# Clean up any stale curl processes
+for PID in $(pgrep -f "curl.*nano-snapshot" 2>/dev/null || true); do
+    log "Killing orphaned curl PID $PID"
     kill "$PID" 2>/dev/null || true
 done
 sleep 1
