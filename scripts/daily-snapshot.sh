@@ -84,12 +84,39 @@ else
 fi
 
 # --- Step 3: Download with rclone (resumable) ---
-log "Downloading with rclone (see $LOG_FILE for progress)"
-# Run rclone in background, writing both stdout and stderr to log file
-stdbuf -oL -eL rclone --stats 20s --stats-one-line copyurl --no-check-certificate --s3-acl public-read "$LATEST_URL" "$TARGET_FILE" 2>&1 >> "$LOG_FILE" &
+log "Starting download: $LATEST_URL (expected ~60GB)"
 
-# Wait for download to complete
-wait $!
+# Start rclone in background without any stats (they don't work reliably)
+rclone copyurl --no-check-certificate --s3-acl public-read "$LATEST_URL" "$TARGET_FILE" 2>&1 &
+RCLONE_PID=$!
+
+# Background progress logger - polls file size every 20 seconds
+(
+    LAST_SIZE=0
+    while kill -0 $RCLONE_PID 2>/dev/null; do
+        CURRENT_SIZE=$(stat -c%s "$TARGET_FILE" 2>/dev/null || echo 0)
+        if [ "$CURRENT_SIZE" != "$LAST_SIZE" ]; then
+            ELAPSED=$(ps -o etimes= -p $RCLONE_PID 2>/dev/null | tr -d ' ' || echo 0)
+            RATE=$(( (CURRENT_SIZE - LAST_SIZE) / 20 ))
+            log "Progress: $(numfmt --to=iec-i --suffix=B $CURRENT_SIZE) downloaded, ${RATE}/sec, ${ELAPSED}s elapsed"
+            LAST_SIZE=$CURRENT_SIZE
+        fi
+        sleep 20
+    done
+) &
+LOGGER_PID=$!
+
+# Wait for rclone to complete
+wait $RCLONE_PID
+RCLONE_EXIT=$?
+
+# Kill the logger
+kill $LOGGER_PID 2>/dev/null || true
+
+if [ $RCLONE_EXIT -ne 0 ]; then
+    log "ERROR: rclone exited with code $RCLONE_EXIT"
+    exit 1
+fi
 
 if [ ! -f "$TARGET_FILE" ]; then
     log "ERROR: Download failed — file not found"
