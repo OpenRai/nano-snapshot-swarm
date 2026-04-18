@@ -91,8 +91,9 @@ else
     # aria2c handles resume via its .aria2 control file — far more reliable than
     # curl -C - which is a dumb byte-offset append with no corruption detection.
     # --file-allocation=none avoids pre-allocating 60GB (important on low-RAM systems).
+    # --quiet suppresses ALL stdout (progress bar + summaries) to avoid flooding journald.
+    # We run aria2c in the background and poll the file size every 20s for clean progress logs.
     log "Downloading with aria2c (4 connections, auto-resume)"
-    ARIA_EXIT=0
     aria2c \
         --user-agent="$AGENT" \
         --max-connection-per-server=4 \
@@ -107,11 +108,49 @@ else
         --connect-timeout=30 \
         --lowest-speed-limit=100K \
         --file-allocation=none \
-        --console-log-level=notice \
-        --summary-interval=60 \
+        --quiet=true \
         --dir="$WORK_DIR" \
         --out="$(basename "$PARTIAL_FILE")" \
-        "$LATEST_URL" || ARIA_EXIT=$?
+        "$LATEST_URL" &
+    ARIA_PID=$!
+
+    # Progress poller: log size/speed/ETA every 20 seconds while aria2c runs
+    POLL_INTERVAL=20
+    PREV_SIZE=$(stat -c%s "$PARTIAL_FILE" 2>/dev/null || echo 0)
+    PREV_TIME=$(date +%s)
+    while kill -0 "$ARIA_PID" 2>/dev/null; do
+        sleep "$POLL_INTERVAL"
+        NOW_SIZE=$(stat -c%s "$PARTIAL_FILE" 2>/dev/null || echo 0)
+        NOW_TIME=$(date +%s)
+        ELAPSED=$((NOW_TIME - PREV_TIME))
+        if [ "$ELAPSED" -gt 0 ]; then
+            SPEED_BPS=$(( (NOW_SIZE - PREV_SIZE) / ELAPSED ))
+        else
+            SPEED_BPS=0
+        fi
+        SPEED_HUMAN=$(numfmt --to=iec-i --suffix=B "$SPEED_BPS" 2>/dev/null || echo "${SPEED_BPS}B")
+        SIZE_HUMAN=$(numfmt --to=iec-i --suffix=B "$NOW_SIZE" 2>/dev/null || echo "${NOW_SIZE}B")
+        if [ -n "${EXPECTED_SIZE:-}" ] && [ "$EXPECTED_SIZE" -gt 0 ] 2>/dev/null && [ "$NOW_SIZE" -gt 0 ]; then
+            PCT=$(( NOW_SIZE * 100 / EXPECTED_SIZE ))
+            REMAINING=$((EXPECTED_SIZE - NOW_SIZE))
+            if [ "$SPEED_BPS" -gt 0 ]; then
+                ETA_SECS=$((REMAINING / SPEED_BPS))
+                ETA_MIN=$((ETA_SECS / 60))
+                ETA_SEC=$((ETA_SECS % 60))
+                log "Progress: ${SIZE_HUMAN} / $(numfmt --to=iec-i --suffix=B "$EXPECTED_SIZE") (${PCT}%) ${SPEED_HUMAN}/s ETA ${ETA_MIN}m${ETA_SEC}s"
+            else
+                log "Progress: ${SIZE_HUMAN} / $(numfmt --to=iec-i --suffix=B "$EXPECTED_SIZE") (${PCT}%) stalled"
+            fi
+        else
+            log "Progress: ${SIZE_HUMAN} ${SPEED_HUMAN}/s"
+        fi
+        PREV_SIZE=$NOW_SIZE
+        PREV_TIME=$NOW_TIME
+    done
+
+    # Collect aria2c exit code
+    ARIA_EXIT=0
+    wait "$ARIA_PID" || ARIA_EXIT=$?
 
     if [ "$ARIA_EXIT" -ne 0 ]; then
         PARTIAL_SIZE=$(stat -c%s "$PARTIAL_FILE" 2>/dev/null || echo 0)
