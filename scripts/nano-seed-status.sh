@@ -5,7 +5,7 @@ set -euo pipefail
 
 DATA_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
 STATS_FILE="$DATA_DIR/seeder-stats.json"
-LINES="${1:-5}"
+LINES="${1:-10}"
 
 echo "=== Nano Torrent Seeder ==="
 echo
