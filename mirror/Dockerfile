@@ -7,7 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     libboost-system-dev \
     libboost-dev \
+    libboost-python-dev \
     libssl-dev \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -21,7 +23,9 @@ RUN mkdir build && cd build && \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
     -DBUILD_SHARED_LIBS=ON \
     -DBUILD_TESTS=OFF \
-    -DBUILD_EXAMPLES=OFF && \
+    -DBUILD_EXAMPLES=OFF \
+    -Dpython-bindings=ON \
+    -Dpython-egg-info=OFF && \
     make -j2 && \
     make install && \
     ldconfig /usr/local/lib
@@ -32,12 +36,13 @@ FROM python:3
 RUN apt-get update && apt-get install -y --no-install-recommends \
     zstd \
     ca-certificates \
-    libboost-system1.88.0 \
-    libboost-python1.88.0 \
+    libboost-system1.83.0 \
+    libboost-python1.83.0 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 COPY --from=builder-cpp /usr/local/lib/libtorrent*.so* /usr/local/lib/
+COPY --from=builder-cpp /usr/local/lib/python3/ /usr/local/lib/python3/
 RUN ldconfig /usr/local/lib
 
 RUN pip install --no-cache-dir pynacl bencodepy
