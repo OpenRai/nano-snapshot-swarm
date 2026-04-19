@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
+RUN pip install --no-cache-dir setuptools
+
 WORKDIR /build
 
 RUN git clone --depth 1 --branch v2.0.11 --recurse-submodules https://github.com/arvidn/libtorrent.git
@@ -25,7 +27,8 @@ RUN mkdir build && cd build && \
     -DBUILD_TESTS=OFF \
     -DBUILD_EXAMPLES=OFF \
     -Dpython-bindings=ON \
-    -Dpython-egg-info=OFF && \
+    -Dpython-egg-info=OFF \
+    -Dpython-install-system-dir=ON && \
     make -j2 && \
     make install && \
     ldconfig /usr/local/lib
@@ -42,7 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 COPY --from=builder-cpp /usr/local/lib/libtorrent*.so* /usr/local/lib/
-COPY --from=builder-cpp /usr/local/lib/python3/ /usr/local/lib/python3/
+COPY --from=builder-cpp /usr/local/lib/python3.13/ /usr/local/lib/python3.13/
 RUN ldconfig /usr/local/lib
 
 RUN pip install --no-cache-dir pynacl bencodepy
