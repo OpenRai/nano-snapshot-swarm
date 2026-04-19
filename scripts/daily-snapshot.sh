@@ -63,8 +63,7 @@ for STALE_FILE in "$WORK_DIR"/*.7z "$WORK_DIR"/*.7z.partial "$WORK_DIR"/*.7z.ari
     fi
 done
 
-# Clean up previous extraction/compaction artifacts
-rm -rf "${WORK_DIR:?}/compacted"
+# Clean up previous extraction artifacts
 rm -f "${WORK_DIR}/data.ldb"
 
 # Use .partial file for download, then atomically rename on success
@@ -203,41 +202,12 @@ fi
 EXTRACTED_SIZE=$(stat -c%s "$EXTRACTED_FILE")
 log "Extracted data.ldb ($(numfmt --to=iec-i --suffix=B "$EXTRACTED_SIZE"))"
 
-# --- Step 5: Compact with mdb_copy ---
-log "Compacting with mdb_copy"
-COMPACTED_DIR="${WORK_DIR}/compacted"
-mkdir -p "$COMPACTED_DIR"
-
-# Remove any stale compacted files first
-rm -f "${COMPACTED_DIR}/data.mdb" "${COMPACTED_DIR}/data.ldb"
-
-# LMDB tools expect data.mdb, but Nano names its database data.ldb
-ln -sf data.ldb "${WORK_DIR}/data.mdb"
-
-if ! mdb_copy "$WORK_DIR" "$COMPACTED_DIR" 2>&1; then
-    rm -f "${WORK_DIR}/data.mdb"
-    log "ERROR: mdb_copy failed - $EXTRACTED_FILE may be corrupted"
-    exit 1
-fi
-rm -f "${WORK_DIR}/data.mdb"
-
-# mdb_copy outputs data.mdb — rename to data.ldb for consistency
-mv "${COMPACTED_DIR}/data.mdb" "${COMPACTED_DIR}/data.ldb"
-
-COMPACTED_FILE="${COMPACTED_DIR}/data.ldb"
-if [ ! -f "$COMPACTED_FILE" ]; then
-    log "ERROR: mdb_copy failed — compacted file not found"
-    exit 1
-fi
-
-COMPACTED_SIZE=$(stat -c%s "$COMPACTED_FILE")
-SAVINGS=$(( (EXTRACTED_SIZE - COMPACTED_SIZE) * 100 / EXTRACTED_SIZE ))
-log "Compacted: $(numfmt --to=iec-i --suffix=B "$COMPACTED_SIZE") (saved ${SAVINGS}%)"
-
-# --- Step 6: Compress with zstd --rsyncable ---
+# --- Step 5: Compress with zstd --rsyncable ---
+# Skipping mdb_copy compaction — the upstream snapshot is already compacted
+# (121GB in, 121GB out, 0% savings). Compress the extracted file directly.
 COMPRESSED_OUTPUT="${OUTPUT_DIR}/nano-daily.ldb.zst"
 log "Compressing with zstd -3 --rsyncable"
-zstd -3 --rsyncable -f "$COMPACTED_FILE" -o "$COMPRESSED_OUTPUT"
+zstd -3 --rsyncable -f "$EXTRACTED_FILE" -o "$COMPRESSED_OUTPUT"
 
 COMP_SIZE=$(stat -c%s "$COMPRESSED_OUTPUT")
 SHA256=$(sha256sum "$COMPRESSED_OUTPUT" | cut -d' ' -f1)
