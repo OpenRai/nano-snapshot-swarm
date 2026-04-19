@@ -1,5 +1,5 @@
 [Unit]
-Description=Nano P2P Snapshot Pipeline (daily fetch, compact, compress, publish)
+Description=Nano P2P Snapshot Pipeline (download, publish, kick seeder)
 After=network-online.target
 Wants=network-online.target
 

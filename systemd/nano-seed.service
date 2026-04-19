@@ -1,0 +1,22 @@
+[Unit]
+Description=Nano P2P Snapshot Seeder (libtorrent)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.env
+Environment=OUTPUT_DIR=%h/nano-snapshots
+Environment=LOG_LEVEL=INFO
+ExecStart=%h/nano-bootstrap-swarm/.venv/bin/python -m producer.seeder
+WorkingDirectory=%h/nano-bootstrap-swarm
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nano-seed
+# Seeder is low priority — don't let it block snapshot pipeline
+Nice=10
+
+[Install]
+WantedBy=default.target

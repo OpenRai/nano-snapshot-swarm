@@ -6,10 +6,8 @@ OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
 WEB_SEED_URL="${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
 AGENT="nano-bootstrap-swarm/1.0"
 
-LOG_FILE="${LOG_FILE:-${OUTPUT_DIR}/nano-snapshot.log}"
-
 log() {
-    echo "[$(date -Iseconds)] $*" | tee -a "$LOG_FILE"
+    echo "[$(date -Iseconds)] $*"
 }
 
 WORK_DIR="${OUTPUT_DIR}/tmp"
@@ -238,5 +236,11 @@ python -m producer.cli publish \
     --private-key "$DHT_PRIVATE_KEY" \
     --snapshot-file "$STABLE_FILE" \
     --web-seed-url "$WEB_SEED_URL"
+
+# --- Step 6: Restart seeder to pick up new torrent ---
+if systemctl --user is-enabled nano-seed.service &>/dev/null; then
+    log "Restarting nano-seed.service to seed updated snapshot"
+    systemctl --user restart nano-seed.service
+fi
 
 log "=== Daily snapshot pipeline complete ==="
