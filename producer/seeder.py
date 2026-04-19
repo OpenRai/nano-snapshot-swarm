@@ -87,6 +87,7 @@ def main() -> None:
             now = time.time()
             stats = {
                 "state": "seeding" if status.is_seeding else str(status.state),
+                "progress_pct": round(status.progress * 100, 1),
                 "peers": status.num_peers,
                 "upload_rate_kbps": round(status.upload_rate / 1024, 1),
                 "download_rate_kbps": round(status.download_rate / 1024, 1),

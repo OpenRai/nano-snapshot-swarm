@@ -29,7 +29,10 @@ uptime = s.get('uptime_seconds', 0)
 h, m = divmod(uptime, 3600)
 m, sec = divmod(m, 60)
 
-print(f\"  State:         {s.get('state', '?')}\")
+state = s.get('state', '?')
+progress = s.get('progress_pct', 100)
+state_str = f\"{state} ({progress}%)\" if state != 'seeding' else state
+print(f\"  State:         {state_str}\")
 print(f\"  Torrent:       {s.get('torrent_name', '?')}\")
 print(f\"  Snapshot:      {s.get('snapshot_size_gib', '?')} GiB\")
 print(f\"  Peers:         {s.get('peers', '?')}\")
