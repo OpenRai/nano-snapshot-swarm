@@ -33,8 +33,11 @@ def create_torrent(
     ct = lt.create_torrent(fs, piece_size=piece_size, flags=_v2_flags(lt))
 
     if web_seed_url:
-        url_list = [f"{web_seed_url.rstrip('/')}/{filename}"]
-        ct.set_web_seeds(url_list)
+        seed_url = f"{web_seed_url.rstrip('/')}/{filename}"
+        if hasattr(ct, "set_web_seeds"):
+            ct.set_web_seeds([seed_url])
+        else:
+            ct.add_url_seed(seed_url)
 
     lt.set_piece_hashes(ct, os.path.dirname(filepath) or ".")
 
@@ -71,10 +74,12 @@ def create_torrent_from_directory(
     ct = lt.create_torrent(fs, piece_size=piece_size, flags=_v2_flags(lt))
 
     if web_seed_url:
-        url_list = []
         for fname in filenames:
-            url_list.append(f"{web_seed_url.rstrip('/')}/{fname}")
-        ct.set_web_seeds(url_list)
+            seed_url = f"{web_seed_url.rstrip('/')}/{fname}"
+            if hasattr(ct, "set_web_seeds"):
+                ct.set_web_seeds([seed_url])
+            else:
+                ct.add_url_seed(seed_url)
 
     lt.set_piece_hashes(ct, directory)
 
