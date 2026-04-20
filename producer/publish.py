@@ -88,12 +88,14 @@ def publish_to_dht(
     print("Waiting for DHT to bootstrap...")
     time.sleep(30)
 
-    # dht_put_mutable_item handles seq and signing internally
+    # dht_put_mutable_item handles seq and signing internally.
+    # IMPORTANT: pass bytes, not str. Python str→C++ std::string uses UTF-8,
+    # which corrupts binary data (bytes >0x7F become multi-byte sequences).
     ses.dht_put_mutable_item(
-        secret_key_64.decode("latin-1"),
-        pub_key_bytes.decode("latin-1") if isinstance(pub_key_bytes, bytes) else pub_key_bytes,
-        value_bytes.decode("latin-1") if isinstance(value_bytes, bytes) else value_bytes,
-        salt,
+        secret_key_64,
+        pub_key_bytes if isinstance(pub_key_bytes, bytes) else pub_key_bytes.encode("latin-1"),
+        value_bytes if isinstance(value_bytes, bytes) else value_bytes.encode("latin-1"),
+        salt.encode("utf-8") if isinstance(salt, str) else salt,
     )
 
     print("Waiting for DHT put confirmation...")
