@@ -83,10 +83,16 @@ if [ -f "$META_FILE" ] && [ -f "$STABLE_FILE" ] && [ -s "$STABLE_FILE" ]; then
             source "$HOME/.env"
         fi
 
-        python -m producer.cli publish \
-            --private-key "$DHT_PRIVATE_KEY" \
-            --snapshot-file "$STABLE_FILE" \
-            --web-seed-url "$WEB_SEED_URL" || log "WARNING: DHT re-publish failed (non-fatal)"
+        # Re-publish using existing info hash — skip expensive torrent re-creation
+        python3 -c "
+from producer.publish import publish_to_dht
+result = publish_to_dht(
+    private_key_hex='$DHT_PRIVATE_KEY',
+    info_hash_hex='$PREV_TORRENT',
+    salt='${DHT_SALT:-daily}',
+)
+print(result)
+" || log "WARNING: DHT re-publish failed (non-fatal)"
 
         log "=== Daily snapshot pipeline complete (re-publish only) ==="
         exit 0
