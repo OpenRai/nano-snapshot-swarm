@@ -95,7 +95,7 @@ def _process_mutable_item_snapshot(
             logger.warning(f"Unexpected item type: {type(item)}")
             return None
 
-        logger.debug(f"DHT item raw: type={type(item).__name__}, len={len(value_bytes)}, hex={value_bytes[:64].hex()}")
+        logger.info(f"DHT item raw: type={type(item).__name__}, len={len(value_bytes)}, hex={value_bytes[:64].hex()}")
 
         # Note: signature verification requires raw signature bytes which
         # we don't currently extract in AlertSnapshot. For now, trust seq > 0
