@@ -20,6 +20,7 @@ def create_torrent(
     web_seed_url: str | None = None,
     piece_size: int = 32 * 1024 * 1024,
     output_path: str | None = None,
+    comment: str | None = None,
 ) -> tuple[str, str]:
     import libtorrent as lt
 
@@ -38,6 +39,9 @@ def create_torrent(
             ct.set_web_seeds([seed_url])
         else:
             ct.add_url_seed(seed_url)
+
+    if comment:
+        ct.set_comment(comment)
 
     lt.set_piece_hashes(ct, os.path.dirname(filepath) or ".")
 

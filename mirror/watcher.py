@@ -298,6 +298,7 @@ class MirrorWatcher:
             t_info = handle.torrent_file()
             t_name = t_info.name() if t_info else "unknown"
             self.state.current_torrent_name = t_name
+            self._log_torrent_metadata(t_info)
             self.state._save()
             logger.info(f"Now tracking torrent: {t_name}")
 
@@ -320,6 +321,7 @@ class MirrorWatcher:
             t_info = handle.torrent_file()
             t_name = t_info.name() if t_info else "unknown"
             self.state.current_torrent_name = t_name
+            self._log_torrent_metadata(t_info)
             self.state._save()
             logger.info(f"Leecher: added torrent '{t_name}'")
 
@@ -329,6 +331,28 @@ class MirrorWatcher:
 
         return self._monitor_download(handle, result.info_hash_hex)
 
+    def _log_torrent_metadata(self, t_info) -> None:
+        """Log snapshot metadata from the torrent comment, if available."""
+        if not t_info:
+            return
+        comment = t_info.comment()
+        if not comment:
+            return
+        try:
+            import json
+            meta = json.loads(comment)
+            parts = []
+            if "original_filename" in meta:
+                parts.append(f"file={meta['original_filename']}")
+            if "source_url" in meta:
+                parts.append(f"url={meta['source_url']}")
+            if "created_at" in meta:
+                parts.append(f"created={meta['created_at']}")
+            if parts:
+                logger.info(f"Snapshot metadata: {', '.join(parts)}")
+        except (ValueError, KeyError):
+            logger.debug(f"Torrent comment (not JSON): {comment[:100]}")
+
     def _monitor_download(
         self,
         handle,
@@ -337,6 +361,7 @@ class MirrorWatcher:
         last_progress_log = 0.0
         consecutive_stall_warnings = 0
         start_time = time.time()
+        metadata_logged = False
 
         while self._running:
             if self.download_timeout > 0:
@@ -346,6 +371,18 @@ class MirrorWatcher:
                     return DownloadStatus.TIMEOUT
 
             try:
+                # Log metadata once it resolves (magnet links start without it)
+                if not metadata_logged:
+                    t_info = handle.torrent_file()
+                    if t_info:
+                        metadata_logged = True
+                        t_name = t_info.name()
+                        if self.state.current_torrent_name == "unknown":
+                            self.state.current_torrent_name = t_name
+                            self.state._save()
+                            logger.info(f"Torrent metadata resolved: {t_name}")
+                        self._log_torrent_metadata(t_info)
+
                 status = handle.status()
                 progress = status.progress
                 state = str(status.state)

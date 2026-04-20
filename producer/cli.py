@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import os
 import sys
@@ -41,11 +42,23 @@ def cmd_publish(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     print(f"Creating torrent for: {snapshot_file}")
+
+    # Build torrent comment with snapshot metadata
+    comment_data = {
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    }
+    if args.source_url:
+        comment_data["source_url"] = args.source_url
+    if args.original_filename:
+        comment_data["original_filename"] = args.original_filename
+    comment = json.dumps(comment_data, separators=(",", ":"))
+
     torrent_path, info_hash = create_torrent(
         filepath=snapshot_file,
         web_seed_url=web_seed_url or None,
         piece_size=args.piece_size,
         output_path=snapshot_file + ".torrent",
+        comment=comment,
     )
     print(f"Torrent created: {torrent_path}")
     print(f"Info-hash (v2): {info_hash}")
@@ -94,6 +107,16 @@ def main() -> None:
         type=int,
         default=32 * 1024 * 1024,
         help="Torrent piece size in bytes (default: 32 MiB)",
+    )
+    pub_parser.add_argument(
+        "--source-url",
+        default=None,
+        help="Resolved source URL of the snapshot (embedded in torrent comment)",
+    )
+    pub_parser.add_argument(
+        "--original-filename",
+        default=None,
+        help="Original snapshot filename (embedded in torrent comment)",
     )
     pub_parser.add_argument(
         "--state-file",

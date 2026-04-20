@@ -262,7 +262,9 @@ fi
 PUBLISH_OUTPUT=$(python -m producer.cli publish \
     --private-key "$DHT_PRIVATE_KEY" \
     --snapshot-file "$STABLE_FILE" \
-    --web-seed-url "$WEB_SEED_URL")
+    --web-seed-url "$WEB_SEED_URL" \
+    --source-url "$LATEST_URL" \
+    --original-filename "$FILENAME")
 
 echo "$PUBLISH_OUTPUT"
 
