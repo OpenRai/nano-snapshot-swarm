@@ -78,28 +78,32 @@ def _process_mutable_item_alert(
     salt: str = DEFAULT_SALT,
 ) -> Optional[DHTDiscoveryResult]:
     try:
-        value_data = alert.item
-        logger.debug(f"DHT item type: {type(value_data)}, repr: {repr(value_data)[:200]}")
+        # libtorrent 2.x: alert.item returns a libtorrent entry object
+        # Use lt.bencode() to serialize it back to bytes
+        try:
+            value_data = alert.item
+        except Exception:
+            value_data = None
         
-        # libtorrent 2.x returns item as a Python str (latin-1 encoded bytes)
-        if isinstance(value_data, dict):
-            value_bytes = bencodepy.encode(value_data)
-        elif isinstance(value_data, (bytes, bytearray)):
-            value_bytes = bytes(value_data)
-        elif isinstance(value_data, str):
-            value_bytes = value_data.encode("latin-1")
+        if value_data is not None:
+            if isinstance(value_data, dict):
+                value_bytes = bencodepy.encode(value_data)
+            elif isinstance(value_data, (bytes, bytearray)):
+                value_bytes = bytes(value_data)
+            elif isinstance(value_data, str):
+                value_bytes = value_data.encode("latin-1")
+            else:
+                # libtorrent entry object — bencode it
+                try:
+                    bencoded = lt.bencode(value_data)
+                    value_bytes = bencoded if isinstance(bencoded, bytes) else bencoded.encode("latin-1")
+                except Exception as e:
+                    logger.warning(f"Failed to bencode entry: {e}, type: {type(value_data)}")
+                    return None
         else:
-            # libtorrent entry object — try to convert via bencode round-trip
-            try:
-                import libtorrent as lt
-                bencoded = lt.bencode(value_data)
-                if isinstance(bencoded, str):
-                    value_bytes = bencoded.encode("latin-1")
-                else:
-                    value_bytes = bytes(bencoded)
-            except Exception:
-                logger.warning(f"Unexpected value type from DHT: {type(value_data)}")
-                return None
+            # Fallback: try to extract from alert message
+            logger.warning("Could not access alert.item directly")
+            return None
 
         seq = alert.seq if hasattr(alert, "seq") else 0
         signature = alert.signature if hasattr(alert, "signature") else b""
