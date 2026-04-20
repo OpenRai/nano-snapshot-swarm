@@ -28,26 +28,72 @@ docker run -d \
 
 ## Monitoring
 
+### Quick Status Check
+
+```bash
+# Is the container running?
+docker compose ps
+
+# One-line status: state + last log line
+docker inspect --format='{{.State.Status}}' nano-mirror && \
+  docker logs --tail 1 nano-mirror
+
+# What snapshot is it tracking?
+docker exec nano-mirror cat /data/mirror_state.json
+```
+
 ### Docker Logs
 
 ```bash
 docker compose logs -f
 # or
 docker logs -f nano-mirror
+
+# Last 50 lines only
+docker logs --tail 50 nano-mirror
 ```
 
-Key log messages to expect:
+### Understanding the Log Output
+
+The mirror goes through distinct phases. Here's what to look for at each stage:
+
+**Startup:**
 
 | Log | Meaning |
 |---|---|
-| `Authority Nano address: nano_...` | Pubkey correctly decoded to Nano address |
-| `Querying DHT for mutable item...` | Discovery cycle running |
-| `Discovered DHT item: seq=N` | Found a snapshot |
-| `New snapshot detected!` | Newer than stored seq, downloading |
-| `Force recheck on existing data...` | Verifying existing pieces |
-| `Download: 45.2% \| State: downloading` | Active download progress |
-| `Snapshot seeding complete` | Download done, now seeding |
-| `Mirror service stopped` | Clean shutdown |
+| `Authority Nano address: nano_...` | Pubkey decoded correctly |
+| `Mode: SWARM (continuous polling every Ns)` | Running as long-lived daemon |
+| `libtorrent session started, listening on port 6881` | BitTorrent engine ready |
+
+**Discovery (repeats every `POLL_INTERVAL`):**
+
+| Log | Meaning |
+|---|---|
+| `DHT get_mutable_item requested` | Querying DHT for latest snapshot |
+| `Discovered DHT item: seq=N` | Found a published snapshot |
+| `Discovery seq N <= stored seq N; no update needed` | Already have the latest, nothing to do |
+| `New snapshot detected! seq=N` | Newer snapshot found, will download |
+| `No snapshot discovered from DHT` | DHT query returned nothing (item expired or not yet published) |
+
+**Download (only when new snapshot found):**
+
+| Log | Meaning |
+|---|---|
+| `Force recheck on existing data...` | Hashing local file to find reusable pieces |
+| `Download: 45.2% \| DL: 1234.5 KB/s \| Peers: 3` | Active download with progress |
+| `Snapshot seeding complete` | Download finished, now seeding to others |
+| `Download: 0.0% ... Peers: 0` | No peers or web seed reachable — check connectivity |
+
+**Seeding (steady state):**
+
+Once download completes, the mirror quietly seeds. There are no periodic seeding logs by default. Use `LOG_LEVEL=DEBUG` for verbose output.
+
+**Shutdown:**
+
+| Log | Meaning |
+|---|---|
+| `Received signal 15, initiating graceful shutdown` | SIGTERM received |
+| `Mirror service stopped` | Clean exit |
 
 ### Healthcheck
 
@@ -56,11 +102,11 @@ docker compose ps
 docker inspect --format='{{.State.Health.Status}}' nano-mirror
 ```
 
-The container healthcheck runs: `python3 -c "import libtorrent; libtorrent.session({'enable_dht': False})"`
+The container healthcheck verifies libtorrent can be imported and initialized.
 
 ### mirror_state.json
 
-Persisted state survives restarts:
+This file persists across restarts and tells you what the mirror is tracking:
 
 ```bash
 docker exec nano-mirror cat /data/mirror_state.json
@@ -69,10 +115,47 @@ docker exec nano-mirror cat /data/mirror_state.json
 ```json
 {
   "last_seq": 42,
-  "last_info_hash": "abcd1234...",
-  "current_torrent_name": "nano-daily.ldb.zst"
+  "last_info_hash": "924a5772b2db194d...",
+  "current_torrent_name": "nano-ledger-snapshot.7z"
 }
 ```
+
+| Field | Meaning |
+|---|---|
+| `last_seq` | Sequence number from DHT — increments with each new publish |
+| `last_info_hash` | BitTorrent info-hash of the snapshot being tracked |
+| `current_torrent_name` | Filename of the snapshot on disk |
+
+If `last_seq` is `0`, the mirror has never successfully discovered a snapshot.
+
+### Disk Usage
+
+```bash
+# Check data volume size
+du -sh ./data/
+
+# List files in the data volume
+docker exec nano-mirror ls -lh /data/
+```
+
+A complete snapshot is approximately 60 GB. During download, a partial file of the same size exists (BitTorrent pre-allocates).
+
+### Network
+
+The mirror needs:
+
+- **UDP port 6881** — for DHT communication (discovery and seeding coordination)
+- **TCP port 6881** — for BitTorrent peer connections
+- **Outbound HTTPS** — for web seed fallback (S3)
+
+Verify the port is reachable from the internet if you want to seed effectively:
+
+```bash
+# From another machine:
+nc -zvu <your-mirror-ip> 6881
+```
+
+If behind NAT without port forwarding, the mirror can still download (via web seed and outbound connections) but cannot serve peers effectively.
 
 ---
 

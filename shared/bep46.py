@@ -76,21 +76,37 @@ def verify_mutable_item(
         return False
 
 
-def build_dht_value(info_hash_hex: str, piece_size: int) -> bytes:
-    import bencodepy
+def build_dht_value(info_hash_hex: str, piece_size: int = 0) -> bytes:
+    """Build the DHT mutable item value: raw 32-byte info hash.
 
-    value_dict = {
-        b"info_hash": bytes.fromhex(info_hash_hex),
-        b"v": 2,
-        b"piece_size": piece_size,
-    }
-    return bencodepy.encode(value_dict)
+    libtorrent's dht_put_mutable_item() treats the data arg as a raw string
+    and bencodes it internally. Passing already-bencoded data causes double
+    bencoding and signature verification failures. So we pass just the raw
+    info hash bytes — minimal, unambiguous, and correctly signed.
+
+    The piece_size parameter is accepted for API compatibility but ignored;
+    it is not included in the DHT value (mirror gets it from the .torrent).
+    """
+    info_hash = bytes.fromhex(info_hash_hex)
+    if len(info_hash) not in (20, 32):
+        raise ValueError(f"info_hash must be 20 or 32 bytes, got {len(info_hash)}")
+    return info_hash
 
 
 def parse_dht_value(raw_value: bytes) -> dict:
-    import bencodepy
+    """Parse DHT mutable item value back to a dict with info_hash key.
 
-    return bencodepy.decode(raw_value)
+    Accepts raw 20/32-byte info hash (new format) or falls back to
+    bencoded dict decoding (legacy format).
+    """
+    if len(raw_value) in (20, 32):
+        return {b"info_hash": raw_value}
+    # Legacy: try bencoded dict
+    try:
+        import bencodepy
+        return bencodepy.decode(raw_value)
+    except Exception:
+        raise ValueError(f"Cannot parse DHT value: {len(raw_value)} bytes")
 
 
 def verify_bep46_test_vectors() -> bool:

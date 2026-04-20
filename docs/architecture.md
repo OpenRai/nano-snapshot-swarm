@@ -151,3 +151,66 @@ Mirrors subscribe to one salt at a time via `DHT_SALT`. Changing the salt produc
 |---|---|---|
 | `mirror_state.json` | Mirror (swarm) | Track last known `seq` and `info_hash`. Survives restarts. |
 | `publisher_state.json` | Producer | Track last published `seq` and `info_hash`. Ensures monotonic sequence. |
+
+---
+
+## Snapshot Updates and File Integrity
+
+When the producer publishes a new snapshot (new info-hash at a higher `seq`), mirrors must transition from the old torrent to the new one. This section explains how that works and what happens in edge cases.
+
+### How updates work
+
+The producer always uses a **stable filename** (`nano-ledger-snapshot.7z`). When a new snapshot is published:
+
+1. The mirror's next discovery cycle sees `seq > last_seq`
+2. The mirror **pauses** the current torrent
+3. The mirror adds the new torrent (different info-hash, same filename on disk)
+4. libtorrent runs a **force recheck** — hashes the existing file piece-by-piece against the new torrent's merkle tree
+5. Pieces that match are marked as "have"; only changed pieces are downloaded
+6. Once all pieces are verified, the mirror seeds the new torrent
+
+Because `zstd --rsyncable` aligns compression boundaries, typically only a small fraction of pieces change between daily snapshots, so step 5 downloads far less than the full file.
+
+### In-place file mutation
+
+During step 5, the `.7z` file on disk is **updated in-place**. For a brief window, the file contains a mix of old pieces (not yet overwritten) and new pieces. This is safe because:
+
+- **BitTorrent pieces are atomic**: each piece is individually hash-verified. A partially-written piece would fail verification and be re-downloaded.
+- **The file is not usable mid-download**: `.7z` archives cannot be partially decompressed. The file is only useful once the torrent reaches 100%.
+- **No concurrent readers**: the mirror doesn't serve the file over HTTP; it only seeds via BitTorrent, which serves individual verified pieces.
+
+### Leech mode (`--once`) during a version change
+
+If a leecher starts downloading torrent N and the producer publishes torrent N+1 mid-download:
+
+- **The leecher does not notice.** It discovered torrent N at startup and downloads that specific info-hash to completion. DHT changes don't affect an in-progress download.
+- The leecher exits successfully with a complete, consistent copy of snapshot N.
+
+If the leecher is **killed** at 60/62 GB on torrent N, then restarted after torrent N+1 is published:
+
+- On restart, the leecher discovers torrent N+1 (the new info-hash)
+- It adds the new torrent, which triggers a force recheck of the existing partial file
+- Pieces from torrent N that happen to match torrent N+1 are kept; the rest are re-downloaded
+- The download completes with a consistent copy of snapshot N+1
+
+The leecher **never** ends up with a corrupt or mixed-version file, because every piece is hash-verified against the torrent it's currently downloading.
+
+### Swarm mode during a version change
+
+In swarm mode, the same logic applies but the mirror also transitions seeding:
+
+1. Old torrent is paused (stops serving old pieces to peers)
+2. New torrent is added and rechecked
+3. Changed pieces are downloaded
+4. Mirror begins seeding the new torrent
+
+Peers still downloading the old torrent will lose this mirror as a seed. That's expected — the old torrent's swarm naturally winds down as mirrors update.
+
+### What could go wrong
+
+| Scenario | Risk | Mitigation |
+|---|---|---|
+| Power loss mid-download | Partial file on disk with some new, some old pieces | Next startup force-rechecks all pieces; corrupted pieces are re-downloaded |
+| Disk full during download | libtorrent reports error, download stalls | Monitor disk usage; the data volume needs ~60 GB free |
+| Producer publishes faster than mirror downloads | Mirror never finishes a version before the next arrives | Unlikely with daily snapshots; mirror pauses old and starts new |
+| Web seed serves stale file (CDN cache) | Piece hash mismatch; libtorrent discards the bad piece and retries from peers | Self-healing via hash verification |

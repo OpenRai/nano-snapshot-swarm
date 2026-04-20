@@ -89,7 +89,7 @@ def _process_mutable_item_alert(
                 return None
         else:
             value_data = alert.item
-        
+
         # libtorrent 2.x: item may be str, bytes, dict, or entry object
         if isinstance(value_data, dict):
             value_bytes = bencodepy.encode(value_data)
@@ -101,7 +101,9 @@ def _process_mutable_item_alert(
             # libtorrent entry object — bencode it
             try:
                 bencoded = lt.bencode(value_data)
-                value_bytes = bencoded if isinstance(bencoded, bytes) else bencoded.encode("latin-1")
+                value_bytes = (
+                    bencoded if isinstance(bencoded, bytes) else bencoded.encode("latin-1")
+                )
             except Exception as e:
                 logger.warning(f"Failed to bencode entry: {e}, type: {type(value_data)}")
                 return None
@@ -121,9 +123,7 @@ def _process_mutable_item_alert(
 
         parsed = parse_dht_value(value_bytes)
         info_hash_raw = parsed.get(b"info_hash", b"")
-        if len(info_hash_raw) == 32:
-            info_hash_hex = info_hash_raw.hex()
-        elif len(info_hash_raw) == 20:
+        if len(info_hash_raw) in (20, 32):
             info_hash_hex = info_hash_raw.hex()
         else:
             logger.error(f"Unexpected info_hash length: {len(info_hash_raw)}")

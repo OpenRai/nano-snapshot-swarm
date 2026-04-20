@@ -155,15 +155,40 @@ class TestBuildDHTValue:
         from shared.bep46 import build_dht_value, parse_dht_value
 
         info_hash_hex = "ab" * 32
-        value_bytes = build_dht_value(info_hash_hex, piece_size=32 * 1024 * 1024)
+        value_bytes = build_dht_value(info_hash_hex)
         parsed = parse_dht_value(value_bytes)
         assert parsed[b"info_hash"] == bytes.fromhex(info_hash_hex)
-        assert parsed[b"v"] == 2
-        assert parsed[b"piece_size"] == 32 * 1024 * 1024
+
+    def test_value_is_raw_info_hash(self):
+        from shared.bep46 import build_dht_value
+
+        info_hash_hex = "ab" * 32
+        value_bytes = build_dht_value(info_hash_hex)
+        assert len(value_bytes) == 32
+        assert value_bytes == bytes.fromhex(info_hash_hex)
 
     def test_value_size_under_limit(self):
         from shared.bep46 import build_dht_value
 
         info_hash_hex = "ab" * 32
-        value_bytes = build_dht_value(info_hash_hex, piece_size=32 * 1024 * 1024)
+        value_bytes = build_dht_value(info_hash_hex)
         assert len(value_bytes) < 1000
+
+    def test_sign_verify_with_raw_info_hash(self):
+        """Verify that signing raw info hash bytes works end-to-end."""
+        from shared.bep46 import build_dht_value
+
+        info_hash_hex = "ab" * 32
+        value_bytes = build_dht_value(info_hash_hex)
+        signature, pub_key = sign_mutable_item(KNOWN_SEED_HEX, value_bytes, seq=1, salt="daily")
+        assert verify_mutable_item(pub_key, value_bytes, 1, signature, salt="daily")
+
+    def test_parse_legacy_bencoded_value(self):
+        """parse_dht_value should still handle legacy bencoded dict format."""
+        import bencodepy
+
+        from shared.bep46 import parse_dht_value
+
+        legacy = bencodepy.encode({b"info_hash": b"\xab" * 32, b"v": 2})
+        parsed = parse_dht_value(legacy)
+        assert parsed[b"info_hash"] == b"\xab" * 32
