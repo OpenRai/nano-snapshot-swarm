@@ -119,16 +119,16 @@ def main() -> None:
     session.start()
 
     # Wait for DHT bootstrap (need enough nodes for dht_put to succeed)
-    logger.info("Waiting for DHT bootstrap (min 100 nodes, up to 120s)...")
+    logger.info("Waiting for DHT bootstrap (min 50 nodes, up to 120s)...")
     bootstrap_deadline = time.time() + 120
     dht_nodes = 0
     while time.time() < bootstrap_deadline:
         time.sleep(5)
         dht_nodes = session.dht_node_count()
         logger.info(f"DHT bootstrap: {dht_nodes} nodes")
-        if dht_nodes >= 100:
+        if dht_nodes >= 50:
             break
-    if dht_nodes < 100:
+    if dht_nodes < 50:
         logger.warning(f"DHT bootstrap: only {dht_nodes} nodes after 120s")
 
     handle = session.add_torrent(
@@ -169,13 +169,24 @@ def main() -> None:
                     _dht_publish(session._session, privkey_64, pubkey_32, info_hash_hex, salt)
                     last_dht_publish = now
 
-                    # Wait for put result (up to 30s)
-                    put_alert = session.wait_for_alert(lt.dht_put_alert, timeout=30.0)
-                    if put_alert:
-                        num = put_alert.num_success if hasattr(put_alert, "num_success") else "?"
-                        logger.info(f"DHT put result: success={num}")
-                    else:
-                        logger.warning("DHT put: no response within 30s")
+                    # Wait for put result (up to 60s, poll every 2s)
+                    put_deadline = time.time() + 60
+                    found_put = False
+                    while time.time() < put_deadline:
+                        time.sleep(2)
+                        alerts = session.pop_alerts()
+                        for a in alerts:
+                            atype = type(a).__name__
+                            if isinstance(a, lt.dht_put_alert):
+                                num = a.num_success if hasattr(a, "num_success") else "?"
+                                logger.info(f"DHT put result: success={num}")
+                                found_put = True
+                            elif "dht" in atype.lower():
+                                logger.debug(f"DHT alert: {atype}: {a}")
+                        if found_put:
+                            break
+                    if not found_put:
+                        logger.warning("DHT put: no dht_put_alert within 60s")
                 except Exception as e:
                     logger.error(f"DHT publish error: {e}")
 
