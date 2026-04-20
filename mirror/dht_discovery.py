@@ -83,16 +83,19 @@ def _process_mutable_item_snapshot(
             logger.info("DHT item not found (seq=0, empty entry) — item may have expired")
             return None
 
-        # Convert item to bytes
-        if isinstance(item, dict):
-            value_bytes = bencodepy.encode(item)
-        elif isinstance(item, (bytes, bytearray)):
+        # Convert item to bytes — libtorrent returns an entry object.
+        # For our raw 32-byte info hash values, the entry is a string type.
+        if isinstance(item, (bytes, bytearray)):
             value_bytes = bytes(item)
         elif isinstance(item, str):
             value_bytes = item.encode("latin-1")
+        elif isinstance(item, dict):
+            value_bytes = bencodepy.encode(item)
         else:
             logger.warning(f"Unexpected item type: {type(item)}")
             return None
+
+        logger.debug(f"DHT item raw: type={type(item).__name__}, len={len(value_bytes)}, hex={value_bytes[:64].hex()}")
 
         # Note: signature verification requires raw signature bytes which
         # we don't currently extract in AlertSnapshot. For now, trust seq > 0
@@ -104,7 +107,7 @@ def _process_mutable_item_snapshot(
         if len(info_hash_raw) in (20, 32):
             info_hash_hex = info_hash_raw.hex()
         else:
-            logger.error(f"Unexpected info_hash length: {len(info_hash_raw)}")
+            logger.error(f"Unexpected info_hash length: {len(info_hash_raw)}, raw value ({len(value_bytes)} bytes): {value_bytes[:64].hex()}")
             return None
 
         logger.info(
