@@ -187,8 +187,8 @@ class LibtorrentSession:
     def dht_get_mutable_item(self, public_key: bytes, salt: str = "daily") -> None:
         if self._session is None:
             raise RuntimeError("Session not started")
-        pk_list = [int(b) for b in public_key]
-        self._session.dht_get_item(pk_list, salt)
+        pk_str = public_key.decode('latin-1') if isinstance(public_key, bytes) else public_key
+        self._session.dht_get_mutable_item(pk_str, salt)
         logger.info(f"DHT get_mutable_item requested for salt='{salt}'")
 
     def dht_put_mutable_item(
