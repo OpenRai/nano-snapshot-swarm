@@ -69,13 +69,26 @@ META_FILE="${OUTPUT_DIR}/snapshot-meta.json"
 # Use .partial file for download, then atomically rename on success
 PARTIAL_FILE="${TARGET_FILE}.partial"
 
-# --- Early exit: if metadata says this filename is already fully processed, skip everything ---
+# --- Early exit: if metadata says this filename is already fully processed, re-publish to DHT ---
+# DHT entries expire after a few hours, so we must re-publish even when snapshot is unchanged.
 if [ -f "$META_FILE" ] && [ -f "$STABLE_FILE" ] && [ -s "$STABLE_FILE" ]; then
     PREV_FILENAME=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('original_filename',''))" 2>/dev/null || true)
     PREV_TORRENT=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('torrent_info_hash',''))" 2>/dev/null || true)
     if [ "$PREV_FILENAME" = "$FILENAME" ] && [ -n "$PREV_TORRENT" ]; then
-        log "Snapshot unchanged (${FILENAME}, torrent ${PREV_TORRENT}) — nothing to do"
-        log "=== Daily snapshot pipeline complete (no-op) ==="
+        log "Snapshot unchanged (${FILENAME}, torrent ${PREV_TORRENT}) — re-publishing to DHT"
+
+        cd "$REPO_DIR"
+        source .venv/bin/activate
+        if [ -z "${DHT_PRIVATE_KEY:-}" ] && [ -f "$HOME/.env" ]; then
+            source "$HOME/.env"
+        fi
+
+        python -m producer.cli publish \
+            --private-key "$DHT_PRIVATE_KEY" \
+            --snapshot-file "$STABLE_FILE" \
+            --web-seed-url "$WEB_SEED_URL" || log "WARNING: DHT re-publish failed (non-fatal)"
+
+        log "=== Daily snapshot pipeline complete (re-publish only) ==="
         exit 0
     fi
     # Metadata matches but publish didn't complete — ensure TARGET_FILE exists so we skip download

@@ -78,32 +78,33 @@ def _process_mutable_item_alert(
     salt: str = DEFAULT_SALT,
 ) -> Optional[DHTDiscoveryResult]:
     try:
-        # libtorrent 2.x: alert.item returns a libtorrent entry object
-        # Use lt.bencode() to serialize it back to bytes
-        try:
-            value_data = alert.item
-        except Exception:
-            value_data = None
-        
-        if value_data is not None:
-            if isinstance(value_data, dict):
-                value_bytes = bencodepy.encode(value_data)
-            elif isinstance(value_data, (bytes, bytearray)):
-                value_bytes = bytes(value_data)
-            elif isinstance(value_data, str):
-                value_bytes = value_data.encode("latin-1")
-            else:
-                # libtorrent entry object — bencode it
-                try:
-                    bencoded = lt.bencode(value_data)
-                    value_bytes = bencoded if isinstance(bencoded, bytes) else bencoded.encode("latin-1")
-                except Exception as e:
-                    logger.warning(f"Failed to bencode entry: {e}, type: {type(value_data)}")
-                    return None
+        # Check for empty/not-found response (seq=0 with no valid item)
+        seq = alert.seq if hasattr(alert, "seq") else 0
+        if seq == 0:
+            # Try accessing item — if it fails, this is a "not found" response
+            try:
+                value_data = alert.item
+            except Exception:
+                logger.info("DHT item not found (seq=0, empty entry) — item may have expired")
+                return None
         else:
-            # Fallback: try to extract from alert message
-            logger.warning("Could not access alert.item directly")
-            return None
+            value_data = alert.item
+        
+        # libtorrent 2.x: item may be str, bytes, dict, or entry object
+        if isinstance(value_data, dict):
+            value_bytes = bencodepy.encode(value_data)
+        elif isinstance(value_data, (bytes, bytearray)):
+            value_bytes = bytes(value_data)
+        elif isinstance(value_data, str):
+            value_bytes = value_data.encode("latin-1")
+        else:
+            # libtorrent entry object — bencode it
+            try:
+                bencoded = lt.bencode(value_data)
+                value_bytes = bencoded if isinstance(bencoded, bytes) else bencoded.encode("latin-1")
+            except Exception as e:
+                logger.warning(f"Failed to bencode entry: {e}, type: {type(value_data)}")
+                return None
 
         seq = alert.seq if hasattr(alert, "seq") else 0
         signature = alert.signature if hasattr(alert, "signature") else b""
