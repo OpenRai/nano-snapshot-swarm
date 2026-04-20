@@ -1,5 +1,5 @@
 ARG AUTHORITY_PUBKEY
-FROM python:3.12-bookworm AS builder-cpp
+FROM python:3.13-trixie AS builder-cpp
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -34,18 +34,18 @@ RUN mkdir build && cd build && \
     ldconfig /usr/local/lib
 
 
-FROM python:3.12-bookworm
+FROM python:3.13-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     zstd \
     ca-certificates \
-    libboost-system1.81.0 \
-    libboost-python1.81.0 \
+    libboost-system1.83.0 \
+    libboost-python1.83.0 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 COPY --from=builder-cpp /usr/local/lib/libtorrent*.so* /usr/local/lib/
-COPY --from=builder-cpp /usr/local/lib/python3.12/ /usr/local/lib/python3.12/
+COPY --from=builder-cpp /usr/local/lib/python3.13/ /usr/local/lib/python3.13/
 RUN ldconfig /usr/local/lib
 
 RUN pip install --no-cache-dir pynacl bencodepy
