@@ -144,6 +144,7 @@ class MirrorWatcher:
         else:
             logger.info("Waiting 30s for DHT to bootstrap (swarm mode)...")
             time.sleep(30)
+            self._resume_existing_torrent()
             try:
                 self._run_loop()
             except Exception:
@@ -161,6 +162,27 @@ class MirrorWatcher:
     def _handle_signal(self, signum: int, frame) -> None:
         logger.info(f"Received signal {signum}, initiating graceful shutdown")
         self._running = False
+
+    def _resume_existing_torrent(self) -> None:
+        """Re-add the last-known torrent on restart so we keep seeding."""
+        if not self.state.last_info_hash:
+            return
+        logger.info(
+            f"Resuming torrent from previous session: "
+            f"{self.state.last_info_hash[:16]}..."
+        )
+        try:
+            handle = self.session.add_torrent(
+                info_hash=self.state.last_info_hash,
+                save_path=self.data_dir,
+                web_seeds=[self.web_seed_url],
+            )
+            self._connect_seed_peers(handle)
+            self._current_info_hash = self.state.last_info_hash
+            logger.info("Force rechecking existing data...")
+            self.session.force_recheck(self.state.last_info_hash)
+        except Exception:
+            logger.exception("Failed to resume existing torrent")
 
     def _run_once(self) -> None:
         logger.info("=== Leecher: starting single discovery cycle ===")
