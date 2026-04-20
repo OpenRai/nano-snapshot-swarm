@@ -158,12 +158,13 @@ def main() -> None:
                     _dht_publish(session._session, privkey_64, pubkey_32, info_hash_hex, salt)
                     last_dht_publish = now
 
-                    # Check for put alert
-                    time.sleep(5)
-                    for alert in session.pop_alerts():
-                        if isinstance(alert, lt.dht_put_alert):
-                            num = alert.num_success if hasattr(alert, "num_success") else "?"
-                            logger.info(f"DHT put result: success={num}")
+                    # Wait for put result (up to 30s)
+                    put_alert = session.wait_for_alert(lt.dht_put_alert, timeout=30.0)
+                    if put_alert:
+                        num = put_alert.num_success if hasattr(put_alert, "num_success") else "?"
+                        logger.info(f"DHT put result: success={num}")
+                    else:
+                        logger.warning("DHT put: no response within 30s")
                 except Exception as e:
                     logger.error(f"DHT publish error: {e}")
 
