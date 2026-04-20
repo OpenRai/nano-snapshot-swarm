@@ -175,7 +175,13 @@ class LibtorrentSession:
             params["flags"] = flags
             handle = self._session.add_torrent(params)
         else:
-            magnet_uri = f"magnet:?xt=urn:btmh:{info_hash}"
+            # Determine magnet URI format based on info hash length
+            if len(info_hash) == 40:
+                # v1: 20 bytes (40 hex chars) — use btih
+                magnet_uri = f"magnet:?xt=urn:btih:{info_hash}"
+            else:
+                # v2: 32 bytes (64 hex chars) — use btmh with SHA-256 multihash prefix
+                magnet_uri = f"magnet:?xt=urn:btmh:1220{info_hash}"
             if web_seeds:
                 for ws in web_seeds:
                     magnet_uri += f"&ws={ws}"

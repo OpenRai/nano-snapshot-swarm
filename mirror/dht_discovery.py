@@ -5,8 +5,6 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-import bencodepy
-
 from shared.bep46 import parse_dht_value
 from shared.nano_identity import compute_bep46_target_id
 
@@ -108,7 +106,10 @@ def _process_mutable_item_snapshot(
             logger.warning(f"Unexpected item type: {type(item)}")
             return None
 
-        logger.info(f"DHT item: type={type(item).__name__}, keys={list(item.keys()) if isinstance(item, dict) else 'N/A'}")
+        logger.debug(
+            f"DHT item: type={type(item).__name__}, "
+            f"keys={list(item.keys()) if isinstance(item, dict) else 'N/A'}"
+        )
 
         # Note: signature verification requires raw signature bytes which
         # we don't currently extract in AlertSnapshot. For now, trust seq > 0
@@ -120,7 +121,11 @@ def _process_mutable_item_snapshot(
         if len(info_hash_raw) in (20, 32):
             info_hash_hex = info_hash_raw.hex()
         else:
-            logger.error(f"Unexpected info_hash length: {len(info_hash_raw)}, raw value ({len(value_bytes)} bytes): {value_bytes[:64].hex()}")
+            logger.error(
+                f"Unexpected info_hash length: {len(info_hash_raw)}, "
+                f"raw value ({len(value_bytes)} bytes): "
+                f"{value_bytes[:64].hex()}"
+            )
             return None
 
         logger.info(
