@@ -79,16 +79,27 @@ def _process_mutable_item_alert(
 ) -> Optional[DHTDiscoveryResult]:
     try:
         value_data = alert.item
+        logger.debug(f"DHT item type: {type(value_data)}, repr: {repr(value_data)[:200]}")
+        
+        # libtorrent 2.x returns item as a Python str (latin-1 encoded bytes)
         if isinstance(value_data, dict):
             value_bytes = bencodepy.encode(value_data)
         elif isinstance(value_data, (bytes, bytearray)):
             value_bytes = bytes(value_data)
         elif isinstance(value_data, str):
-            # dht_put_mutable_item stores as string entry; decode back to bytes
             value_bytes = value_data.encode("latin-1")
         else:
-            logger.warning(f"Unexpected value type from DHT: {type(value_data)}")
-            return None
+            # libtorrent entry object — try to convert via bencode round-trip
+            try:
+                import libtorrent as lt
+                bencoded = lt.bencode(value_data)
+                if isinstance(bencoded, str):
+                    value_bytes = bencoded.encode("latin-1")
+                else:
+                    value_bytes = bytes(bencoded)
+            except Exception:
+                logger.warning(f"Unexpected value type from DHT: {type(value_data)}")
+                return None
 
         seq = alert.seq if hasattr(alert, "seq") else 0
         signature = alert.signature if hasattr(alert, "signature") else b""
