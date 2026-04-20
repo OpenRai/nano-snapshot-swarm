@@ -78,7 +78,7 @@ def _process_mutable_item_alert(
     salt: str = DEFAULT_SALT,
 ) -> Optional[DHTDiscoveryResult]:
     try:
-        value_data = alert.value
+        value_data = alert.item
         if isinstance(value_data, dict):
             value_bytes = bencodepy.encode(value_data)
         elif isinstance(value_data, (bytes, bytearray)):
