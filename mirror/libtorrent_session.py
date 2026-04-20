@@ -291,7 +291,10 @@ class LibtorrentSession:
                             logger.info("DHT bootstrap complete (%d nodes)", self.dht_node_count())
                             self._dht_bootstrapped.set()
                         if snap.category & lt.alert.category_t.error_notification:
-                            logger.warning(f"libtorrent alert: {snap.message}")
+                            if "dropped alerts" in snap.message:
+                                logger.debug(f"libtorrent: {snap.message}")
+                            else:
+                                logger.warning(f"libtorrent alert: {snap.message}")
             except Exception as e:
                 if self._running:
                     logger.error(f"Alert loop error: {e}")
