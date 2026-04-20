@@ -361,10 +361,14 @@ class MirrorWatcher:
 
     def _connect_seed_peers(self, handle) -> None:
         """Connect to explicit seed peers (e.g. seeder on the same host)."""
+        import socket
+
         for host, port in self.seed_peers:
             try:
-                handle.connect_peer((host, port))
-                logger.info(f"Connecting to seed peer {host}:{port}")
+                # Resolve hostname to IP — libtorrent needs a raw IP address
+                ip = socket.gethostbyname(host)
+                handle.connect_peer((ip, port))
+                logger.info(f"Connecting to seed peer {host}:{port} ({ip})")
             except Exception as e:
                 logger.warning(f"Failed to connect to seed peer {host}:{port}: {e}")
 
