@@ -4,6 +4,10 @@
 Intended to run as a long-lived systemd service. On restart (e.g. after
 a new snapshot is published), it picks up the latest .torrent file and
 begins seeding immediately.
+
+If DHT_PRIVATE_KEY is set, the seeder also periodically publishes the
+snapshot's info hash to the DHT via BEP 46, keeping the mutable item
+alive without needing a separate short-lived publisher process.
 """
 from __future__ import annotations
 
@@ -19,11 +23,63 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+import libtorrent as lt  # noqa: E402
+
 from mirror.libtorrent_session import LibtorrentSession  # noqa: E402
+from shared.bep46 import build_dht_value  # noqa: E402
+from shared.nano_identity import compute_bep46_target_id  # noqa: E402
 
 logger = logging.getLogger("producer.seeder")
 
 SNAPSHOT_NAME = "nano-ledger-snapshot.7z"
+DHT_REPUBLISH_INTERVAL = 1800  # 30 minutes
+
+
+def _load_dht_keys() -> tuple[bytes, bytes] | None:
+    """Load DHT private key from env, return (privkey_64, pubkey_32) or None."""
+    private_key_hex = os.environ.get("DHT_PRIVATE_KEY")
+    if not private_key_hex:
+        return None
+    try:
+        import nacl.signing
+
+        sk = nacl.signing.SigningKey(bytes.fromhex(private_key_hex))
+        return bytes(sk._signing_key), bytes(sk.verify_key)
+    except Exception as e:
+        logger.warning(f"Failed to load DHT_PRIVATE_KEY: {e}")
+        return None
+
+
+def _load_info_hash(data_dir: str) -> str | None:
+    """Read torrent info hash from snapshot-meta.json."""
+    meta_path = Path(data_dir) / "snapshot-meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        with open(meta_path) as f:
+            meta = json.load(f)
+        return meta.get("torrent_info_hash")
+    except Exception as e:
+        logger.warning(f"Failed to read snapshot-meta.json: {e}")
+        return None
+
+
+def _dht_publish(
+    lt_session: lt.session,
+    privkey_64: bytes,
+    pubkey_32: bytes,
+    info_hash_hex: str,
+    salt: str,
+) -> None:
+    """Publish info hash to DHT via BEP 46 mutable item."""
+    value_bytes = build_dht_value(info_hash_hex)
+    salt_bytes = salt.encode("utf-8")
+    lt_session.dht_put_mutable_item(privkey_64, pubkey_32, value_bytes, salt_bytes)
+    target = compute_bep46_target_id(pubkey_32, salt)
+    logger.info(
+        f"DHT publish: info_hash={info_hash_hex[:16]}... "
+        f"target={target.hex()[:16]}... salt='{salt}'"
+    )
 
 
 def main() -> None:
@@ -34,6 +90,7 @@ def main() -> None:
     )
 
     data_dir = os.environ.get("OUTPUT_DIR", os.path.expanduser("~/nano-snapshots"))
+    salt = os.environ.get("DHT_SALT", "daily")
     snapshot_path = Path(data_dir) / SNAPSHOT_NAME
     torrent_path = Path(data_dir) / f"{SNAPSHOT_NAME}.torrent"
 
@@ -47,6 +104,13 @@ def main() -> None:
     snapshot_size = snapshot_path.stat().st_size
     logger.info(f"Seeding: {snapshot_path} ({snapshot_size / (1024**3):.1f} GiB)")
     logger.info(f"Torrent: {torrent_path}")
+
+    # Load DHT publishing keys (optional)
+    dht_keys = _load_dht_keys()
+    if dht_keys:
+        logger.info("DHT publishing enabled (DHT_PRIVATE_KEY set)")
+    else:
+        logger.info("DHT publishing disabled (no DHT_PRIVATE_KEY)")
 
     session = LibtorrentSession(
         data_dir=data_dir,
@@ -79,12 +143,32 @@ def main() -> None:
     # Stats file path
     stats_path = Path(data_dir) / "seeder-stats.json"
     started_at = time.time()
+    last_dht_publish = 0.0
 
-    # Periodic status logging + stats file
+    # Periodic status logging + stats file + DHT publishing
     while running:
+        now = time.time()
+
+        # DHT publishing (every 30 min)
+        if dht_keys and (now - last_dht_publish) >= DHT_REPUBLISH_INTERVAL:
+            info_hash_hex = _load_info_hash(data_dir)
+            if info_hash_hex and session._session:
+                try:
+                    privkey_64, pubkey_32 = dht_keys
+                    _dht_publish(session._session, privkey_64, pubkey_32, info_hash_hex, salt)
+                    last_dht_publish = now
+
+                    # Check for put alert
+                    time.sleep(5)
+                    for alert in session.pop_alerts():
+                        if isinstance(alert, lt.dht_put_alert):
+                            num = alert.num_success if hasattr(alert, "num_success") else "?"
+                            logger.info(f"DHT put result: success={num}")
+                except Exception as e:
+                    logger.error(f"DHT publish error: {e}")
+
         try:
             status = handle.status()
-            now = time.time()
             stats = {
                 "state": "seeding" if status.is_seeding else str(status.state),
                 "progress_pct": round(status.progress * 100, 1),
@@ -97,6 +181,12 @@ def main() -> None:
                 "torrent_name": status.name,
                 "uptime_seconds": int(now - started_at),
                 "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                "dht_publishing": dht_keys is not None,
+                "last_dht_publish": time.strftime(
+                    "%Y-%m-%dT%H:%M:%S%z", time.localtime(last_dht_publish)
+                )
+                if last_dht_publish > 0
+                else None,
             }
             # Atomic write
             tmp = stats_path.with_suffix(".tmp")
