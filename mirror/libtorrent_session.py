@@ -55,6 +55,14 @@ def _snapshot_alert(alert: lt.alert) -> AlertSnapshot:
             extra["public_key"] = bytes(alert.public_key).hex()
         except Exception:
             pass
+        try:
+            extra["target"] = str(alert.target)
+        except Exception:
+            pass
+        try:
+            extra["signature"] = bytes(alert.signature).hex()
+        except Exception:
+            pass
 
     elif isinstance(alert, lt.dht_mutable_item_alert):
         extra["authoritative"] = getattr(alert, "authoritative", False)

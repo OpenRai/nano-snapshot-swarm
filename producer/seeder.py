@@ -170,10 +170,15 @@ def main() -> None:
                         for snap in alerts:
                             if snap.type_name == "dht_put_alert":
                                 num = snap.extra.get("num_success", "?")
-                                logger.info(f"DHT put result: success={num}")
+                                logger.info(
+                                    f"DHT put result: success={num}"
+                                    f" extra={snap.extra}"
+                                )
                                 found_put = True
                             elif "dht" in snap.type_name.lower():
-                                logger.debug(f"DHT alert: {snap.type_name}: {snap.message}")
+                                logger.info(
+                                    f"Alert: {snap.type_name}: {snap.message}"
+                                )
                         if found_put:
                             break
                     if not found_put:
