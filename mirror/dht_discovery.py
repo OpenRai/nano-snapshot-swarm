@@ -45,20 +45,14 @@ def discover_latest_snapshot(
 
         session.dht_get_mutable_item(pub_key_bytes, salt)
 
-        deadline = time.time() + timeout
-        found = False
-
-        while time.time() < deadline:
-            alerts = session.pop_alerts()
-            for snap in alerts:
-                if snap.type_name == "dht_mutable_item_alert":
-                    result = _process_mutable_item_snapshot(snap, pub_key_bytes, salt)
-                    if result is not None:
-                        return result
-                    found = True
-            if found:
-                break
-            time.sleep(2)
+        snap = session.wait_for_dht_mutable_item(salt=salt, timeout=timeout)
+        if snap is not None:
+            result = _process_mutable_item_snapshot(snap, pub_key_bytes, salt)
+            if result is not None:
+                return result
+            found = True
+        else:
+            found = False
 
         if not found:
             logger.warning(f"No DHT response after attempt {attempt + 1}")

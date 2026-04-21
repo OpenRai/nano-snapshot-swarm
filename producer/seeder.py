@@ -178,27 +178,11 @@ def main() -> None:
                     _dht_publish(session._session, privkey_64, pubkey_32, info_hash_hex, salt)
                     last_dht_publish = now
 
-                    # Wait for put result (up to 60s, poll every 2s)
-                    put_deadline = time.time() + 60
-                    found_put = False
-                    while time.time() < put_deadline:
-                        time.sleep(2)
-                        alerts = session.pop_alerts()
-                        for snap in alerts:
-                            if snap.type_name == "dht_put_alert":
-                                num = snap.extra.get("num_success", "?")
-                                logger.info(
-                                    f"DHT put result: success={num}"
-                                    f" extra={snap.extra}"
-                                )
-                                found_put = True
-                            elif "dht" in snap.type_name.lower():
-                                logger.debug(
-                                    f"Alert: {snap.type_name}: {snap.message}"
-                                )
-                        if found_put:
-                            break
-                    if not found_put:
+                    snap = session.wait_for_dht_put(timeout=60)
+                    if snap is not None:
+                        num = snap.extra.get("num_success", "?")
+                        logger.info(f"DHT put result: success={num} extra={snap.extra}")
+                    else:
                         logger.warning("DHT put: no dht_put_alert within 60s")
                 except Exception as e:
                     logger.error(f"DHT publish error: {e}")

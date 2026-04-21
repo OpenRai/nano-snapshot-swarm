@@ -40,3 +40,16 @@ def test_mirror_state_loads_phase_and_error(tmp_path) -> None:
     assert state.current_torrent_name == "nano-ledger-snapshot.7z"
     assert state.phase == "error"
     assert state.last_error == "download stalled"
+
+
+def test_mirror_state_update_preserves_torrent_name_when_omitted(tmp_path) -> None:
+    state_path = tmp_path / "mirror_state.json"
+    state = MirrorState(str(state_path))
+
+    state.update(4, "ab" * 32, "nano-ledger-snapshot.7z")
+    state.update(5, "cd" * 32)
+
+    loaded = json.loads(state_path.read_text())
+    assert loaded["last_seq"] == 5
+    assert loaded["last_info_hash"] == "cd" * 32
+    assert loaded["current_torrent_name"] == "nano-ledger-snapshot.7z"

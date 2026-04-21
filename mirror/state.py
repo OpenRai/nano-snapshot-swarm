@@ -49,10 +49,11 @@ class MirrorState:
         }
         Path(self.path).write_text(json.dumps(data, indent=2))
 
-    def update(self, seq: int, info_hash: str, torrent_name: str = "") -> None:
+    def update(self, seq: int, info_hash: str, torrent_name: str | None = None) -> None:
         self.last_seq = seq
         self.last_info_hash = info_hash
-        self.current_torrent_name = torrent_name
+        if torrent_name is not None:
+            self.current_torrent_name = torrent_name
         self._save()
         logger.info(f"State updated: seq={seq}, hash={info_hash[:16]}...")
 

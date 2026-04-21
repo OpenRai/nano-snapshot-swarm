@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import logging
+import socket
 import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import libtorrent as lt
 
@@ -27,6 +29,22 @@ class AlertSnapshot:
     message: str
     # Alert-specific fields (extracted before the raw alert is freed)
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class TorrentStatusSnapshot:
+    progress: float
+    state: str
+    num_peers: int
+    download_rate: int
+    upload_rate: int
+    is_seeding: bool
+
+
+@dataclass(frozen=True)
+class TorrentMetadataSnapshot:
+    name: str
+    snapshot_meta: Optional[dict[str, Any]] = None
 
 
 def _snapshot_alert(alert: lt.alert) -> AlertSnapshot:
@@ -202,6 +220,23 @@ class LibtorrentSession:
             self._session.remove_torrent(handle)
             logger.info(f"Removed torrent: {info_hash[:16]}...")
 
+    def has_torrent(self, info_hash: str) -> bool:
+        return info_hash in self._handles
+
+    def ensure_torrent(
+        self,
+        info_hash: str,
+        save_path: Optional[str] = None,
+        web_seeds: Optional[list[str]] = None,
+    ) -> None:
+        if self.has_torrent(info_hash):
+            return
+        self.add_torrent(
+            info_hash=info_hash,
+            save_path=save_path,
+            web_seeds=web_seeds,
+        )
+
     def pause_torrent(self, info_hash: str) -> None:
         handle = self._handles.get(info_hash)
         if handle:
@@ -222,6 +257,55 @@ class LibtorrentSession:
 
     def get_handle(self, info_hash: str) -> Optional[lt.torrent_handle]:
         return self._handles.get(info_hash)
+
+    def connect_peer(self, info_hash: str, host: str, port: int) -> None:
+        handle = self._handles.get(info_hash)
+        if handle is None:
+            raise KeyError(f"Unknown torrent: {info_hash}")
+        ip = socket.gethostbyname(host)
+        handle.connect_peer((ip, port))
+        logger.info(f"Connecting to seed peer {host}:{port} ({ip})")
+
+    def torrent_status(self, info_hash: str) -> Optional[TorrentStatusSnapshot]:
+        handle = self._handles.get(info_hash)
+        if handle is None:
+            return None
+        status = handle.status()
+        return TorrentStatusSnapshot(
+            progress=status.progress,
+            state=str(status.state),
+            num_peers=status.num_peers,
+            download_rate=status.download_rate,
+            upload_rate=status.upload_rate,
+            is_seeding=status.is_seeding,
+        )
+
+    def torrent_metadata(self, info_hash: str) -> Optional[TorrentMetadataSnapshot]:
+        handle = self._handles.get(info_hash)
+        if handle is None:
+            return None
+        t_info = handle.torrent_file()
+        if not t_info:
+            return None
+
+        snapshot_meta: Optional[dict[str, Any]] = None
+        try:
+            import bencodepy
+
+            raw = (
+                t_info.info_section()
+                if hasattr(t_info, "info_section")
+                else t_info.metadata()
+            )
+            if raw:
+                info_dict = bencodepy.decode(raw)
+                x_snapshot = info_dict.get(b"x-snapshot")
+                if x_snapshot:
+                    snapshot_meta = json.loads(x_snapshot)
+        except Exception:
+            logger.debug("Could not parse torrent metadata", exc_info=True)
+
+        return TorrentMetadataSnapshot(name=t_info.name(), snapshot_meta=snapshot_meta)
 
     def dht_node_count(self) -> int:
         """Return the number of DHT nodes in the routing table."""
@@ -254,7 +338,10 @@ class LibtorrentSession:
             logger.warning("Failed to save DHT state: %s", e)
 
     def wait_for_alert(
-        self, type_name: str, timeout: float = 60.0
+        self,
+        type_name: str,
+        timeout: float = 60.0,
+        predicate: Optional[Callable[[AlertSnapshot], bool]] = None,
     ) -> Optional[AlertSnapshot]:
         """Wait for an alert snapshot with the given type name."""
         deadline = time.time() + timeout
@@ -263,17 +350,27 @@ class LibtorrentSession:
             with self._alert_lock:
                 self._alert_event.clear()
                 for snap in self._alerts:
-                    if snap.type_name == type_name:
+                    if snap.type_name == type_name and (
+                        predicate is None or predicate(snap)
+                    ):
                         self._alerts.remove(snap)
                         return snap
         return None
 
-    def pop_alerts(self) -> list[AlertSnapshot]:
-        """Return and clear all accumulated alert snapshots."""
-        with self._alert_lock:
-            alerts = self._alerts[:]
-            self._alerts.clear()
-            return alerts
+    def wait_for_dht_mutable_item(
+        self,
+        *,
+        salt: str,
+        timeout: float = 60.0,
+    ) -> Optional[AlertSnapshot]:
+        return self.wait_for_alert(
+            "dht_mutable_item_alert",
+            timeout=timeout,
+            predicate=lambda snap: snap.extra.get("salt", "") == salt,
+        )
+
+    def wait_for_dht_put(self, timeout: float = 60.0) -> Optional[AlertSnapshot]:
+        return self.wait_for_alert("dht_put_alert", timeout=timeout)
 
     def _alert_loop(self) -> None:
         while self._running and self._session:

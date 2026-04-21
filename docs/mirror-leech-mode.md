@@ -146,7 +146,9 @@ docker run --rm \
   --once --download-timeout 3600
 ```
 
-Unlike swarm mode, leech mode does not save `mirror_state.json` — each run is independent.
+Leech mode also persists `mirror_state.json` in `DATA_DIR`, alongside the downloaded archive or
+extracted `data.ldb`. This preserves the last discovered sequence, info-hash, torrent name, and
+phase for inspection after the run exits.
 
 ---
 
