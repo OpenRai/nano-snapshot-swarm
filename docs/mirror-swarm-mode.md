@@ -63,6 +63,7 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 |---|---|
 | `Authority Nano address: nano_...` | Pubkey decoded correctly |
 | `Mode: SWARM (continuous polling every Ns)` | Running as long-lived daemon |
+| `Web seed mode: fallback` | Web transfer allowed only as fallback |
 | `libtorrent session started, listening on port 6881` | BitTorrent engine ready |
 
 **Discovery (repeats every `POLL_INTERVAL`):**
@@ -80,7 +81,8 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 | Log | Meaning |
 |---|---|
 | `Force recheck on existing data...` | Hashing local file to find reusable pieces |
-| `Download: 45.2% \| DL: 1234.5 KB/s \| Peers: 3` | Active download with progress |
+| `State transition: downloading → checking_files` | Mirror phase changed |
+| `Download: 45.2% \| State: downloading \| DL: 1234.5 KB/s \| Peers: 3` | Active transfer with progress |
 | `Snapshot seeding complete` | Download finished, now seeding to others |
 | `Download: 0.0% ... Peers: 0` | No peers or web seed reachable — check connectivity |
 
@@ -116,7 +118,9 @@ docker exec nano-mirror cat /data/mirror_state.json
 {
   "last_seq": 42,
   "last_info_hash": "924a5772b2db194d...",
-  "current_torrent_name": "nano-ledger-snapshot.7z"
+  "current_torrent_name": "nano-ledger-snapshot.7z",
+  "phase": "seeding",
+  "last_error": ""
 }
 ```
 
@@ -125,6 +129,8 @@ docker exec nano-mirror cat /data/mirror_state.json
 | `last_seq` | Sequence number from DHT — increments with each new publish |
 | `last_info_hash` | BitTorrent info-hash of the snapshot being tracked |
 | `current_torrent_name` | Filename of the snapshot on disk |
+| `phase` | Current mirror lifecycle phase |
+| `last_error` | Last persisted error, if any |
 
 If `last_seq` is `0`, the mirror has never successfully discovered a snapshot.
 

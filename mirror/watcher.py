@@ -11,8 +11,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+from mirror.config import WEB_SEED_MODE_FALLBACK, WEB_SEED_MODES, resolve_web_seeds
 from mirror.dht_discovery import DEFAULT_SALT, DHTDiscoveryResult, discover_latest_snapshot
 from mirror.libtorrent_session import LibtorrentSession
+from mirror.state import MirrorState
 from shared.nano_identity import public_key_to_nano_address
 
 logger = logging.getLogger("mirror.watcher")
@@ -29,49 +31,6 @@ class DownloadStatus(Enum):
     SEEDING = "seeding"
     TIMEOUT = "timeout"
     ERROR = "error"
-
-
-class MirrorState:
-    def __init__(self, path: str):
-        self.path = path
-        self.last_seq: int = 0
-        self.last_info_hash: str = ""
-        self.current_torrent_name: str = ""
-        self._load()
-
-    def _load(self) -> None:
-        p = Path(self.path)
-        if p.exists():
-            try:
-                data = json.loads(p.read_text())
-                self.last_seq = data.get("last_seq", 0)
-                self.last_info_hash = data.get("last_info_hash", "")
-                self.current_torrent_name = data.get("current_torrent_name", "")
-                logger.info(
-                    f"Loaded state: seq={self.last_seq}, hash={self.last_info_hash[:16]}..."
-                )
-            except (json.JSONDecodeError, KeyError) as e:
-                logger.warning(f"Corrupted state file, resetting: {e}")
-                self._save()
-        else:
-            self._save()
-
-    def _save(self) -> None:
-        data = {
-            "last_seq": self.last_seq,
-            "last_info_hash": self.last_info_hash,
-            "current_torrent_name": self.current_torrent_name,
-        }
-        Path(self.path).write_text(json.dumps(data, indent=2))
-
-    def update(self, seq: int, info_hash: str, torrent_name: str = "") -> None:
-        self.last_seq = seq
-        self.last_info_hash = info_hash
-        self.current_torrent_name = torrent_name
-        self._save()
-        logger.info(f"State updated: seq={seq}, hash={info_hash[:16]}...")
-
-
 class MirrorWatcher:
     def __init__(
         self,
@@ -83,6 +42,7 @@ class MirrorWatcher:
         download_timeout: int = DEFAULT_DOWNLOAD_TIMEOUT,
         extract: bool = False,
         seed_peers: Optional[list[tuple[str, int]]] = None,
+        web_seed_mode: str = WEB_SEED_MODE_FALLBACK,
     ):
         self.authority_pubkey_hex = authority_pubkey_hex
         self.data_dir = data_dir
@@ -92,6 +52,7 @@ class MirrorWatcher:
         self.download_timeout = download_timeout
         self.extract = extract
         self.seed_peers = seed_peers or []
+        self.web_seed_mode = web_seed_mode
 
         self.pub_key_bytes = bytes.fromhex(self.authority_pubkey_hex)
         self.nano_address = public_key_to_nano_address(self.pub_key_bytes)
@@ -108,6 +69,7 @@ class MirrorWatcher:
         logger.info(f"Authority public key: {self.authority_pubkey_hex[:16]}...")
         logger.info(f"Data directory: {self.data_dir}")
         logger.info(f"Web seed URL: {self.web_seed_url}")
+        logger.info(f"Web seed mode: {self.web_seed_mode}")
         logger.info(f"DHT salt: '{self.salt}'")
         if once:
             logger.info("Mode: LEECH (download-once, exit when done)")
@@ -126,6 +88,7 @@ class MirrorWatcher:
             listen_port=6881,
         )
         self.session.start()
+        self.state.set_phase("bootstrapping_dht")
 
         self._running = True
 
@@ -135,9 +98,11 @@ class MirrorWatcher:
         if once:
             logger.info("Waiting 15s for DHT to bootstrap (leech mode)...")
             time.sleep(15)
+            self.state.set_phase("discovering")
             try:
                 self._run_once()
             except Exception:
+                self.state.set_phase("error", "Fatal error in leech mode")
                 logger.exception("Fatal error in leech mode")
             finally:
                 self.stop()
@@ -145,9 +110,11 @@ class MirrorWatcher:
             logger.info("Waiting 30s for DHT to bootstrap (swarm mode)...")
             time.sleep(30)
             self._resume_existing_torrent()
+            self.state.set_phase("idle")
             try:
                 self._run_loop()
             except Exception:
+                self.state.set_phase("error", "Fatal error in main loop")
                 logger.exception("Fatal error in main loop")
             finally:
                 self.stop()
@@ -155,6 +122,7 @@ class MirrorWatcher:
     def stop(self) -> None:
         logger.info("Shutting down mirror service...")
         self._running = False
+        self.state.set_phase("stopped")
         if self.session:
             self.session.stop()
         logger.info("Mirror service stopped.")
@@ -172,21 +140,24 @@ class MirrorWatcher:
             f"{self.state.last_info_hash[:16]}..."
         )
         try:
+            self.state.set_phase("resuming")
             handle = self.session.add_torrent(
                 info_hash=self.state.last_info_hash,
                 save_path=self.data_dir,
-                web_seeds=[self.web_seed_url],
+                web_seeds=resolve_web_seeds(self.web_seed_url, self.web_seed_mode),
             )
             self._connect_seed_peers(handle)
             self._current_info_hash = self.state.last_info_hash
             logger.info("Force rechecking existing data...")
             self.session.force_recheck(self.state.last_info_hash)
         except Exception:
+            self.state.set_phase("error", "Failed to resume existing torrent")
             logger.exception("Failed to resume existing torrent")
 
     def _run_once(self) -> None:
         logger.info("=== Leecher: starting single discovery cycle ===")
         try:
+            self.state.set_phase("discovering")
             result = discover_latest_snapshot(
                 session=self.session,
                 authority_pubkey_hex=self.authority_pubkey_hex,
@@ -197,6 +168,7 @@ class MirrorWatcher:
             sys.exit(1)
 
         if result is None:
+            self.state.set_phase("error", "No snapshot discovered from DHT in leech mode")
             logger.error("No snapshot discovered from DHT in leech mode")
             sys.exit(1)
 
@@ -268,6 +240,7 @@ class MirrorWatcher:
     def _run_loop(self) -> None:
         while self._running:
             try:
+                self.state.set_phase("discovering")
                 result = discover_latest_snapshot(
                     session=self.session,
                     authority_pubkey_hex=self.authority_pubkey_hex,
@@ -280,6 +253,7 @@ class MirrorWatcher:
                     logger.info("No snapshot discovered from DHT; will retry next cycle")
 
             except Exception:
+                self.state.set_phase("error", "Error during discovery cycle")
                 logger.exception("Error during discovery cycle")
 
             logger.info(f"Next discovery cycle in {self.poll_interval}s")
@@ -301,6 +275,7 @@ class MirrorWatcher:
             f"info_hash={result.info_hash_hex[:16]}... "
             f"(was seq={self.state.last_seq})"
         )
+        self.state.set_phase("metadata")
 
         if self._current_info_hash and self._current_info_hash != result.info_hash_hex:
             logger.info("Pausing current torrent...")
@@ -311,7 +286,7 @@ class MirrorWatcher:
             handle = self.session.add_torrent(
                 info_hash=result.info_hash_hex,
                 save_path=self.data_dir,
-                web_seeds=[self.web_seed_url],
+                web_seeds=resolve_web_seeds(self.web_seed_url, self.web_seed_mode),
             )
             self._connect_seed_peers(handle)
 
@@ -332,6 +307,10 @@ class MirrorWatcher:
             self._monitor_download(handle, result.info_hash_hex)
 
         except Exception:
+            self.state.set_phase(
+                "error",
+                f"Failed to add torrent for {result.info_hash_hex[:16]}...",
+            )
             logger.exception(f"Failed to add torrent for info_hash {result.info_hash_hex[:16]}...")
 
     def _download_and_wait(self, result: DHTDiscoveryResult) -> DownloadStatus:
@@ -339,9 +318,10 @@ class MirrorWatcher:
             handle = self.session.add_torrent(
                 info_hash=result.info_hash_hex,
                 save_path=self.data_dir,
-                web_seeds=[self.web_seed_url],
+                web_seeds=resolve_web_seeds(self.web_seed_url, self.web_seed_mode),
             )
             self._connect_seed_peers(handle)
+            self.state.set_phase("metadata")
 
             self._current_info_hash = result.info_hash_hex
             self.state.update(result.sequence, result.info_hash_hex)
@@ -354,6 +334,7 @@ class MirrorWatcher:
             logger.info(f"Leecher: added torrent '{t_name}'")
 
         except Exception:
+            self.state.set_phase("error", "Leecher: failed to add torrent")
             logger.exception("Leecher: failed to add torrent")
             return DownloadStatus.ERROR
 
@@ -445,6 +426,8 @@ class MirrorWatcher:
                         logger.info(f"State transition: {last_state} → {state}")
                     last_state = state
                     last_progress_log = 0.0
+                    phase = "checking" if state == "checking_files" else state
+                    self.state.set_phase(phase)
 
                 if progress - last_progress_log >= 0.05 or progress == 1.0:
                     dl_rate = status.download_rate
@@ -457,6 +440,7 @@ class MirrorWatcher:
                     last_progress_log = progress
 
                 if status.is_seeding:
+                    self.state.set_phase("seeding")
                     logger.info(f"Snapshot seeding complete: {info_hash[:16]}...")
                     return DownloadStatus.SEEDING
 
@@ -473,6 +457,7 @@ class MirrorWatcher:
                     no_peer_seconds = 0
 
             except Exception as e:
+                self.state.set_phase("error", str(e))
                 logger.error(f"Error monitoring download: {e}")
                 return DownloadStatus.ERROR
 
@@ -532,6 +517,12 @@ def main() -> None:
         "--extract",
         action="store_true",
         help="Extract .7z after download and delete archive (only in --once mode)",
+    )
+    parser.add_argument(
+        "--web-seed-mode",
+        default=os.environ.get("WEB_SEED_MODE", WEB_SEED_MODE_FALLBACK),
+        choices=sorted(WEB_SEED_MODES),
+        help="Web seed policy: fallback or off",
     )
     parser.add_argument(
         "--seed-peer",
@@ -597,6 +588,7 @@ def main() -> None:
         download_timeout=download_timeout,
         extract=extract,
         seed_peers=seed_peers,
+        web_seed_mode=args.web_seed_mode,
     )
     watcher.start(once=args.once)
 

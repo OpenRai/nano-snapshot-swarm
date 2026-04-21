@@ -18,7 +18,7 @@ docker run --rm \
   -e AUTHORITY_PUBKEY \
   -v $(pwd)/data:/data \
   ghcr.io/openrai/nano-p2p-mirror:latest \
-  --once
+  --once --web-seed-mode off
 ```
 
 ### With Custom Timeout
@@ -30,14 +30,14 @@ docker run --rm \
   -e AUTHORITY_PUBKEY \
   -v $(pwd)/data:/data \
   ghcr.io/openrai/nano-p2p-mirror:latest \
-  --once --download-timeout 7200
+  --once --download-timeout 7200 --web-seed-mode off
 ```
 
 ### With Docker Compose Override
 
 ```bash
 docker compose run --rm nano-mirror \
-  --once --download-timeout 3600
+  --once --download-timeout 3600 --web-seed-mode off
 ```
 
 ---
@@ -126,10 +126,25 @@ docker run --rm \
 
 1. Waits 15 seconds for DHT to bootstrap (shorter than swarm mode since no polling is needed)
 2. Queries DHT for mutable item under `AUTHORITY_PUBKEY` with given salt
-3. On success: adds the torrent (magnet URI + web seed), begins download
-4. Tracks progress every 5 seconds
-5. On seeding complete: logs file path, exits `0`
-6. On timeout or error: logs error, exits `1`
+3. On success: adds the torrent, begins P2P download
+4. If `--web-seed-mode fallback` is enabled, libtorrent may use the configured web seed when peers are unavailable
+5. Tracks progress every 5 seconds
+6. On seeding complete: logs file path, exits `0`
+7. On timeout or error: logs error, exits `1`
+
+## Validation Stream Example
+
+Use the dedicated validation salt for manual system validation:
+
+```bash
+docker run --rm \
+  -e AUTHORITY_PUBKEY=<pubkey> \
+  -e DHT_SALT=validation \
+  -e WEB_SEED_MODE=off \
+  -v $(pwd)/data:/data \
+  ghcr.io/openrai/nano-p2p-mirror:latest \
+  --once --download-timeout 3600
+```
 
 Unlike swarm mode, leech mode does not save `mirror_state.json` — each run is independent.
 

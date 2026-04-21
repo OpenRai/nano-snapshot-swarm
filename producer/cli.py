@@ -13,6 +13,12 @@ sys.path.insert(0, str(PROJECT_ROOT))  # noqa: E402
 
 from producer.publish import DEFAULT_SALT, publish_to_dht  # noqa: E402
 from producer.torrent_create import create_torrent  # noqa: E402
+from producer.validation_fixture import (  # noqa: E402
+    DEFAULT_VALIDATION_ARCHIVE_NAME,
+    DEFAULT_VALIDATION_SALT,
+    create_validation_fixture,
+    parse_size_bytes,
+)
 
 
 def cmd_publish(args: argparse.Namespace) -> None:
@@ -80,6 +86,36 @@ def cmd_publish(args: argparse.Namespace) -> None:
     print(json.dumps(result, indent=2))
 
 
+def cmd_validation_fixture_create(args: argparse.Namespace) -> None:
+    output_dir = args.output_dir or os.environ.get("OUTPUT_DIR", ".")
+    result = create_validation_fixture(
+        output_dir=output_dir,
+        archive_name=args.archive_name,
+        size_bytes=parse_size_bytes(args.size),
+        force=args.force,
+        keep_source=args.keep_source,
+    )
+    print(json.dumps(result, indent=2))
+
+
+def cmd_validation_fixture_publish(args: argparse.Namespace) -> None:
+    output_dir = args.output_dir or os.environ.get("OUTPUT_DIR", ".")
+    archive_path = os.path.join(output_dir, args.archive_name)
+    publish_args = argparse.Namespace(
+        private_key=args.private_key,
+        web_seed_url=args.web_seed_url,
+        snapshot_file=archive_path,
+        output_dir=output_dir,
+        source_url=args.source_url,
+        original_filename=args.archive_name,
+        piece_size=args.piece_size,
+        state_file=args.state_file,
+        dry_run=args.dry_run,
+        salt=args.salt,
+    )
+    cmd_publish(publish_args)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Nano P2P Snapshot Producer — create torrent and publish to DHT"
@@ -136,6 +172,94 @@ def main() -> None:
         help=f"DHT salt (env DHT_SALT, default: {DEFAULT_SALT})",
     )
     pub_parser.set_defaults(func=cmd_publish)
+
+    validation_parser = subparsers.add_parser(
+        "validation-fixture",
+        help="Create or publish a small synthetic validation artifact",
+    )
+    validation_subparsers = validation_parser.add_subparsers(
+        dest="validation_command",
+        required=True,
+    )
+
+    create_parser = validation_subparsers.add_parser(
+        "create",
+        help="Create a random validation artifact and 7z archive",
+    )
+    create_parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Output directory for validation fixture files (overrides OUTPUT_DIR env)",
+    )
+    create_parser.add_argument(
+        "--archive-name",
+        default=DEFAULT_VALIDATION_ARCHIVE_NAME,
+        help="Validation archive filename",
+    )
+    create_parser.add_argument(
+        "--size",
+        default="1g",
+        help="Uncompressed random source size, e.g. 512m or 1g",
+    )
+    create_parser.add_argument("--force", action="store_true", help="Overwrite existing files")
+    create_parser.add_argument(
+        "--keep-source",
+        action="store_true",
+        help="Keep the uncompressed random source file after 7z creation",
+    )
+    create_parser.set_defaults(func=cmd_validation_fixture_create)
+
+    publish_validation_parser = validation_subparsers.add_parser(
+        "publish",
+        help="Publish the validation archive to DHT",
+    )
+    publish_validation_parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Directory containing the validation archive (overrides OUTPUT_DIR env)",
+    )
+    publish_validation_parser.add_argument(
+        "--archive-name",
+        default=DEFAULT_VALIDATION_ARCHIVE_NAME,
+        help="Validation archive filename",
+    )
+    publish_validation_parser.add_argument(
+        "--private-key",
+        default=None,
+        help="Ed25519 private key hex (overrides DHT_PRIVATE_KEY env)",
+    )
+    publish_validation_parser.add_argument(
+        "--web-seed-url",
+        default=None,
+        help="Optional validation web seed URL (overrides WEB_SEED_URL env)",
+    )
+    publish_validation_parser.add_argument(
+        "--source-url",
+        default=None,
+        help="Resolved source URL to record in torrent metadata",
+    )
+    publish_validation_parser.add_argument(
+        "--piece-size",
+        type=int,
+        default=32 * 1024 * 1024,
+        help="Torrent piece size in bytes (default: 32 MiB)",
+    )
+    publish_validation_parser.add_argument(
+        "--state-file",
+        default="publisher_state.validation.json",
+        help="Path to validation publisher state file",
+    )
+    publish_validation_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Create torrent and payload but don't publish to DHT",
+    )
+    publish_validation_parser.add_argument(
+        "--salt",
+        default=os.environ.get("VALIDATION_DHT_SALT", DEFAULT_VALIDATION_SALT),
+        help=f"Validation DHT salt (env VALIDATION_DHT_SALT, default: {DEFAULT_VALIDATION_SALT})",
+    )
+    publish_validation_parser.set_defaults(func=cmd_validation_fixture_publish)
 
     args = parser.parse_args()
     args.func(args)

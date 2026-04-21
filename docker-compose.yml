@@ -7,14 +7,16 @@ services:
       AUTHORITY_PUBKEY: "${AUTHORITY_PUBKEY:?AUTHORITY_PUBKEY is required}"
       SEED_PEERS: "${SEED_PEERS:-}"
       DATA_DIR: /data
-      DHT_SALT: "daily"
-      POLL_INTERVAL: "600"
-      LOG_LEVEL: INFO
+      DHT_SALT: "${DHT_SALT:-daily}"
+      POLL_INTERVAL: "${POLL_INTERVAL:-600}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      WEB_SEED_URL: "${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
+      WEB_SEED_MODE: "${WEB_SEED_MODE:-fallback}"
     volumes:
       - nano-data:/data
     ports:
-      - "6881:6881/tcp"
-      - "6881:6881/udp"
+      - "${MIRROR_HOST_PORT:-6881}:6881/tcp"
+      - "${MIRROR_HOST_PORT:-6881}:6881/udp"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python3", "-c", "import libtorrent; libtorrent.session({'enable_dht': False})"]
