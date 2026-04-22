@@ -17,18 +17,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+        run: uv python install 3.12
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install ruff pynacl bencodepy pytest
+        run: uv sync --extra dev
 
       - name: Lint with ruff
-        run: ruff check shared/ producer/ mirror/ tests/
+        run: uv run ruff check shared/ producer/ mirror/ tests/
 
   test:
     runs-on: ubuntu-latest
@@ -36,20 +35,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+        run: uv python install 3.12
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install pynacl bencodepy pytest
+        run: uv sync --extra dev
 
       - name: Run tests
-        run: |
-          export PYTHONPATH=$(pwd)
-          pytest tests/ -v
+        run: uv run pytest tests/ -v
+        env:
+          PYTHONPATH: ${{ github.workspace }}
 
   build:
     runs-on: ubuntu-latest

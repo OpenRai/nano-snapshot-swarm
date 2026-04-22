@@ -1,3 +1,0 @@
-pynacl>=1.5
-bencodepy>=0.3
-libtorrent>=2.0

@@ -4,10 +4,10 @@
 
 ```bash
 # Tests (PYTHONPATH required — pytest won't find shared/ otherwise)
-PYTHONPATH=$(pwd) pytest tests/ -v
+PYTHONPATH=$(pwd) uv run pytest tests/ -v
 
 # Lint
-ruff check shared/ producer/ mirror/ tests/
+uv run ruff check shared/ producer/ mirror/ tests/
 ```
 
 ### Key non-obvious facts

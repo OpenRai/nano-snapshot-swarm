@@ -47,9 +47,12 @@ COPY --from=builder-cpp /usr/local/lib/libtorrent*.so* /usr/local/lib/
 COPY --from=builder-cpp /usr/local/lib/python3.13/ /usr/local/lib/python3.13/
 RUN ldconfig /usr/local/lib
 
-RUN pip install --no-cache-dir pynacl bencodepy
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
+COPY pyproject.toml uv.lock /app/
+RUN uv pip install --system --no-cache -r pyproject.toml
+
 COPY shared/ /app/shared/
 COPY mirror/ /app/mirror/
 
