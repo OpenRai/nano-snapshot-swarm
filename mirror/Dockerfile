@@ -50,7 +50,7 @@ RUN ldconfig /usr/local/lib
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
-COPY pyproject.toml uv.lock /app/
+COPY pyproject.toml /app/
 RUN uv pip install --system --no-cache -r pyproject.toml
 
 COPY shared/ /app/shared/
@@ -61,10 +61,12 @@ ENV DATA_DIR=/data
 ENV POLL_INTERVAL=600
 ENV LOG_LEVEL=INFO
 
-# Public build-time defaults — override with --build-arg or at runtime with -e
-ARG AUTHORITY_PUBKEY=b9036c6c3d05d70b9d8b3e255b15cec8f962e88e36ebaeb96232c08c1cf163f3
+# Public build-time defaults — AUTHORITY_PUBKEY comes from the repo root AUTHORITY_PUBKEY file
+ARG AUTHORITY_PUBKEY
 ARG DHT_SALT=daily
 ARG WEB_SEED_URL=https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest
+
+RUN test -n "$AUTHORITY_PUBKEY"
 
 ENV AUTHORITY_PUBKEY=${AUTHORITY_PUBKEY}
 ENV DHT_SALT=${DHT_SALT}
