@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$REPO_DIR"
+
+if [ -z "${DHT_PRIVATE_KEY:-}" ] && [ -f "$HOME/.env" ]; then
+    source "$HOME/.env"
+fi
+
+if [ -z "${DHT_PRIVATE_KEY:-}" ]; then
+    echo "ERROR: DHT_PRIVATE_KEY not set (env or ~/.env)" >&2
+    exit 1
+fi
+
+PYTHON_BIN="$REPO_DIR/.venv/bin/python3"
+if [ ! -x "$PYTHON_BIN" ]; then
+    PYTHON_BIN=python3
+fi
+
+"$PYTHON_BIN" -c 'from shared.nano_identity import derive_nano_address; import os; pub, _ = derive_nano_address(os.environ["DHT_PRIVATE_KEY"]); print(pub.hex())'
