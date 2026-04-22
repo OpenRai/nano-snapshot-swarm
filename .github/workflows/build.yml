@@ -19,15 +19,22 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-
-      - name: Set up Python 3.12
-        run: uv python install 3.12
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-python: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --frozen
 
       - name: Lint with ruff
         run: uv run ruff check shared/ producer/ mirror/ tests/
+
+      - name: Prune uv cache for CI
+        run: uv cache prune --ci
 
   test:
     runs-on: ubuntu-latest
@@ -37,17 +44,24 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-
-      - name: Set up Python 3.12
-        run: uv python install 3.12
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-python: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
 
       - name: Install dependencies
-        run: uv sync --extra dev
+        run: uv sync --extra dev --frozen
 
       - name: Run tests
         run: uv run pytest tests/ -v
         env:
           PYTHONPATH: ${{ github.workspace }}
+
+      - name: Prune uv cache for CI
+        run: uv cache prune --ci
 
   build:
     runs-on: ubuntu-latest
@@ -57,6 +71,10 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Read default authority pubkey
+        id: authority
+        run: echo "value=$(tr -d '\n' < AUTHORITY_PUBKEY)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -85,6 +103,8 @@ jobs:
         with:
           context: .
           file: mirror/Dockerfile
+          build-args: |
+            AUTHORITY_PUBKEY=${{ steps.authority.outputs.value }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
