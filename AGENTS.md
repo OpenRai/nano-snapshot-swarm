@@ -1,138 +1,44 @@
 # AGENTS.md
 
-## Project: Nano P2P Ledger Snapshot Service
-
-Decentralized Nano ledger snapshot distribution using BitTorrent BEP 46 (Mutable Torrents) with binary delta efficiency.
-
-### Quick Start
+### Dev commands
 
 ```bash
-# Install dependencies (producer development)
-uv pip install pynacl bencodepy pytest ruff
-
-# Run tests
+# Tests (PYTHONPATH required — pytest won't find shared/ otherwise)
 PYTHONPATH=$(pwd) pytest tests/ -v
 
 # Lint
 ruff check shared/ producer/ mirror/ tests/
 ```
 
-### Architecture
+### Key non-obvious facts
 
-```
-shared/nano_identity.py    — Ed25519 key handling, Nano address derivation, BEP 46 target ID
-shared/bep46.py           — BEP 46 signature buffer, sign/verify, DHT value encoding
-producer/snapshot.sh       — mdb_copy + zstd --rsyncable pipeline
-producer/torrent_create.py — BitTorrent v2 .torrent generation via libtorrent
-producer/publish.py        — BEP 46 DHT mutable item publisher
-producer/cli.py           — Unified CLI entry point (snapshot/publish/full)
-mirror/Dockerfile          — 2-stage build: libtorrent C++ lib + Python runtime
-mirror/libtorrent_session.py — libtorrent session wrapper with alert loop, DHT ops
-mirror/dht_discovery.py   — DHT mutable item retrieval with retry/verification
-mirror/watcher.py          — Main sidecar: swarm daemon + leech (--once) mode
-```
+- `producer/publish.py` uses raw `lt.session` directly and is intentionally left untouched. All other libtorrent usage goes through `mirror/libtorrent_session.py`.
+- `pop_alerts()` is removed from `LibtorrentSession` — do not add it back. Use the narrow wait APIs (`wait_for_dht_mutable_item`, `wait_for_dht_put`).
+- `MirrorState.update()` preserves `current_torrent_name` when `torrent_name=None` — do not pass empty string.
+- `mirror_state.json` is saved in **both** swarm and `--once` (leech) mode.
+- Leech mode has **no download timeout** — it runs until complete or user cancels. A stall warning is logged if `download_rate == 0` for 300s, but it never exits. Do not add a wall-clock timeout to leech mode.
+- Swarm mode exits after `--download-timeout` (default 1800s) of continuous DHT inactivity (no results from DHT), so the container can restart.
+- `AUTHORITY_PUBKEY`, `DHT_SALT`, and `WEB_SEED_URL` are baked into the mirror Docker image as `ARG` defaults. The image runs with zero env vars. Override at build time with `--build-arg` or at runtime with `-e`.
 
-### Key Commands
+### Mirror Docker image — run without any env vars
 
 ```bash
-# Producer: extract and compress ledger
-python -m producer.cli snapshot --ledger-path /var/nano/data/data.ldb
-
-# Producer: create torrent and publish to DHT
-python -m producer.cli publish --private-key <HEX> --web-seed-url <URL>
-
-# Producer: full pipeline (extract + compress + publish)
-python -m producer.cli full --ledger-path /var/nano/data/data.ldb
-
-# Producer: with custom DHT salt
-python -m producer.cli publish --private-key <HEX> --salt weekly
-
-# Mirror: Docker swarm mode (long-running)
-docker compose up -d
-
-# Mirror: Docker leech mode (one-shot download)
-docker run --rm -e AUTHORITY_PUBKEY=<HEX> \
-  -v $(pwd)/data:/data ghcr.io/openrai/nano-p2p-mirror:latest \
-  --once --download-timeout 3600
+docker run --rm -v /data:/data ghcr.io/openrai/nano-p2p-mirror:latest --once
 ```
 
-### Documentation
+### Stale doc in CLI help (fix if editing)
 
-| Document | Purpose |
-|---|---|
-| `docs/` | Full documentation directory |
-| `docs/getting-started.md` | First run, Docker setup |
-| `docs/mirror-swarm-mode.md` | Long-running mirror |
-| `docs/mirror-leech-mode.md` | One-shot download (`--once`) |
-| `docs/producer-guide.md` | Authority/producer notes |
-| `docs/configuration.md` | Env vars, CLI flags, docker-compose |
-| `docs/architecture.md` | BEP 46, DHT, delta updates |
-| `docs/validation.md` | Manual test templates |
+`--download-timeout` help text says "ignored in --once mode" — that is correct. Do not reintroduce auto-setting it for leech mode.
 
-### Testing
+### Deployment — remote host `bandwidth-martyr`
 
-```bash
-PYTHONPATH=$(pwd) pytest tests/ -v
-```
+- Production runs as user-level systemd on the `openrai` user. **Always use `systemctl --user` / `journalctl --user`** — never system-level. Service units must NOT contain `User=`.
+- Repo lives at `/opt/nano-bootstrap-swarm`. After any change: `git pull && systemctl --user daemon-reload && systemctl --user restart nano-snapshot.timer`.
+- `.env` lives at `~/.env` on the remote (not in the repo). Contains `DHT_PRIVATE_KEY` and `AUTHORITY_PUBKEY`.
 
-Tests cover: BEP 46 signature buffer construction, sign/verify round-trips, BEP 46 test vectors (official), Nano address derivation, DHT value encoding.
+### E2E validation procedure
 
-### Environment Variables
-
-| Variable | Service | Description | Default |
-|---|---|---|---|
-| `NANO_LEDGER_PATH` | Producer | Path to live `data.ldb` | `/var/nano/data/data.ldb` |
-| `OUTPUT_DIR` | Producer | Snapshot output directory | `.` |
-| `DHT_PRIVATE_KEY` | Producer | Ed25519 private key (hex) | Required for publish |
-| `DHT_SALT` | Both | DHT mutable item salt | `daily` |
-| `AUTHORITY_PUBKEY` | Mirror | Ed25519 public key (hex) | Required for mirror |
-| `DATA_DIR` | Mirror | Data volume path | `/data` |
-| `POLL_INTERVAL` | Mirror | DHT poll interval (seconds) | `600` |
-| `WEB_SEED_URL` | Mirror | S3/HTTP web seed URL | `https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest` |
-| `LOG_LEVEL` | Both | Python log level | `INFO` |
-
-### Mirror CLI Flags
-
-The mirror watcher accepts these additional flags beyond env vars:
-
-```bash
-python -m mirror.watcher \
-  --authority-pubkey <HEX> \     # required
-  --salt daily \                   # DHT salt (env: DHT_SALT)
-  --poll-interval 600 \            # swarm mode poll interval
-  --web-seed-url <URL> \          # fallback web seed
-  --log-level INFO \              # DEBUG, INFO, WARNING, ERROR
-  --once \                        # leech mode: download once then exit
-  --download-timeout 3600         # seconds (0=infinite; auto-3600 in --once)
-```
-
-### Deployment
-
-The production pipeline runs on a remote server via **user-level systemd** (not system-level).
-
-**Always use `systemctl --user` and `journalctl --user`** — never system-level units. The service unit must NOT contain `User=` (user services already run as the owning user).
-
-Unit files live in `systemd/` and are symlinked into `~/.config/systemd/user/` on the server. After any change:
-```bash
-cd /opt/nano-bootstrap-swarm && git pull
-systemctl --user daemon-reload
-systemctl --user restart nano-snapshot.timer
-```
-
-Helper scripts (run on the server as the `openrai` user):
-```bash
-./scripts/nano-snapshot-status.sh [n]     # timer + last n log lines
-./scripts/nano-snapshot-start.sh [--follow]
-./scripts/nano-snapshot-stop.sh
-./scripts/nano-snapshot-restart.sh [--service]
-./scripts/nano-snapshot-logs.sh [n]
-./scripts/nano-mirror-build.sh [--push]
-```
-
-### Dependencies
-
-- **Runtime:** Python 3.12+, libtorrent 2.x (C++ built in Docker), pynacl, bencodepy, zstd
-- **Build:** Docker, cmake, boost (libtorrent compilation handled in Dockerfile)
+See `docs/manual-e2e-validation.md`. Uses `DHT_SALT=validation` and `WEB_SEED_MODE=off` to isolate from production. Run against a temporary nohup seeder on the remote, not the production seeder.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
@@ -180,3 +86,4 @@ bd close <id>         # Complete work
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 <!-- END BEADS INTEGRATION -->
+
