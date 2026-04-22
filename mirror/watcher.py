@@ -111,8 +111,8 @@ class MirrorWatcher:
         signal.signal(signal.SIGINT, self._handle_signal)
 
         if once:
-            logger.info("Waiting 15s for DHT to bootstrap (leech mode)...")
-            time.sleep(15)
+            logger.info("Waiting 30s for DHT to bootstrap (leech mode)...")
+            time.sleep(30)
             self.state.set_phase("discovering")
             try:
                 self._run_once()
@@ -462,7 +462,7 @@ class MirrorWatcher:
                     last_state = status.state
                     last_progress_log = 0.0
 
-                if status.progress - last_progress_log >= 0.05 or status.progress == 1.0:
+                if status.progress - last_progress_log >= 0.02 or status.progress == 1.0:
                     last_progress_log = status.progress
 
                 if status.num_peers == 0:
@@ -503,7 +503,7 @@ class MirrorWatcher:
             phase = "checking" if status.state == "checking_files" else status.state
             self.state.set_phase(phase)
 
-        if status.progress - last_progress_log >= 0.05 or status.progress == 1.0:
+        if status.progress - last_progress_log >= 0.02 or status.progress == 1.0:
             logger.info(
                 f"Download: {status.progress * 100:.1f}% | State: {status.state} | "
                 f"DL: {status.download_rate / 1000:.1f} KB/s | "
