@@ -1,10 +1,12 @@
 # Leech Mode: One-Shot Download
 
-Leech mode downloads the latest snapshot once, verifies it, and exits. No daemon, no polling. Useful for:
+Leech mode downloads the latest snapshot once, verifies it, and exits. No daemon, no polling. It is the simplest way to get a fresh snapshot archive for a Nano node. Useful for:
 
 - **CI/CD pipelines** — fetch the latest snapshot as part of a build
 - **One-off sync** — get the ledger file without running a long-lived service
-- **Testing** — quickly verify DHT discovery works with a given authority key
+- **Testing** — quickly verify DHT discovery works
+
+The published Docker image already has the current OpenRAI producer public key baked in. You only need to set `AUTHORITY_PUBKEY` if you want to follow a different producer.
 
 ---
 
@@ -13,31 +15,31 @@ Leech mode downloads the latest snapshot once, verifies it, and exits. No daemon
 ### Docker Run (recommended)
 
 ```bash
-export AUTHORITY_PUBKEY=<your_pubkey_hex>
 docker run --rm \
-  -e AUTHORITY_PUBKEY \
   -v $(pwd)/data:/data \
   ghcr.io/openrai/nano-p2p-mirror:latest \
-  --once --web-seed-mode off
+  --once
 ```
+
+### uvx
+
+```bash
+read -r AUTHORITY_PUBKEY < AUTHORITY_PUBKEY
+export AUTHORITY_PUBKEY
+uvx --from . nano-mirror --once
+```
+
+That `uvx` snippet is only needed when running from a local git clone, because the source tree keeps the default producer key in the repo root `AUTHORITY_PUBKEY` file rather than hardcoding it into shell examples.
 
 ### With Custom Timeout
 
-Default timeout is 3600 seconds (1 hour). If the download is expected to be faster or slower, override:
-
-```bash
-docker run --rm \
-  -e AUTHORITY_PUBKEY \
-  -v $(pwd)/data:/data \
-  ghcr.io/openrai/nano-p2p-mirror:latest \
-  --once --download-timeout 7200 --web-seed-mode off
-```
+Leech mode has no wall-clock download timeout. `--download-timeout` only applies to swarm mode DHT inactivity, so there is nothing to tune here for `--once`.
 
 ### With Docker Compose Override
 
 ```bash
 docker compose run --rm nano-mirror \
-  --once --download-timeout 3600 --web-seed-mode off
+  --once
 ```
 
 ---
@@ -46,16 +48,16 @@ docker compose run --rm nano-mirror \
 
 | Code | Meaning |
 |---|---|
-| `0` | Download complete, now seeding |
-| `1` | Failure — no DHT response, signature verification failed, download timed out, or error |
+| `0` | Download complete, archive saved |
+| `1` | Failure — no DHT response, signature verification failed, or other error |
 
 This makes leech mode easy to use in shell scripts:
 
 ```bash
-if docker run --rm -e AUTHORITY_PUBKEY="$PUBKEY" \
+if docker run --rm \
     -v $(pwd)/data:/data \
     ghcr.io/openrai/nano-p2p-mirror:latest \
-    --once --download-timeout 3600; then
+    --once; then
   echo "Download succeeded"
   # decompress and use the ledger
 else
@@ -82,6 +84,10 @@ zstd -d /data/nano-daily.ldb.zst -o /tmp/data.ldb
 # Verify it opens with mdb_copy
 mdb_copy /tmp/data.ldb /tmp/data_copy
 ```
+
+For the official Nano node Docker image, place the resulting `data.ldb` into the host directory you mount at `/root` inside the node container. Nano's Docker docs describe the node data directory as the path bound with `-v`/`--volume`, and they recommend keeping that directory persistent instead of treating the ledger as disposable.
+
+As of 2026-04, unpacking needs roughly `{compressed size} + {2 * compressed size}` GB of temporary space, so a ~60 GB archive means about ~180 GB free while decompressing.
 
 ---
 
@@ -114,7 +120,6 @@ If the producer publishes to a non-default DHT salt:
 
 ```bash
 docker run --rm \
-  -e AUTHORITY_PUBKEY=<pubkey> \
   -v $(pwd)/data:/data \
   ghcr.io/openrai/nano-p2p-mirror:latest \
   --once --salt weekly
@@ -125,12 +130,12 @@ docker run --rm \
 ## How It Works
 
 1. Waits 15 seconds for DHT to bootstrap (shorter than swarm mode since no polling is needed)
-2. Queries DHT for mutable item under `AUTHORITY_PUBKEY` with given salt
+2. Queries DHT for the latest mutable item under the configured authority key and salt
 3. On success: adds the torrent, begins P2P download
 4. If `--web-seed-mode fallback` is enabled, libtorrent may use the configured web seed when peers are unavailable
 5. Tracks progress every 5 seconds
 6. On seeding complete: logs file path, exits `0`
-7. On timeout or error: logs error, exits `1`
+7. On error: logs error, exits `1`
 
 ## Validation Stream Example
 
@@ -138,17 +143,18 @@ Use the dedicated validation salt for manual system validation:
 
 ```bash
 docker run --rm \
-  -e AUTHORITY_PUBKEY=<pubkey> \
   -e DHT_SALT=validation \
   -e WEB_SEED_MODE=off \
   -v $(pwd)/data:/data \
   ghcr.io/openrai/nano-p2p-mirror:latest \
-  --once --download-timeout 3600
+  --once
 ```
 
-Leech mode also persists `mirror_state.json` in `DATA_DIR`, alongside the downloaded archive or
-extracted `data.ldb`. This preserves the last discovered sequence, info-hash, torrent name, and
-phase for inspection after the run exits.
+Leech mode also persists two local metadata files in `DATA_DIR`, alongside the downloaded archive or
+extracted `data.ldb`:
+
+- `mirror_state.json` records the last discovered sequence, info-hash, torrent name, and phase.
+- `snapshot-meta.json` records the authority pubkey, DHT signature, torrent info-hash, and original upstream `.7z` filename once discovery and torrent metadata resolution complete.
 
 ---
 
@@ -158,10 +164,9 @@ phase for inspection after the run exits.
 - name: Download latest Nano ledger snapshot
   run: |
     docker run --rm \
-      -e AUTHORITY_PUBKEY="${{ secrets.AUTHORITY_PUBKEY }}" \
       -v ${{ github.workspace }}/data:/data \
       ghcr.io/openrai/nano-p2p-mirror:latest \
-      --once --download-timeout 7200
+      --once
 
     echo " Ledger downloaded:"
     ls -lh data/*.ldb.zst

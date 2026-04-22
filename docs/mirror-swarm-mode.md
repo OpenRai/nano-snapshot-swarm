@@ -2,6 +2,8 @@
 
 Swarm mode is the default operational mode. The mirror runs as a daemon, polling the DHT every `POLL_INTERVAL` seconds, downloading new snapshots as they appear, and seeding them back to the P2P network.
 
+The published Docker image already targets the default OpenRAI producer stream. You only need to set `AUTHORITY_PUBKEY` when you intentionally want to follow a different producer.
+
 ---
 
 ## Starting in Swarm Mode
@@ -9,16 +11,16 @@ Swarm mode is the default operational mode. The mirror runs as a daemon, polling
 ### Docker Compose
 
 ```bash
-export AUTHORITY_PUBKEY=<your_pubkey_hex>
 docker compose up -d
 ```
+
+This is the fire-and-forget path for anyone with spare disk and bandwidth. The container restarts automatically and keeps seeding the latest snapshot back to the network.
 
 ### Docker Run
 
 ```bash
 docker run -d \
   --name nano-mirror \
-  -e AUTHORITY_PUBKEY=<your_pubkey_hex> \
   -p 6881:6881/tcp -p 6881:6881/udp \
   -v $(pwd)/data:/data \
   ghcr.io/openrai/nano-p2p-mirror:latest
@@ -42,6 +44,16 @@ docker inspect --format='{{.State.Status}}' nano-mirror && \
 docker exec nano-mirror cat /data/mirror_state.json
 ```
 
+### Kubernetes
+
+Use a Deployment or StatefulSet with a persistent `/data` volume, TCP/UDP 6881 exposed, and a restart policy that keeps the pod alive.
+
+```bash
+kubectl get pods
+kubectl logs -f deploy/nano-mirror
+kubectl describe pod <pod-name>
+```
+
 ### Docker Logs
 
 ```bash
@@ -61,7 +73,7 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 
 | Log | Meaning |
 |---|---|
-| `Authority Nano address: nano_...` | Pubkey decoded correctly |
+| `Authority public key (Nano-format): nano_...` | The DHT authority pubkey rendered in Nano address format for readability |
 | `Mode: SWARM (continuous polling every Ns)` | Running as long-lived daemon |
 | `Web seed mode: fallback` | Web transfer allowed only as fallback |
 | `libtorrent session started, listening on port 6881` | BitTorrent engine ready |
@@ -134,6 +146,32 @@ docker exec nano-mirror cat /data/mirror_state.json
 
 If `last_seq` is `0`, the mirror has never successfully discovered a snapshot.
 
+### snapshot-meta.json
+
+This file is updated locally after DHT discovery and torrent metadata resolution, so mirrors and leechers can inspect the latest resolved snapshot details without scraping logs:
+
+```bash
+docker exec nano-mirror cat /data/snapshot-meta.json
+```
+
+```json
+{
+  "authority_pubkey": "2b845d...",
+  "authority_pubkey_nano": "nano_...",
+  "dht_pubkey": "2b845d...",
+  "dht_signature": "ed05ae...",
+  "dht_seq": 70,
+  "dht_salt": "daily",
+  "torrent_info_hash": "f6d068...",
+  "dht_verified": true,
+  "current_torrent_name": "nano-ledger-snapshot.7z",
+  "original_filename": "snapshot-2026-04-22T00-00-00Z.7z",
+  "source_url": "https://..."
+}
+```
+
+`authority_pubkey_nano` is only a Nano-format rendering of the DHT authority pubkey. It is not proof that the producer controls a Nano account with that same address.
+
 ### Disk Usage
 
 ```bash
@@ -144,7 +182,7 @@ du -sh ./data/
 docker exec nano-mirror ls -lh /data/
 ```
 
-A complete snapshot is approximately 60 GB. During download, a partial file of the same size exists (BitTorrent pre-allocates).
+A complete compressed snapshot is approximately 60 GB or less as of 2026-04. During download, a partial file of the same size exists (BitTorrent pre-allocates).
 
 ### Network
 
@@ -197,8 +235,12 @@ environment:
 ## Updating the Container
 
 ```bash
-# Rebuild
-docker build -f mirror/Dockerfile -t nano-bootstrap-mirror .
+# Rebuild from a local clone using the repo's default authority key
+read -r AUTHORITY_PUBKEY < AUTHORITY_PUBKEY
+docker build \
+  --build-arg AUTHORITY_PUBKEY="$AUTHORITY_PUBKEY" \
+  -f mirror/Dockerfile \
+  -t nano-bootstrap-mirror .
 
 # Pull latest published image
 docker pull ghcr.io/openrai/nano-p2p-mirror:latest
@@ -214,9 +256,9 @@ State is preserved in the `nano-data` volume. No data is lost on restart.
 
 ## Troubleshooting
 
-### "Authority Nano address" doesn't match expected
+### "Authority public key (Nano-format)" doesn't match expected
 
-Your `AUTHORITY_PUBKEY` may be wrong or byteswapped. The hex is interpreted as raw bytes of the Ed25519 public key. Double-check the source of the key.
+If you overrode `AUTHORITY_PUBKEY`, it may be wrong or byteswapped. The hex is interpreted as raw bytes of the DHT Ed25519 public key. The Nano-format rendering in logs is only that same pubkey encoded with Nano's address alphabet and checksum; it is not derived from the producer's Nano account keypair.
 
 ### "Signature verification FAILED"
 

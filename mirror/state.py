@@ -7,6 +7,38 @@ from pathlib import Path
 logger = logging.getLogger("mirror.watcher")
 
 
+class SnapshotMetadata:
+    def __init__(self, path: str):
+        self.path = path
+        self.data: dict[str, object] = {}
+        self._load()
+
+    def _load(self) -> None:
+        p = Path(self.path)
+        if not p.exists():
+            return
+        try:
+            loaded = json.loads(p.read_text())
+            if isinstance(loaded, dict):
+                self.data = loaded
+        except json.JSONDecodeError as e:
+            logger.warning("Corrupted snapshot metadata file, resetting: %s", e)
+            self.data = {}
+
+    def _save(self) -> None:
+        Path(self.path).write_text(json.dumps(self.data, indent=2) + "\n")
+
+    def set(self, data: dict[str, object]) -> None:
+        self.data = dict(data)
+        self._save()
+
+    def update(self, **fields: object) -> None:
+        for key, value in fields.items():
+            if value is not None:
+                self.data[key] = value
+        self._save()
+
+
 class MirrorState:
     def __init__(self, path: str):
         self.path = path

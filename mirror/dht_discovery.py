@@ -22,6 +22,8 @@ class DHTDiscoveryResult:
     sequence: int
     value_bytes: bytes
     verified: bool
+    signature_hex: Optional[str] = None
+    dht_pubkey_hex: Optional[str] = None
 
 
 def discover_latest_snapshot(
@@ -132,6 +134,8 @@ def _process_mutable_item_snapshot(
             sequence=seq,
             value_bytes=value_bytes,
             verified=verified,
+            signature_hex=snap.extra.get("signature"),
+            dht_pubkey_hex=snap.extra.get("key"),
         )
     except Exception as e:
         logger.error(f"Error processing DHT mutable item alert: {e}")

@@ -47,7 +47,7 @@ def publish_to_dht(
     pub_key_bytes, nano_address = derive_nano_address(private_key_hex)
     target_id = compute_bep46_target_id(pub_key_bytes, salt)
 
-    print(f"Publisher identity: {nano_address}")
+    print(f"Publisher DHT pubkey (Nano-format): {nano_address}")
     print(f"DHT target ID (SHA-1): {target_id.hex()}")
     print(f"Publishing seq={seq}, info_hash={info_hash_hex}, salt='{salt}'")
 

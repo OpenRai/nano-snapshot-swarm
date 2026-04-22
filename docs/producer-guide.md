@@ -20,7 +20,7 @@ uv venv .venv --python 3.12
 source .venv/bin/activate
 
 # Install Python dependencies
-uv pip install pynacl bencodepy
+uv pip install pynacl bencodepy nano_lib_py
 
 # libtorrent is C++ and must be installed separately — see mirror/Dockerfile for build instructions
 ```
@@ -31,26 +31,27 @@ uv pip install pynacl bencodepy
 
 The producer needs an Ed25519 key pair. The **private key** (hex) is used to sign DHT mutable items. The **public key** (hex) is what mirrors use as `AUTHORITY_PUBKEY`.
 
-### Option A: Derive from your Nano secret key (recommended)
+Important: the BEP 46 / libtorrent keypair uses standard Ed25519 derivation. A Nano account address uses Nano's Ed25519-Blake2b derivation. Reusing the same 32-byte secret across both systems does not make the DHT public key numerically equal to the Nano account public key.
 
-Your Nano secret key (64-char hex, 32 bytes) is already an Ed25519 seed. The same seed produces both your Nano address and the BEP 46 signing key.
+### Option A: Reuse a 32-byte secret you already control
+
+If you already have a 32-byte secret, you can reuse it as `DHT_PRIVATE_KEY`. The helper below derives the corresponding DHT public key that mirrors must follow:
 
 ```bash
 cd /opt/nano-bootstrap-swarm
 uv pip install nano_lib_py
 .venv/bin/python3 -c "
 import getpass
-from nano_lib_py import get_account_id, get_account_key_pair
+from nacl.signing import SigningKey
 
-NANO_SECRET = getpass.getpass('Enter Nano secret key: ').strip()
-print(f'Nano address: {get_account_id(private_key=NANO_SECRET)}')
-kp = get_account_key_pair(NANO_SECRET)
-print(f'DHT_PRIVATE_KEY: {NANO_SECRET}')
-print(f'AUTHORITY_PUBKEY:  {kp.public}')
+secret = getpass.getpass('Enter 32-byte secret key hex: ').strip()
+sk = SigningKey(bytes.fromhex(secret))
+print(f'DHT_PRIVATE_KEY: {secret}')
+print(f'AUTHORITY_PUBKEY: {sk.verify_key.encode().hex()}')
 "
 ```
 
-This uses the same Ed25519-Blake2b seed expansion as `nano-vanity`, so the address will match exactly.
+If that same secret also controls a Nano account, treat that as an operational convenience only. The mirror follows the DHT public key, not your Nano account address.
 
 ### Option B: Generate a fresh random key
 
@@ -87,7 +88,7 @@ NANO_LEDGER_PATH=/var/nano/data/data.ldb
 OUTPUT_DIR=/opt/nano-snapshots
 ```
 
-This file is read by the systemd service via `EnvironmentFile=-/home/openrai/.env` and by the daily script when run manually (not via systemd).
+This file is read by the systemd service via `EnvironmentFile=-/home/openrai/.env` and by `scripts/daily-snapshot.sh` when run manually.
 
 ---
 
@@ -106,31 +107,24 @@ if [ -z "$DHT_PRIVATE_KEY" ] && [ -f /home/openrai/.env ]; then
     source /home/openrai/.env
 fi
 
-python -m producer.cli full \
-  --ledger-path /var/nano/data/data.ldb \
-  --private-key "$DHT_PRIVATE_KEY" \
-  --web-seed-url https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest
+./scripts/daily-snapshot.sh
 ```
 
 ### Individual steps (advanced)
 
 ```bash
-# Step 1: Extract and compress
-export NANO_LEDGER_PATH=/var/nano/data/data.ldb
-export OUTPUT_DIR=/opt/nano-snapshots
-python -m producer.cli snapshot
-
-# Step 2: Create torrent and publish to DHT
+# Create and publish a torrent for an existing .7z snapshot
 source /home/openrai/.env
 python -m producer.cli publish \
   --private-key "$DHT_PRIVATE_KEY" \
+  --snapshot-file /opt/nano-snapshots/nano-ledger-snapshot.7z \
   --web-seed-url https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest \
   --output-dir /opt/nano-snapshots
 ```
 
 Expected publish output:
 ```
-Publisher identity: nano_...
+Publisher DHT pubkey (Nano-format): nano_...
 DHT target ID (SHA-1): <target>
 Publishing seq=1, info_hash=<info_hash>
 Signature: <sig_hex>
@@ -144,20 +138,23 @@ Published seq=1 to DHT
 
 ## Salt Convention
 
-Use `--salt daily` (default) for daily snapshots or `--salt weekly` for weekly. Mirrors must use the matching `--salt` / `DHT_SALT` to discover your items.
+Use `--salt daily` (default) for the main stream or `--salt weekly` for a separate stream. Mirrors must use the matching `--salt` / `DHT_SALT` to discover your items.
 
-Example for weekly snapshots:
+Example for a separate stream:
 
 ```bash
 python -m producer.cli publish \
   --private-key "$DHT_PRIVATE_KEY" \
+  --snapshot-file /opt/nano-snapshots/nano-ledger-snapshot.7z \
   --salt weekly
 ```
 
-And on the mirror:
+And on a mirror following that separate stream:
 ```bash
 docker run --rm -e AUTHORITY_PUBKEY=<pubkey> -e DHT_SALT=weekly ghcr.io/openrai/nano-p2p-mirror:latest --once
 ```
+
+For the default OpenRAI stream, the published mirror image already has the current producer public key baked in, so mirror and leech users do not need to set `AUTHORITY_PUBKEY`.
 
 ---
 
@@ -171,7 +168,7 @@ Snapshots run automatically via a **user-level** systemd timer on the producer s
 
 **Credentials:** The service reads `/home/openrai/.env` (EnvironmentFile), so keys are never in the unit file itself.
 
-**Pipeline steps:** The timer invokes `/opt/nano-bootstrap-swarm/scripts/daily-snapshot.sh`, which downloads from S3, extracts, compacts with `mdb_copy`, compresses with `zstd --rsyncable`, then runs `producer.cli publish`.
+**Pipeline steps:** The timer invokes `/opt/nano-bootstrap-swarm/scripts/daily-snapshot.sh`, which resolves the latest `.7z` archive from the web seed, downloads it, validates it, writes provenance metadata, and publishes the torrent info-hash to DHT.
 
 ```bash
 # Check timer status
@@ -196,7 +193,7 @@ The service runs with `TimeoutStopSec=3600` (1 hour) to accommodate large downlo
 
 - **Never commit `DHT_PRIVATE_KEY`** to git. Use environment variables or a secrets manager.
 - The private key controls your snapshot stream. If compromised, rotate to a new key and update your `AUTHORITY_PUBKEY` in all mirrors.
-- Logs contain your public key and DHT target ID but **never** the private key.
+- Logs contain your DHT public key and DHT target ID but **never** the private key.
 
 ---
 

@@ -19,7 +19,7 @@ from mirror.libtorrent_session import (
     TorrentStatusSnapshot,
 )
 from mirror.reconcile import DesiredSnapshot, ReconcileDecision, reconcile_snapshot
-from mirror.state import MirrorState
+from mirror.state import MirrorState, SnapshotMetadata
 from shared.nano_identity import public_key_to_nano_address
 
 logger = logging.getLogger("mirror.watcher")
@@ -29,8 +29,17 @@ DEFAULT_POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "600"))
 DEFAULT_STALL_WARN_SECONDS = 300   # leech: warn if no bytes received for this long
 DEFAULT_DHT_INACTIVITY_TIMEOUT = 1800  # swarm: exit if DHT returns nothing for this long
 STATE_FILENAME = "mirror_state.json"
+SNAPSHOT_META_FILENAME = "snapshot-meta.json"
 
 WEB_SEED_URL = "https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest"
+DEFAULT_AUTHORITY_PUBKEY_FILE = Path(__file__).resolve().parent.parent / "AUTHORITY_PUBKEY"
+
+
+def load_default_authority_pubkey() -> str:
+    try:
+        return DEFAULT_AUTHORITY_PUBKEY_FILE.read_text(encoding="ascii").strip()
+    except FileNotFoundError:
+        return ""
 
 
 class DownloadStatus(Enum):
@@ -67,6 +76,7 @@ class MirrorWatcher:
         self.nano_address = public_key_to_nano_address(self.pub_key_bytes)
 
         self.state = MirrorState(os.path.join(data_dir, STATE_FILENAME))
+        self.snapshot_meta = SnapshotMetadata(os.path.join(data_dir, SNAPSHOT_META_FILENAME))
         self.session: Optional[LibtorrentSession] = None
         self._desired_snapshot = self._load_desired_snapshot()
         self._active_info_hash: Optional[str] = None
@@ -77,11 +87,12 @@ class MirrorWatcher:
         self._stop_reason: Optional[DownloadStatus] = None
         self._state_lock = threading.Lock()
         self._reconcile_event = threading.Event()
+        self._last_discovery: Optional[DHTDiscoveryResult] = None
 
     def start(self, *, once: bool = False) -> None:
         logger.info("=" * 60)
         logger.info("Nano P2P Mirror Service Starting")
-        logger.info(f"Authority Nano address: {self.nano_address}")
+        logger.info(f"Authority public key (Nano-format): {self.nano_address}")
         logger.info(f"Authority public key: {self.authority_pubkey_hex[:16]}...")
         logger.info(f"Data directory: {self.data_dir}")
         logger.info(f"Web seed URL: {self.web_seed_url}")
@@ -323,7 +334,18 @@ class MirrorWatcher:
                 seq=result.sequence,
                 info_hash=result.info_hash_hex,
             )
+            self._last_discovery = result
             self.state.update(result.sequence, result.info_hash_hex)
+            self.snapshot_meta.update(
+                authority_pubkey=self.authority_pubkey_hex,
+                authority_pubkey_nano=self.nano_address,
+                dht_pubkey=result.dht_pubkey_hex or self.authority_pubkey_hex,
+                dht_signature=result.signature_hex,
+                dht_seq=result.sequence,
+                dht_salt=self.salt,
+                torrent_info_hash=result.info_hash_hex,
+                dht_verified=result.verified,
+            )
 
         self._reconcile_to_desired()
 
@@ -404,9 +426,16 @@ class MirrorWatcher:
             self.state._save()
             logger.info(f"Torrent metadata resolved: {metadata.name}")
 
+        self.snapshot_meta.update(current_torrent_name=metadata.name)
+
         meta = metadata.snapshot_meta
         if not meta:
             return
+
+        self.snapshot_meta.update(
+            original_filename=meta.get("original_filename"),
+            source_url=meta.get("source_url"),
+        )
 
         parts = []
         if "original_filename" in meta:
@@ -556,8 +585,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Nano P2P Mirror Service")
     parser.add_argument(
         "--authority-pubkey",
-        default=os.environ.get("AUTHORITY_PUBKEY", ""),
-        help="Authority Ed25519 public key (hex). Required.",
+        default=os.environ.get("AUTHORITY_PUBKEY") or load_default_authority_pubkey(),
+        help="Authority Ed25519 public key (hex). Defaults to env or repo root AUTHORITY_PUBKEY.",
     )
     parser.add_argument(
         "--data-dir",
@@ -630,7 +659,11 @@ def main() -> None:
 
     pubkey = args.authority_pubkey.replace(":", "").strip()
     if not pubkey:
-        print("ERROR: AUTHORITY_PUBKEY is required (env or --authority-pubkey)", file=sys.stderr)
+        print(
+            "ERROR: AUTHORITY_PUBKEY is required via --authority-pubkey, env, "
+            "or AUTHORITY_PUBKEY file",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     try:

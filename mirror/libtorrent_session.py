@@ -94,6 +94,10 @@ def _snapshot_alert(alert: lt.alert) -> AlertSnapshot:
             extra["key"] = bytes(alert.key).hex()
         except Exception:
             pass
+        try:
+            extra["signature"] = bytes(alert.signature).hex()
+        except Exception:
+            pass
 
     return AlertSnapshot(type_name=type_name, category=cat, message=msg, extra=extra)
 
