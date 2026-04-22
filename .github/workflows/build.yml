@@ -22,13 +22,12 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-          cache-python: true
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
 
       - name: Install dependencies
-        run: uv sync --extra dev --frozen
+        run: uv sync --extra dev
 
       - name: Lint with ruff
         run: uv run ruff check shared/ producer/ mirror/ tests/
@@ -47,13 +46,12 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-          cache-python: true
           cache-dependency-glob: |
             pyproject.toml
             uv.lock
 
       - name: Install dependencies
-        run: uv sync --extra dev --frozen
+        run: uv sync --extra dev
 
       - name: Run tests
         run: uv run pytest tests/ -v
