@@ -110,6 +110,7 @@ docker compose run --rm nano-mirror --once
 | `DHT_PRIVATE_KEY` | — | **Yes** | Ed25519 private key (hex, 64 chars) |
 | `WEB_SEED_URL` | _(empty)_ | No | S3/HTTP URL added as web seed to torrent |
 | `DHT_SALT` | `daily` | No | DHT salt namespace |
+| `STATUS_API_URL` | _(empty)_ | No | URL of the status API to push snapshot metadata (e.g. `https://nano-snapshot-hub.fly.dev`) |
 
 ---
 
@@ -135,6 +136,22 @@ python -m producer.cli validation-fixture publish [flags]
 | `--state-file` | Path to publisher state file (default: `publisher_state.json`) |
 | `--dry-run` | Create torrent metadata but don't publish to DHT |
 | `--salt` | DHT salt (overrides `DHT_SALT`) |
+
+#### `push-status`
+
+Push snapshot metadata and `.torrent` file to the status API after publishing.
+
+| Flag | Description |
+|---|---|
+| `--status-api-url` | Status API base URL (overrides `STATUS_API_URL`) |
+| `--private-key` | Ed25519 private key hex (overrides `DHT_PRIVATE_KEY`) |
+| `--state-file` | Path to publisher state file (default: `publisher_state.json`) |
+| `--meta-file` | Path to snapshot metadata file (default: `snapshot-meta.json`) |
+| `--torrent-file` | Path to `.torrent` file |
+| `--snapshot-file` | Path to `.7z` snapshot file |
+| `--web-seed-url` | Base web seed URL (overrides `WEB_SEED_URL`) |
+| `--torrent-name` | Torrent name/filename (default: `nano-ledger-snapshot.7z`) |
+| `--piece-size` | Torrent piece size in bytes (default: 32 MiB) |
 
 #### `validation-fixture create`
 

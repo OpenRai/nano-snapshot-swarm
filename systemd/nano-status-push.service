@@ -1,0 +1,13 @@
+[Unit]
+Description=Push snapshot status to status API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.env
+ExecStart=%h/nano-bootstrap-swarm/scripts/push-snapshot-status.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nano-status-push
+TimeoutStartSec=120

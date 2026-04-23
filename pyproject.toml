@@ -22,6 +22,7 @@ dev = [
 [project.scripts]
 nano-producer = "producer.cli:main"
 nano-mirror = "mirror.watcher:main"
+nano-push-status = "producer.push_status:main"
 
 [tool.setuptools.packages.find]
 include = ["shared*", "mirror*", "producer*"]

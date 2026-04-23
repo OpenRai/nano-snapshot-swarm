@@ -94,6 +94,12 @@ result = publish_to_dht(
 print(result)
 " || log "WARNING: DHT re-publish failed (non-fatal)"
 
+        # --- Step 7: Push status to API (re-publish path) ---
+        if [ -n "${STATUS_API_URL:-}" ]; then
+            log "Pushing status to ${STATUS_API_URL}"
+            "${REPO_DIR}/scripts/push-snapshot-status.sh" || log "WARNING: Status push failed (non-fatal)"
+        fi
+
         log "=== Daily snapshot pipeline complete (re-publish only) ==="
         exit 0
     fi
@@ -284,6 +290,12 @@ fi
 if systemctl --user is-enabled nano-seed.service &>/dev/null; then
     log "Restarting nano-seed.service to seed updated snapshot"
     systemctl --user restart nano-seed.service
+fi
+
+# --- Step 7: Push status to API ---
+if [ -n "${STATUS_API_URL:-}" ]; then
+    log "Pushing status to ${STATUS_API_URL}"
+    "${REPO_DIR}/scripts/push-snapshot-status.sh" || log "WARNING: Status push failed (non-fatal)"
 fi
 
 log "=== Daily snapshot pipeline complete ==="

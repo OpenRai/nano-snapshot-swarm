@@ -1,0 +1,25 @@
+app = "nano-snapshot-hub"
+primary_region = "sjc"
+
+[env]
+  AUTHORITY_PUBKEY = "cdbc9284015e84c225f0e67b891606505a60cf1218b127ac1c1edb6444567e6b"
+  DHT_SALT = "daily"
+
+[mounts]
+  source = "status_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop = "suspend"
+  auto_start = true
+
+[http_service.concurrency]
+  type = "requests"
+  hard_limit = 25
+  soft_limit = 20
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"

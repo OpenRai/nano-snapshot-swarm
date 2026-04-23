@@ -189,6 +189,70 @@ The service runs with `TimeoutStopSec=3600` (1 hour) to accommodate large downlo
 
 ---
 
+## Status API Deployment
+
+The **Status API** is a lightweight Fly.io service that makes your snapshot stream discoverable without requiring users to run the Mirror client. It receives signed pushes from the Producer and serves JSON metadata, `.torrent` files, and an SSR dashboard.
+
+### Architecture
+
+```
+Producer ──HTTPS signed push──► Fly.io: nano-snapshot-hub
+                                     ├── GET /api/status   (JSON)
+                                     ├── GET /api/torrent  (.torrent file)
+                                     ├── GET /             (SSR dashboard)
+                                     └── /data volume      (persistent)
+                                          ▼
+                                   Cloudflare CDN cache
+                                          ▼
+                              GitHub Pages static dashboard
+```
+
+### Deploy the Status API
+
+See the full runbook at `status-api/deploy/fly.io/README.md`. Quick start:
+
+```bash
+cd status-api
+
+# One-time setup
+fly apps create nano-snapshot-hub
+fly volumes create status_data --size 1 --region sjc --app nano-snapshot-hub
+
+# Deploy
+fly deploy
+```
+
+The `fly.toml` and `Dockerfile` live directly in `status-api/` (the service root). The checked-in config already embeds the OpenRAI `AUTHORITY_PUBKEY`, so no env vars are needed at runtime.
+
+### Producer Configuration
+
+Add `STATUS_API_URL` to the producer's `~/.env`:
+
+```bash
+STATUS_API_URL=https://nano-snapshot-hub.fly.dev
+```
+
+The `daily-snapshot.sh` pipeline will then push after every DHT publish. Push failures are non-fatal.
+
+You can also push manually or via systemd:
+
+```bash
+# Immediate manual push
+./scripts/push-snapshot-status.sh
+
+# Or via the dedicated systemd timer
+systemctl --user start nano-status-push.service
+systemctl --user enable nano-status-push.timer
+```
+
+### Cloudflare Caching (Recommended)
+
+Place Cloudflare in front of the Fly app to cache `.torrent` files and status JSON at the edge. See `status-api/deploy/fly.io/README.md` §5 for exact DNS and cache-rule settings.
+
+Expected Fly.io cost: **under $5/month** (mostly idle 256 MB VM + 1 GB volume).
+
+---
+
 ## Security
 
 - **Never commit `DHT_PRIVATE_KEY`** to git. Use environment variables or a secrets manager.

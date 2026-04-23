@@ -1,0 +1,22 @@
+<section id="status">
+  <h2>Current Snapshot</h2>
+  <dl>
+    <dt>Sequence</dt><dd>{{ sequence }}</dd>
+    <dt>Info Hash</dt><dd>{{ info_hash[:16] }}…</dd>
+    <dt>Verified</dt><dd>✓ Yes</dd>
+    <dt>Last Updated</dt><dd>{{ timestamp }}</dd>
+  </dl>
+</section>
+<section id="downloads">
+  <div class="download-grid">
+    <a href="{{ magnet }}" class="download-card">
+      <h3>🧲 Magnet Link</h3><p>Open in Transmission, qBittorrent…</p>
+    </a>
+    <a href="/api/torrent" class="download-card">
+      <h3>📄 .torrent File</h3><p>Download and add to your client</p>
+    </a>
+    <a href="{{ web_seed_url }}" class="download-card">
+      <h3>🌐 Direct HTTP</h3><p>Download via HTTPS from S3</p>
+    </a>
+  </div>
+</section>

@@ -7,8 +7,16 @@
 PYTHONPATH=$(pwd) uv run pytest tests/ -v
 
 # Lint
-uv run ruff check shared/ producer/ mirror/ tests/
+uv run ruff check shared/ producer/ mirror/ tests/ status-api/
 ```
+
+### Status API
+
+- `status-api/` is a **standalone** FastAPI app with no imports from `shared/`, `producer/`, or `mirror/`. It only needs `pynacl` for signature verification.
+- The status-api Docker image is ~100MB (no libtorrent).
+- `producer/push_status.py` uses `urllib.request` (stdlib) to avoid adding a new dependency to the main project.
+- Push failures are **non-fatal** — the DHT publish is the source of truth; the status API is best-effort.
+- `AUTHORITY_PUBKEY` is embedded in `fly.toml` and the status-api reads it from the env var of the same name.
 
 ### Key non-obvious facts
 

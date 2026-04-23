@@ -1,0 +1,10 @@
+[Unit]
+Description=Push snapshot status to status API hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

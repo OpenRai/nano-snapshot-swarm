@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano Ledger Snapshot — P2P Bootstrap Download</title>
+    <meta name="description" content="Download the latest Nano (XNO) ledger snapshot via BitTorrent P2P or direct HTTP. Bootstrap your Nano node quickly with a verified, signed snapshot.">
+    <meta name="keywords" content="nano xno ledger snapshot, nano node bootstrap, nano blockchain snapshot download, nano ledger p2p">
+    <meta property="og:title" content="Nano Ledger Snapshot — P2P Bootstrap Download">
+    <meta property="og:description" content="Download the latest Nano (XNO) ledger snapshot via BitTorrent P2P or direct HTTP.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary">
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <style>
+        :root { --bg: #0b0f19; --fg: #e2e8f0; --accent: #4f46e5; --muted: #94a3b8; --card: #151c2c; }
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--fg); max-width: 800px; margin: 0 auto; padding: 2rem 1rem; line-height: 1.6; }
+        h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+        .subtitle { color: var(--muted); margin-bottom: 1.5rem; }
+        section { margin: 1.5rem 0; }
+        #status dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
+        #status dt { color: var(--muted); }
+        #status dd { margin: 0; font-family: ui-monospace, monospace; word-break: break-all; }
+        .download-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .download-card { display: block; background: var(--card); border-radius: 0.5rem; padding: 1rem; text-decoration: none; color: inherit; border: 1px solid #1e293b; transition: border-color 0.2s; }
+        .download-card:hover { border-color: var(--accent); }
+        .download-card h3 { margin: 0 0 0.25rem; font-size: 1rem; }
+        .download-card p { margin: 0; color: var(--muted); font-size: 0.875rem; }
+        pre { background: var(--card); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+        code { font-family: ui-monospace, monospace; font-size: 0.875rem; }
+        footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #1e293b; color: var(--muted); font-size: 0.875rem; }
+        noscript { display: block; background: var(--card); padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <h1>Nano (XNO) Ledger Snapshot</h1>
+    <p class="subtitle">Verified, signed snapshot for bootstrapping Nano nodes — distributed via BitTorrent and HTTP.</p>
+
+    <div hx-get="/api/status-fragment"
+         hx-trigger="load, every 60s"
+         hx-swap="innerHTML">
+        <p>Loading snapshot status…</p>
+    </div>
+
+    <noscript>
+        <p>JavaScript is disabled. You can view the current status as <a href="/api/status">JSON</a> or download directly from the web seed if you know the URL.</p>
+    </noscript>
+
+    <section id="seed">
+        <h2>Help Seed</h2>
+        <pre><code>docker run -d -p 6881:6881/tcp -p 6881:6881/udp \
+  -v nano-data:/data \
+  ghcr.io/openrai/nano-p2p-mirror:latest</code></pre>
+    </section>
+
+    <section id="about">
+        <h2>About</h2>
+        <p>
+            This snapshot is published daily to the BitTorrent DHT as a <a href="https://www.bittorrent.org/beps/bep_0046.html">BEP 46</a> mutable item,
+            signed with an Ed25519 key. The <code>.torrent</code> file and magnet link above let you download the ~60 GB ledger archive
+            via P2P (fast, resilient) or direct HTTPS fallback.
+        </p>
+        <p>
+            For technical details, see the <a href="https://github.com/OpenRai/nano-bootstrap-swarm">nano-bootstrap-swarm</a> repository.
+        </p>
+    </section>
+
+    <footer>
+        Nano snapshot hub · Data refreshed every ~5 minutes · <a href="/api/status">API</a> · <a href="/health">Health</a>
+    </footer>
+</body>
+</html>
