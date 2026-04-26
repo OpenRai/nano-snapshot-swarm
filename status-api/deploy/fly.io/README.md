@@ -165,7 +165,7 @@ The `daily-snapshot.sh` pipeline will automatically push to the API after each D
 You can also push manually:
 
 ```bash
-cd /opt/nano-bootstrap-swarm
+cd /opt/nano-snapshot-swarm
 ./scripts/push-snapshot-status.sh
 ```
 

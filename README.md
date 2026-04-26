@@ -1,4 +1,4 @@
-# nano-bootstrap-swarm
+# nano-snapshot-swarm
 
 Decentralized [Nano](https://nano.org) ledger snapshot distribution using BitTorrent BEP 46 mutable torrents and DHT.
 

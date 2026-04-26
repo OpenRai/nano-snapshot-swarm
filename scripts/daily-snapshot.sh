@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
 WEB_SEED_URL="${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
-AGENT="nano-bootstrap-swarm/1.0"
+AGENT="nano-snapshot-swarm/1.0"
 
 log() {
     echo "[$(date -Iseconds)] $*"

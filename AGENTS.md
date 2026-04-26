@@ -41,7 +41,7 @@ docker run --rm -v /data:/data ghcr.io/openrai/nano-p2p-mirror:latest --once
 ### Deployment — remote host `bandwidth-martyr`
 
 - Production runs as user-level systemd on the `openrai` user. **Always use `systemctl --user` / `journalctl --user`** — never system-level. Service units must NOT contain `User=`.
-- Repo lives at `/opt/nano-bootstrap-swarm`. After any change: `git pull && systemctl --user daemon-reload && systemctl --user restart nano-snapshot.timer`.
+- Repo lives at `/opt/nano-snapshot-swarm`. After any change: `git pull && systemctl --user daemon-reload && systemctl --user restart nano-snapshot.timer`.
 - `.env` lives at `~/.env` on the remote (not in the repo). `DHT_PRIVATE_KEY` is required; `AUTHORITY_PUBKEY` can be regenerated from it.
 - From the repo root, refresh the checked-in authority key file with `./derive-authority-pubkey | tee AUTHORITY_PUBKEY`.
 

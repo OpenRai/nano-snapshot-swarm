@@ -38,7 +38,7 @@ Important: the BEP 46 / libtorrent keypair uses standard Ed25519 derivation. A N
 If you already have a 32-byte secret, you can reuse it as `DHT_PRIVATE_KEY`. The helper below derives the corresponding DHT public key that mirrors must follow:
 
 ```bash
-cd /opt/nano-bootstrap-swarm
+cd /opt/nano-snapshot-swarm
 uv pip install nano_lib_py
 .venv/bin/python3 -c "
 import getpass
@@ -56,7 +56,7 @@ If that same secret also controls a Nano account, treat that as an operational c
 ### Option B: Generate a fresh random key
 
 ```bash
-cd /opt/nano-bootstrap-swarm
+cd /opt/nano-snapshot-swarm
 .venv/bin/python3 -c "
 from nacl.signing import SigningKey
 sk = SigningKey.generate()
@@ -101,7 +101,7 @@ The production pipeline runs automatically via systemd. See [Scheduling with sys
 ### Manual ad-hoc run
 
 ```bash
-cd /opt/nano-bootstrap-swarm
+cd /opt/nano-snapshot-swarm
 source .venv/bin/activate
 if [ -z "$DHT_PRIVATE_KEY" ] && [ -f /home/openrai/.env ]; then
     source /home/openrai/.env
@@ -168,7 +168,7 @@ Snapshots run automatically via a **user-level** systemd timer on the producer s
 
 **Credentials:** The service reads `/home/openrai/.env` (EnvironmentFile), so keys are never in the unit file itself.
 
-**Pipeline steps:** The timer invokes `/opt/nano-bootstrap-swarm/scripts/daily-snapshot.sh`, which resolves the latest `.7z` archive from the web seed, downloads it, validates it, writes provenance metadata, and publishes the torrent info-hash to DHT.
+**Pipeline steps:** The timer invokes `/opt/nano-snapshot-swarm/scripts/daily-snapshot.sh`, which resolves the latest `.7z` archive from the web seed, downloads it, validates it, writes provenance metadata, and publishes the torrent info-hash to DHT.
 
 ```bash
 # Check timer status
