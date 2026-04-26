@@ -180,6 +180,25 @@ class TestGetEndpoints:
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
+    def test_status_fragment_renders_truncated_info_hash(self, client, sample_push_payload):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+        original_pubkey = main_module.AUTHORITY_PUBKEY
+        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        try:
+            client.post("/api/push", json=payload)
+            resp = client.get("/api/status-fragment")
+            assert resp.status_code == 200
+            # payload['info_hash'] is 'ab' * 32, so first 16 chars is 'abababababababab'
+            expected_short_hash = payload["info_hash"][:16]
+            assert expected_short_hash in resp.text
+            # It should not contain the full info_hash as a literal {{ info_hash[:16] }}
+            assert "{{ info_hash[:16] }}" not in resp.text
+        finally:
+            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module._current_status = None
+            main_module._torrent_bytes = b""
+
     def test_index_returns_html(self, client):
         resp = client.get("/")
         assert resp.status_code == 200

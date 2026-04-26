@@ -47,8 +47,10 @@ def push_status(
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
     signature = sign_push(private_key_hex, sequence, info_hash, timestamp)
 
-    # Construct full web seed URL (base + filename)
-    full_web_seed = f"{web_seed_url.rstrip('/')}/{torrent_name}"
+    # Construct full web seed URL (follow BEP 19 logic: append if ends in slash)
+    full_web_seed = web_seed_url
+    if full_web_seed.endswith("/"):
+        full_web_seed += torrent_name
 
     payload = {
         "sequence": sequence,

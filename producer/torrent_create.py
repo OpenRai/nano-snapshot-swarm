@@ -45,7 +45,10 @@ def create_torrent(
     ct = lt.create_torrent(fs, piece_size=piece_size, flags=_v2_flags(lt))
 
     if web_seed_url:
-        seed_url = f"{web_seed_url.rstrip('/')}/{filename}"
+        seed_url = web_seed_url
+        if seed_url.endswith("/"):
+            seed_url += filename
+
         if hasattr(ct, "set_web_seeds"):
             ct.set_web_seeds([seed_url])
         else:

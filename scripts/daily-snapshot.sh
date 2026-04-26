@@ -251,6 +251,7 @@ json.dump({
     'original_filename': '$FILENAME',
     'sha256': '$SHA256',
     'size_bytes': $FILE_SIZE,
+    'source_url': '$LATEST_URL',
     'downloaded_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
 }, open('$META_FILE', 'w'), indent=2)
 "
@@ -268,7 +269,7 @@ fi
 PUBLISH_OUTPUT=$(python -m producer.cli publish \
     --private-key "$DHT_PRIVATE_KEY" \
     --snapshot-file "$STABLE_FILE" \
-    --web-seed-url "$WEB_SEED_URL" \
+    --web-seed-url "$LATEST_URL" \
     --source-url "$LATEST_URL" \
     --original-filename "$FILENAME")
 
