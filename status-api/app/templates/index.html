@@ -182,11 +182,11 @@ volumes:
                 const group = tabs.dataset.group;
                 const tab = btn.dataset.tab;
 
-                tabs.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                tabs.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.querySelectorAll(`.tab-btn[data-group="${group}"]`).forEach(b => b.classList.remove('active'));
+                document.querySelectorAll(`.tab-content[data-group="${group}"]`).forEach(c => c.classList.remove('active'));
 
                 btn.classList.add('active');
-                tabs.querySelector(`.tab-content[data-id="${tab}"]`).classList.add('active');
+                document.querySelector(`.tab-content[data-group="${group}"][data-id="${tab}"]`).classList.add('active');
             });
         });
 
