@@ -179,12 +179,19 @@ def get_torrent() -> Response:
 def index() -> Response:
     template_path = Path(__file__).parent / "templates" / "index.html"
     html = template_path.read_text()
-    if _current_status:
-        html = html.replace(
-            '{{ timestamp }}', _current_status["timestamp"]
-        )
-    else:
-        html = html.replace('{{ timestamp }}', '')
+    if _current_status is None:
+        return HTMLResponse(content=html, headers={"Cache-Control": "public, max-age=300"})
+
+    fragment_path = Path(__file__).parent / "templates" / "status_fragment.html"
+    fragment = fragment_path.read_text()
+    fragment = fragment.replace("{{ sequence }}", str(_current_status["sequence"]))
+    fragment = fragment.replace("{{ info_hash_short }}", _current_status["info_hash"][:16])
+    fragment = fragment.replace("{{ timestamp }}", _current_status["timestamp"])
+    fragment = fragment.replace("{{ magnet }}", _current_status["magnet"])
+    fragment = fragment.replace("{{ web_seed_url }}", _current_status["web_seed_url"])
+    fragment += f'<span id="_push-ts" data-ts="{_current_status["timestamp"]}" hidden></span>'
+
+    html = html.replace("{{ status_fragment }}", fragment)
     return HTMLResponse(content=html, headers={"Cache-Control": "public, max-age=300"})
 
 

@@ -46,12 +46,10 @@
     <p class="subtitle">Verified, signed snapshot for bootstrapping Nano nodes — distributed via BitTorrent and HTTP.</p>
 
     <div hx-get="/api/status-fragment"
-         hx-trigger="load, every 60s"
-         hx-swap="innerHTML"
-         hx-on:afterSwap="var ts=document.getElementById('_push-ts'); if(ts){var d=document.getElementById('data-age'); if(d)d.setAttribute('data-pushed-at',ts.dataset.ts);}">
-        <p>Connecting to swarm hub…</p>
+         hx-trigger="load, every 300s"
+         hx-swap="innerHTML">
+        {{ status_fragment }}
     </div>
-        <span id="data-age" data-pushed-at="{{ timestamp }}" data-push-interval="3600">Connecting…</span>
 
     <noscript>
         <p>JavaScript is disabled. You can view the current status as <a href="/api/status">JSON</a> or download directly from the web seed if you know the URL.</p>
@@ -160,18 +158,18 @@ volumes:
 
         // Relative time for data age
         setInterval(() => {
-            const ageEl = document.getElementById('data-age');
-            if (!ageEl) return;
-            const pushedAt = ageEl.dataset.pushedAt;
+            const tsEl = document.getElementById('_push-ts');
+            if (!tsEl) return;
+            const pushedAt = tsEl.dataset.ts;
             if (!pushedAt) return;
             const diff = Math.floor((new Date().getTime() - Date.parse(pushedAt)) / 1000);
-            const interval = parseInt(ageEl.dataset.pushInterval || '3600', 10);
+            const interval = 3600;
             const stale = diff > interval * 2;
             let label;
             if (diff < 5) label = "BitTorrent seeder stats synced just now";
             else if (diff < 60) label = `BitTorrent seeder stats synced ${diff}s ago`;
             else label = `BitTorrent seeder stats synced ${Math.floor(diff/60)}m ago`;
-            ageEl.innerText = stale ? label + " \u26A0\uFE0F" : label;
+            document.title = stale ? "⚠️ " + label : label;
         }, 5000);
     </script>
 </body>
