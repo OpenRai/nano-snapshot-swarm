@@ -18,7 +18,7 @@
         h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
         .subtitle { color: var(--muted); margin-bottom: 1.5rem; }
         section { margin: 2rem 0; }
-        #data-age { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.025em; margin-bottom: 0.5rem; display: block; }
+        #data-age { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.025em; margin-bottom: 0.5rem; display: block; }
         #status dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         #status dt { color: var(--muted); }
         #status dd { margin: 0; font-family: ui-monospace, monospace; word-break: break-all; }
@@ -45,12 +45,11 @@
     <h1>Nano (XNO) Ledger Snapshot</h1>
     <p class="subtitle">Verified, signed snapshot for bootstrapping Nano nodes — distributed via BitTorrent and HTTP.</p>
 
-    <span id="data-age">Loading status…</span>
-    <div hx-get="/api/status-fragment"
-         hx-trigger="load, every 60s"
+        hx-trigger="load, every 60s"
          hx-swap="innerHTML">
         <p>Connecting to swarm hub…</p>
     </div>
+    <span id="data-age" style="font-size: 0.75rem; color: var(--muted); margin: 0.5rem 0 1rem; display: block;">Connecting…</span>
 
     <noscript>
         <p>JavaScript is disabled. You can view the current status as <a href="/api/status">JSON</a> or download directly from the web seed if you know the URL.</p>
