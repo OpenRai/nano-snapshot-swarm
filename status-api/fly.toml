@@ -2,7 +2,7 @@ app = "nano-snapshot-hub"
 primary_region = "sjc"
 
 [build]
-  dockerfile = "status-api/Dockerfile"
+  dockerfile = "Dockerfile"
 
 [env]
   AUTHORITY_PUBKEY = "cdbc9284015e84c225f0e67b891606505a60cf1218b127ac1c1edb6444567e6b"
