@@ -57,28 +57,6 @@
         <p>JavaScript is disabled. You can view the current status as <a href="/api/status">JSON</a> or download directly from the web seed if you know the URL.</p>
     </noscript>
 
-    <section id="about-nano">
-        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-            <svg width="48" height="9" viewBox="0 0 1650 301" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0;">
-                <path d="M224.313 296.076H201.028L112.722 161.794L23.0955 296.076H0L100.495 143.94L8.94383 4.19922H32.6809L113.1 127.117L195.255 4.19922H217.52L124.988 143.534L224.313 296.076Z" fill="#209CE9"/>
-                <path d="M22.0762 135.051H202.991V151.652H22.0762V135.051ZM22.0762 184.852H203.028V201.453H22.0762V184.852Z" fill="#209CE9"/>
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M338.073 225.622L338.073 84.7158L341.106 84.7158L341.106 225.622L338.073 225.622Z" fill="white" fill-opacity="0.33"/>
-                <path d="M690.349 296.077H667.343L473.907 37.5205H472.12C473.907 68.9445 474.801 92.648 474.801 108.631V296.077H452.911V4.2002H475.694L668.906 267.512H670.246C668.906 243.131 668.236 219.969 668.236 198.027V4.2002H690.349V296.077Z" fill="white"/>
-                <path d="M940.304 197.621H807.624L762.057 296.077H736.817L868.156 4.2002H882.675L1011.33 296.077H985.647L940.304 197.621ZM815.889 178.929H932.71L888.26 71.8567C884.537 63.4589 880.069 51.8103 874.857 36.911C870.836 49.9141 866.444 61.6981 861.679 72.2631L815.889 178.929Z" fill="white"/>
-                <path d="M1295.23 296.077H1269.35L1078.78 37.5205H1077C1078.78 68.9445 1079.68 92.648 1079.68 108.631V296.077H1057.79V4.2002H1080.57L1273.78 267.512H1275.12C1273.78 243.131 1273.11 219.969 1273.11 198.027V4.2002H1295.23V296.077Z" fill="white"/>
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M1650 150.138C1650 233.057 1582.78 300.276 1499.86 300.276C1416.94 300.276 1349.72 233.057 1349.72 150.138C1349.72 67.219 1416.94 0 1499.86 0C1582.78 0 1650 67.219 1650 150.138ZM1499.86 279.277C1571.18 279.277 1629 221.46 1629 150.138C1629 78.8161 1571.18 20.9983 1499.86 20.9983C1428.54 20.9983 1370.72 78.8161 1370.72 150.138C1370.72 221.46 1428.54 279.277 1499.86 279.277Z" fill="white"/>
-            </svg>
-            <div>
-                <h2 style="margin: 0; font-size: 1.1rem;">What is Nano?</h2>
-                <p style="margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem;">
-                    Nano is a feeless, instant, sustainable <a href="https://nano.org" style="color: #4f46e5;">cryptocurrency</a>.
-                    Unlike most blockchains, Nano uses a block-lattice architecture where each account has its own blockchain,
-                    enabling pure DAG consensus without mining fees or energy waste.
-                </p>
-            </div>
-        </div>
-    </section>
-
     <section id="download-options">
         <h2>Run with Docker</h2>
         <p style="color: var(--muted); margin-bottom: 1.5rem;">Pre-built Docker images let you download and seed the snapshot without configuring BitTorrent clients manually. Works on any system that runs Docker or Podman.</p>
@@ -154,6 +132,27 @@ volumes:
 
     <section id="about">
         <h2>About</h2>
+
+        <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem;">
+            <svg width="64" height="64" viewBox="0 0 1650 301" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0; margin-top: 0.25rem;">
+                <path d="M224.313 296.076H201.028L112.722 161.794L23.0955 296.076H0L100.495 143.94L8.94383 4.19922H32.6809L113.1 127.117L195.255 4.19922H217.52L124.988 143.534L224.313 296.076Z" fill="#209CE9"/>
+                <path d="M22.0762 135.051H202.991V151.652H22.0762V135.051ZM22.0762 184.852H203.028V201.453H22.0762V184.852Z" fill="#209CE9"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M338.073 225.622L338.073 84.7158L341.106 84.7158L341.106 225.622L338.073 225.622Z" fill="white" fill-opacity="0.33"/>
+                <path d="M690.349 296.077H667.343L473.907 37.5205H472.12C473.907 68.9445 474.801 92.648 474.801 108.631V296.077H452.911V4.2002H475.694L668.906 267.512H670.246C668.906 243.131 668.236 219.969 668.236 198.027V4.2002H690.349V296.077Z" fill="white"/>
+                <path d="M940.304 197.621H807.624L762.057 296.077H736.817L868.156 4.2002H882.675L1011.33 296.077H985.647L940.304 197.621ZM815.889 178.929H932.71L888.26 71.8567C884.537 63.4589 880.069 51.8103 874.857 36.911C870.836 49.9141 866.444 61.6981 861.679 72.2631L815.889 178.929Z" fill="white"/>
+                <path d="M1295.23 296.077H1269.35L1078.78 37.5205H1077C1078.78 68.9445 1079.68 92.648 1079.68 108.631V296.077H1057.79V4.2002H1080.57L1273.78 267.512H1275.12C1273.78 243.131 1273.11 219.969 1273.11 198.027V4.2002H1295.23V296.077Z" fill="white"/>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M1650 150.138C1650 233.057 1582.78 300.276 1499.86 300.276C1416.94 300.276 1349.72 233.057 1349.72 150.138C1349.72 67.219 1416.94 0 1499.86 0C1582.78 0 1650 67.219 1650 150.138ZM1499.86 279.277C1571.18 279.277 1629 221.46 1629 150.138C1629 78.8161 1571.18 20.9983 1499.86 20.9983C1428.54 20.9983 1370.72 78.8161 1370.72 150.138C1370.72 221.46 1428.54 279.277 1499.86 279.277Z" fill="white"/>
+            </svg>
+            <div>
+                <h3 style="font-size: 1rem; margin: 0 0 0.25rem; font-weight: 600;">What is Nano?</h3>
+                <p style="margin: 0; color: var(--muted);">
+                    Nano is a feeless, instant, sustainable <a href="https://nano.org" style="color: #4f46e5;">cryptocurrency</a>.
+                    Unlike most blockchains, Nano uses a block-lattice architecture where each account has its own blockchain,
+                    enabling pure DAG consensus without mining fees or energy waste.
+                </p>
+            </div>
+        </div>
+
         <p>
             This snapshot is published daily to the BitTorrent DHT as a <a href="https://www.bittorrent.org/beps/bep_0046.html">BEP 46</a> mutable item,
             signed with an Ed25519 key. The <code>.torrent</code> file and magnet link above let you download the ~60 GB ledger archive
@@ -178,14 +177,16 @@ volumes:
         // Simple tab switcher
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                const group = btn.parentElement.dataset.group;
+                const tabs = btn.closest('.tabs');
+                if (!tabs) return;
+                const group = tabs.dataset.group;
                 const tab = btn.dataset.tab;
-                
-                document.querySelectorAll(`.tab-btn[data-group="${group}"]`).forEach(b => b.classList.remove('active'));
-                document.querySelectorAll(`.tab-content[data-group="${group}"]`).forEach(c => c.classList.remove('active'));
-                
+
+                tabs.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                tabs.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
                 btn.classList.add('active');
-                document.querySelector(`.tab-content[data-group="${group}"][data-id="${tab}"]`).classList.add('active');
+                tabs.querySelector(`.tab-content[data-id="${tab}"]`).classList.add('active');
             });
         });
 
