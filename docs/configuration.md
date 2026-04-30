@@ -110,7 +110,7 @@ docker compose run --rm nano-mirror --once
 | `DHT_PRIVATE_KEY` | — | **Yes** | Ed25519 private key (hex, 64 chars) |
 | `WEB_SEED_URL` | _(empty)_ | No | S3/HTTP URL added as web seed to torrent |
 | `DHT_SALT` | `daily` | No | DHT salt namespace |
-| `STATUS_API_URL` | _(empty)_ | No | URL of the status API to push snapshot metadata (e.g. `https://nano-snapshot-hub.fly.dev`) |
+| `STATUS_API_URL` | _(empty)_ | No | URL of the status API to push snapshot metadata (e.g. `https://nano-snapshots.openrai.org`) |
 
 ---
 

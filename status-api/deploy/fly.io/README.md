@@ -92,15 +92,15 @@ Initially, `GET /api/status` and `GET /api/torrent` will return `404` until the 
 
 ## 5. DNS & Cloudflare (Recommended)
 
-Point a custom domain (e.g. `snapshots.openrai.org`) to the Fly app and enable Cloudflare proxying:
+Point a custom domain (e.g. `nano-snapshots.openrai.org`) to the Fly app and enable Cloudflare proxying:
 
-1. In Fly: `fly certs create snapshots.openrai.org --app nano-snapshot-hub`
-2. In Cloudflare DNS: add a CNAME from `snapshots` to `nano-snapshot-hub.fly.dev`
+1. In Fly: `fly certs create nano-snapshots.openrai.org --app nano-snapshot-hub`
+2. In Cloudflare DNS: add a CNAME from `nano-snapshots` to `nano-snapshot-hub.fly.dev`
 3. In Cloudflare SSL/TLS: set mode to **Full (strict)**
 4. Add a Cloudflare Page Rule or Cache Rule:
-   - `snapshots.openrai.org/api/torrent` → **Cache Level: Cache Everything**, **Edge TTL: 1 hour**
-   - `snapshots.openrai.org/api/status*` → **Cache Level: Cache Everything**, **Edge TTL: 5–10 minutes**
-   - `snapshots.openrai.org/api/push` → **Cache Level: Bypass**
+   - `nano-snapshots.openrai.org/api/torrent` → **Cache Level: Cache Everything**, **Edge TTL: 1 hour**
+   - `nano-snapshots.openrai.org/api/status*` → **Cache Level: Cache Everything**, **Edge TTL: 5–10 minutes**
+   - `nano-snapshots.openrai.org/api/push` → **Cache Level: Bypass**
 
 This keeps the Fly VM mostly idle (only ~1 request/hour from the Producer hits origin).
 
@@ -157,7 +157,7 @@ Once the Status API is live, set `STATUS_API_URL` on the Producer:
 
 ```bash
 # ~/.env on the producer server
-STATUS_API_URL=https://nano-snapshot-hub.fly.dev
+STATUS_API_URL=https://nano-snapshots.openrai.org
 ```
 
 The `daily-snapshot.sh` pipeline will automatically push to the API after each DHT publish (both full pipeline and re-publish paths). Push failures are logged as warnings but are **non-fatal** — DHT remains the source of truth.

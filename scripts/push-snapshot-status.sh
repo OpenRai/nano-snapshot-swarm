@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
-STATUS_API_URL="${STATUS_API_URL:-}"  # Must be set, e.g. https://nano-snapshot-hub.fly.dev
+STATUS_API_URL="${STATUS_API_URL:-}"  # Must be set, e.g. https://nano-snapshots.openrai.org
 
 if [ -z "$STATUS_API_URL" ]; then
     echo "STATUS_API_URL not set, skipping push"

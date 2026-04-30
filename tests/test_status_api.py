@@ -19,6 +19,21 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def isolated_status_api_state(tmp_path, monkeypatch):
+    import app.main as main_module
+
+    data_dir = tmp_path / "status-api-data"
+    monkeypatch.setattr(main_module, "DATA_DIR", data_dir)
+    monkeypatch.setattr(main_module, "STATUS_FILE", data_dir / "status.json")
+    monkeypatch.setattr(main_module, "TORRENT_FILE", data_dir / "torrent.bin")
+    main_module._current_status = None
+    main_module._torrent_bytes = b""
+    yield
+    main_module._current_status = None
+    main_module._torrent_bytes = b""
+
+
 @pytest.fixture
 def sample_push_payload():
     """Return a valid push payload with signature pre-computed."""
