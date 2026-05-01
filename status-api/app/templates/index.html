@@ -38,8 +38,13 @@
         .tab-content { display: none; margin-top: 1rem; }
         .tab-content.active { display: block; }
 
-        pre { background: var(--card); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; border: 1px solid var(--border); }
+        pre { background: var(--card); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; border: 1px solid var(--border); margin: 0; }
         code { font-family: ui-monospace, monospace; font-size: 0.875rem; }
+        .copyable { position: relative; }
+        .copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; display: flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; padding: 0; background: rgba(11, 15, 25, 0.6); border: 1px solid var(--border); border-radius: 0.35rem; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s, border-color 0.15s; }
+        .copyable:hover .copy-btn, .copy-btn:focus-visible { opacity: 1; }
+        .copy-btn:hover { color: var(--fg); border-color: var(--accent); }
+        .copy-btn svg { width: 0.9rem; height: 0.9rem; flex-shrink: 0; }
         footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.875rem; }
         noscript { display: block; background: var(--card); padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; }
         .hero-note { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.8rem; border: 1px solid var(--border); border-radius: 999px; background: rgba(11, 15, 25, 0.28); color: var(--muted); font-size: 0.875rem; }
@@ -52,7 +57,7 @@
         .donate-grid p { margin: 0 0 0.85rem; color: var(--muted); font-size: 0.875rem; }
         .button-link { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 2.75rem; padding: 0.7rem 1rem; border-radius: 0.65rem; border: 1px solid var(--border); background: var(--accent); color: #04111d; text-decoration: none; font-weight: 600; }
         .button-link:hover { color: #04111d; background: #6ec7ff; }
-        .address-block { margin: 0 0 0.75rem; padding: 0.8rem; border-radius: 0.65rem; background: rgba(11, 15, 25, 0.4); border: 1px solid var(--border); font-family: ui-monospace, monospace; font-size: 0.8125rem; line-height: 1.55; word-break: break-all; }
+        .address-block { margin: 0 0 0.75rem; padding: 0.8rem 2.5rem 0.8rem 0.8rem; border-radius: 0.65rem; background: rgba(11, 15, 25, 0.4); border: 1px solid var(--border); font-family: ui-monospace, monospace; font-size: 0.8125rem; line-height: 1.55; word-break: break-all; }
         .secondary-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
         .secondary-link { display: inline-flex; align-items: center; justify-content: center; min-height: 2.5rem; padding: 0.65rem 0.9rem; border-radius: 0.65rem; border: 1px solid var(--border); background: var(--accent-soft); color: var(--fg); text-decoration: none; }
         .secondary-link:hover { color: var(--fg); border-color: var(--accent); }
@@ -93,22 +98,22 @@
             </div>
 
             <div class="tab-content active" data-group="one-shot" data-id="docker">
-                <pre><code>docker run --rm -it \
+                <div class="copyable"><pre><code>docker run --rm -it \
   -v ./nano-data:/data \
-  ghcr.io/openrai/nano-p2p-mirror:latest --once</code></pre>
+  ghcr.io/openrai/nano-p2p-mirror:latest --once</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
             <div class="tab-content" data-group="one-shot" data-id="podman">
-                <pre><code>podman run --rm -it \
+                <div class="copyable"><pre><code>podman run --rm -it \
   -v ./nano-data:/data:Z \
-  ghcr.io/openrai/nano-p2p-mirror:latest --once</code></pre>
+  ghcr.io/openrai/nano-p2p-mirror:latest --once</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
             <div class="tab-content" data-group="one-shot" data-id="compose">
-                <pre><code>services:
+                <div class="copyable"><pre><code>services:
   bootstrap:
     image: ghcr.io/openrai/nano-p2p-mirror:latest
     command: --once
     volumes:
-      - ./nano-data:/data</code></pre>
+      - ./nano-data:/data</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
         </section>
 
@@ -122,21 +127,21 @@
             </div>
 
             <div class="tab-content active" data-group="seed" data-id="docker">
-                <pre><code>docker run -d --name nano-seed \
+                <div class="copyable"><pre><code>docker run -d --name nano-seed \
   -p 6881:6881/tcp -p 6881:6881/udp \
   -v nano-data:/data \
   --restart unless-stopped \
-  ghcr.io/openrai/nano-p2p-mirror:latest</code></pre>
+  ghcr.io/openrai/nano-p2p-mirror:latest</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
             <div class="tab-content" data-group="seed" data-id="podman">
-                <pre><code>podman run -d --name nano-seed \
+                <div class="copyable"><pre><code>podman run -d --name nano-seed \
   -p 6881:6881/tcp -p 6881:6881/udp \
   -v nano-data:/data:Z \
   --restart unless-stopped \
-  ghcr.io/openrai/nano-p2p-mirror:latest</code></pre>
+  ghcr.io/openrai/nano-p2p-mirror:latest</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
             <div class="tab-content" data-group="seed" data-id="compose">
-                <pre><code>services:
+                <div class="copyable"><pre><code>services:
   seed:
     image: ghcr.io/openrai/nano-p2p-mirror:latest
     ports:
@@ -147,7 +152,7 @@
     restart: unless-stopped
 
 volumes:
-  nano-data:</code></pre>
+  nano-data:</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
         </section>
     </section>
@@ -192,11 +197,10 @@ volumes:
             <article>
                 <h3>Donate Nano</h3>
                 <p>Project-specific donations for <code>nano-snapshot-swarm</code> go to this dedicated Nano address.</p>
-                <p class="address-block" id="nano-donation-address">nano_1ajzj77o69wrua17zuffqo7ebjzx4okmdpddm4cmpqggc186dpe65irrdyur</p>
+                <div class="copyable address-block" id="nano-donation-address">nano_1ajzj77o69wrua17zuffqo7ebjzx4okmdpddm4cmpqggc186dpe65irrdyur<button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="self"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
                 <div class="secondary-actions">
                     <a class="secondary-link" href="nano:nano_1ajzj77o69wrua17zuffqo7ebjzx4okmdpddm4cmpqggc186dpe65irrdyur">Open Nano URI</a>
                     <a class="secondary-link" href="https://blocklattice.io/account/nano_1ajzj77o69wrua17zuffqo7ebjzx4okmdpddm4cmpqggc186dpe65irrdyur">View Address</a>
-                    <button class="secondary-link" id="copy-nano-address" type="button">Copy Address</button>
                 </div>
             </article>
         </div>
@@ -212,17 +216,15 @@ volumes:
     </footer>
 
     <script>
-        // Simple tab switcher
+        // Tab switcher
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const tabs = btn.closest('.tabs');
                 if (!tabs) return;
                 const group = tabs.dataset.group;
                 const tab = btn.dataset.tab;
-
                 document.querySelectorAll(`.tab-btn[data-group="${group}"]`).forEach(b => b.classList.remove('active'));
                 document.querySelectorAll(`.tab-content[data-group="${group}"]`).forEach(c => c.classList.remove('active'));
-
                 btn.classList.add('active');
                 document.querySelector(`.tab-content[data-group="${group}"][data-id="${tab}"]`).classList.add('active');
             });
@@ -235,8 +237,7 @@ volumes:
             const pushedAt = tsEl.dataset.ts;
             if (!pushedAt) return;
             const diff = Math.floor((new Date().getTime() - Date.parse(pushedAt)) / 1000);
-            const interval = 3600;
-            const stale = diff > interval * 2;
+            const stale = diff > 7200;
             let label;
             if (diff < 5) label = "BitTorrent seeder stats synced just now";
             else if (diff < 60) label = `BitTorrent seeder stats synced ${diff}s ago`;
@@ -244,24 +245,56 @@ volumes:
             document.title = stale ? "⚠️ " + label : label;
         }, 5000);
 
-        const copyButton = document.getElementById('copy-nano-address');
-        const addressBlock = document.getElementById('nano-donation-address');
-        if (copyButton && addressBlock) {
-            copyButton.addEventListener('click', async () => {
+        // Unified copy-to-clipboard for all .copy-btn elements
+        const COPY_SVG = document.querySelector('.copy-btn svg')?.outerHTML ?? '';
+        const CHECK_SVG = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,8 6,12 14,4"/></svg>`;
+
+        async function copyText(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                // Fallback for older Safari / non-secure contexts
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+                document.body.appendChild(ta);
+                ta.focus(); ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+        }
+
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            // Cache original icon HTML once all buttons are in DOM
+            const originalHTML = btn.innerHTML;
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const copyable = btn.closest('.copyable');
+                let text;
+                if (btn.dataset.copyTarget === 'self') {
+                    // Address block: text content of the wrapper minus the button text
+                    text = copyable.childNodes[0]?.textContent?.trim() ?? copyable.textContent.trim();
+                } else {
+                    // code block inside a <pre>
+                    text = copyable.querySelector('code')?.textContent?.trim() ?? '';
+                }
                 try {
-                    await navigator.clipboard.writeText(addressBlock.textContent.trim());
-                    copyButton.textContent = 'Copied';
+                    await copyText(text);
+                    btn.innerHTML = CHECK_SVG;
+                    btn.style.color = 'var(--accent)';
+                    btn.style.opacity = '1';
                     setTimeout(() => {
-                        copyButton.textContent = 'Copy Address';
+                        btn.innerHTML = originalHTML;
+                        btn.style.color = '';
+                        btn.style.opacity = '';
                     }, 1500);
                 } catch {
-                    copyButton.textContent = 'Copy failed';
-                    setTimeout(() => {
-                        copyButton.textContent = 'Copy Address';
-                    }, 1500);
+                    btn.style.color = '#f87171';
+                    btn.style.opacity = '1';
+                    setTimeout(() => { btn.style.color = ''; btn.style.opacity = ''; }, 1500);
                 }
             });
-        }
+        });
     </script>
 </body>
 </html>
