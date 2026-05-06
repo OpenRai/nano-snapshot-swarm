@@ -14,8 +14,13 @@
     <style>
         :root { --bg: #0b0f19; --fg: #e2e8f0; --accent: #209ce9; --accent-soft: rgba(32, 156, 233, 0.14); --muted: #94a3b8; --card: rgba(21, 28, 44, 0.88); --border: rgba(148, 163, 184, 0.2); }
         * { box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, sans-serif; background-color: var(--bg); background-image: linear-gradient(to left top, #209ce9, #2e82cb, #3269ad, #31518e, #2c3b71, #28305e, #22254c, #1c1b3b, #19172f, #151323, #100e17, #070707); background-attachment: fixed; color: var(--fg); max-width: 800px; margin: 0 auto; padding: 2rem 1rem 3rem; line-height: 1.6; }
-        h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+        body { font-family: system-ui, -apple-system, sans-serif; background-color: var(--bg); background-image: linear-gradient(to left top, #209ce9, #2e82cb, #3269ad, #31518e, #2c3b71, #28305e, #22254c, #1c1b3b, #19172f, #151323, #100e17, #070707); background-attachment: fixed; color: var(--fg); margin: 0; padding: 0 1rem 3rem; line-height: 1.6; }
+        .glass { max-width: 800px; margin: 0 auto; background: rgba(11, 15, 25, 0.62); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border: 1px solid rgba(148, 163, 184, 0.12); border-top: none; border-radius: 0 0 1rem 1rem; padding: 1.5rem 1.5rem 2.5rem; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); }
+        .hero-row { display: flex; align-items: stretch; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+        .hero-text { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+        .hero-row h1 { font-size: 1.75rem; margin: 0 0 0.5rem; }
+        .hero-row .subtitle { color: var(--muted); margin: 0; }
+        .hero-row .xno-symbol { width: 3.5rem; height: auto; flex-shrink: 0; align-self: stretch; }
         .subtitle { color: var(--muted); margin-bottom: 1.5rem; }
         section { margin: 2rem 0; }
         a { color: var(--accent); }
@@ -57,6 +62,9 @@
         .donate-grid p { margin: 0 0 0.85rem; color: var(--muted); font-size: 0.875rem; }
         .button-link { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 2.75rem; padding: 0.7rem 1rem; border-radius: 0.65rem; border: 1px solid var(--border); background: var(--accent); color: #04111d; text-decoration: none; font-weight: 600; }
         .button-link:hover { color: #04111d; background: #6ec7ff; }
+        .donate-btn { display: inline-block; line-height: 0; transition: opacity 0.2s; }
+        .donate-btn:hover { opacity: 0.85; }
+        .donate-btn img { height: 50px; width: auto; display: block; }
         .address-block { margin: 0 0 0.75rem; padding: 0.8rem 2.5rem 0.8rem 0.8rem; border-radius: 0.65rem; background: rgba(11, 15, 25, 0.4); border: 1px solid var(--border); font-family: ui-monospace, monospace; font-size: 0.8125rem; line-height: 1.55; word-break: break-all; }
         .secondary-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
         .secondary-link { display: inline-flex; align-items: center; justify-content: center; min-height: 2.5rem; padding: 0.65rem 0.9rem; border-radius: 0.65rem; border: 1px solid var(--border); background: var(--accent-soft); color: var(--fg); text-decoration: none; }
@@ -70,8 +78,14 @@
     </style>
 </head>
 <body>
-    <h1>Nano (XNO) Ledger Snapshot</h1>
-    <p class="subtitle">Verified, signed snapshot for bootstrapping Nano nodes — distributed via BitTorrent and HTTP.</p>
+<div class="glass">
+    <div class="hero-row">
+        <svg class="xno-symbol" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="XNO symbol"><circle cx="540" cy="540" r="540" fill="#209CE9"/><path d="M740.509 877H793L654.016 658.179H744.939V619.785H629.627L580.858 543.005H744.922V504.619H581.676L777.649 202H727.445L542.156 486.267L360.707 202H307.195L500.509 504.619H336.791V543.005H502.197L452.727 619.785H336.791V658.179H427.984L287 877H339.061L481.572 658.179H600.141L740.509 877ZM506.568 619.785L541.304 566.459L575.516 619.785H506.568Z" fill="white"/></svg>
+        <div class="hero-text">
+            <h1>Nano (XNO) Ledger Snapshot</h1>
+            <p class="subtitle">Verified, signed snapshot for bootstrapping <a href="https://docs.nano.org/running-a-node/overview/">Nano nodes</a> — distributed via BitTorrent and HTTP.</p>
+        </div>
+    </div>
     <!-- <p class="hero-note">An OpenRai Initiative project hosted publicly at <code>nano-snapshots.openrai.org</code></p> -->
 
     <div hx-get="/api/status-fragment"
@@ -195,10 +209,9 @@ volumes:
                 <a class="button-link" href="https://github.com/sponsors/openrai">GitHub Sponsors</a>
             </article>
             <article>
-                <h3>Donate Nano</h3>
-                <p>Project-specific donations for <code>nano-snapshot-swarm</code> go to this dedicated Nano address.</p>
-                <div class="copyable address-block" id="nano-donation-address">nano_1ajzj77o69wrua17zuffqo7ebjzx4okmdpddm4cmpqggc186dpe65irrdyur<button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="self"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
-
+                <h3>Donate Crypto</h3>
+                <p>Project-specific donations for <code>nano-snapshot-swarm</code> via NOWPayments.</p>
+                <a class="donate-btn" href="https://nowpayments.io/donation?api_key=914af3ef-3d59-445c-b7ca-6e2aa8f8ad00" target="_blank" rel="noreferrer noopener"><img src="https://nowpayments.io/images/embeds/donation-button-white.svg" alt="Cryptocurrency & Bitcoin donation button by NOWPayments"></a>
             </article>
         </div>
     </section>
@@ -211,6 +224,7 @@ volumes:
             <a href="/health">Health</a>
         </span>
     </footer>
+</div>
 
     <script>
         // Tab switcher
