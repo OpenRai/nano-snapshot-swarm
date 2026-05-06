@@ -150,6 +150,7 @@ def _render_fragment() -> str:
     html = (Path(__file__).parent / "templates" / "status_fragment.html").read_text()
     rendered = html.replace("{{ sequence }}", str(_current_status["sequence"]))
     rendered = rendered.replace("{{ info_hash }}", _current_status["info_hash"])
+    rendered = rendered.replace("{{ torrent_name }}", _current_status["torrent_name"])
     rendered = rendered.replace("{{ timestamp }}", _current_status["timestamp"])
     rendered = rendered.replace("{{ magnet }}", _current_status["magnet"])
     rendered = rendered.replace("{{ web_seed_url }}", _current_status["web_seed_url"])
