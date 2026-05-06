@@ -83,7 +83,7 @@ fly status --app nano-snapshot-hub
 fly logs --app nano-snapshot-hub
 
 # Test the API directly
-curl https://nano-snapshot-hub.fly.dev/health
+curl https://nano-snapshot.ninzin.net/health
 ```
 
 Initially, `GET /api/status` and `GET /api/torrent` will return `404` until the Producer pushes the first snapshot.
@@ -92,17 +92,21 @@ Initially, `GET /api/status` and `GET /api/torrent` will return `404` until the 
 
 ## 5. DNS & Cloudflare (Recommended)
 
-Point a custom domain (e.g. `nano-snapshots.openrai.org`) to the Fly app and enable Cloudflare proxying:
+The canonical public URL is `https://nano-snapshot.ninzin.net`, fronted by Cloudflare to protect the tiny Fly VM.
 
-1. In Fly: `fly certs create nano-snapshots.openrai.org --app nano-snapshot-hub`
-2. In Cloudflare DNS: add a CNAME from `nano-snapshots` to `nano-snapshot-hub.fly.dev`
+1. In Fly: `fly certs add nano-snapshot.ninzin.net --app nano-snapshot-hub`
+2. In Cloudflare DNS for `ninzin.net`:
+   - **A** `nano-snapshot` → `66.241.124.49` (orange cloud / proxied)
+   - **AAAA** `nano-snapshot` → `2a09:8280:1::109:b32e:0` (orange cloud / proxied)
+   - **CNAME** `_acme-challenge.nano-snapshot` → `nano-snapshot.ninzin.net.0pd61ql.flydns.net` (DNS only, **not proxied**)
+   - **TXT** `_fly-ownership.nano-snapshot` → `app-0pd61ql` (DNS only)
 3. In Cloudflare SSL/TLS: set mode to **Full (strict)**
-4. Add a Cloudflare Page Rule or Cache Rule:
-   - `nano-snapshots.openrai.org/api/torrent` → **Cache Level: Cache Everything**, **Edge TTL: 1 hour**
-   - `nano-snapshots.openrai.org/api/status*` → **Cache Level: Cache Everything**, **Edge TTL: 5–10 minutes**
-   - `nano-snapshots.openrai.org/api/push` → **Cache Level: Bypass**
+4. Optionally add Cloudflare Cache Rules:
+   - `nano-snapshot.ninzin.net/api/torrent` → **Cache Level: Cache Everything**, **Edge TTL: 1 hour**
+   - `nano-snapshot.ninzin.net/api/status*` → **Cache Level: Cache Everything**, **Edge TTL: 5–10 minutes**
+   - `nano-snapshot.ninzin.net/api/push` → **Cache Level: Bypass**
 
-This keeps the Fly VM mostly idle (only ~1 request/hour from the Producer hits origin).
+The `_acme-challenge` and `_fly-ownership` records are only needed for initial certificate issuance and can be removed afterwards.
 
 ---
 
@@ -157,7 +161,7 @@ Once the Status API is live, set `STATUS_API_URL` on the Producer:
 
 ```bash
 # ~/.env on the producer server
-STATUS_API_URL=https://nano-snapshots.openrai.org
+STATUS_API_URL=https://nano-snapshot.ninzin.net
 ```
 
 The `daily-snapshot.sh` pipeline will automatically push to the API after each DHT publish (both full pipeline and re-publish paths). Push failures are logged as warnings but are **non-fatal** — DHT remains the source of truth.

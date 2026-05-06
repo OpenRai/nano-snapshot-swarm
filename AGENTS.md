@@ -10,44 +10,50 @@ PYTHONPATH=$(pwd) uv run pytest tests/ -v
 uv run ruff check shared/ producer/ mirror/ tests/ status-api/
 ```
 
-### Status API
+### Architecture
 
-- `status-api/` is a **standalone** FastAPI app with no imports from `shared/`, `producer/`, or `mirror/`. It only needs `pynacl` for signature verification.
-- The status-api Docker image is ~100MB (no libtorrent).
-- `producer/push_status.py` uses `urllib.request` (stdlib) to avoid adding a new dependency to the main project.
-- Push failures are **non-fatal** — the DHT publish is the source of truth; the status API is best-effort.
-- `AUTHORITY_PUBKEY` is embedded in `fly.toml` and the status-api reads it from the env var of the same name.
+- **`shared/`** — crypto, DHT value building, signing (used by both producer and mirror)
+- **`producer/`** — torrent creation, DHT publishing, seeder, status push
+- **`mirror/`** — libtorrent-based downloader (swarm or leech mode)
+- **`status-api/`** — standalone FastAPI app, no imports from shared/producer/mirror. Only needs `pynacl` for signature verification.
+- **`tests/`** — covers shared, producer, status-api, and validation fixture
+
+### Status API deployment
+
+- Deploys to Fly.io (app `nano-snapshot-hub`, region `sjc`) via GitHub Actions on push to `main` when `status-api/**` changes.
+- `status-api/app/static/` is served at `/static` via `StaticFiles` mount.
+- `producer/push_status.py` uses `urllib.request` (stdlib) — no new deps for the main project.
+- Push failures are non-fatal. DHT publish is the source of truth; status API is best-effort.
+- `AUTHORITY_PUBKEY` is baked into `fly.toml` as an env var.
 
 ### Key non-obvious facts
 
-- `producer/publish.py` uses raw `lt.session` directly and is intentionally left untouched. All other libtorrent usage goes through `mirror/libtorrent_session.py`.
+- `producer/publish.py` uses raw `lt.session` directly — intentionally untouched. All other libtorrent usage goes through `mirror/libtorrent_session.py`.
 - `pop_alerts()` is removed from `LibtorrentSession` — do not add it back. Use the narrow wait APIs (`wait_for_dht_mutable_item`, `wait_for_dht_put`).
 - `MirrorState.update()` preserves `current_torrent_name` when `torrent_name=None` — do not pass empty string.
-- `mirror_state.json` is saved in **both** swarm and `--once` (leech) mode.
-- Leech mode has **no download timeout** — it runs until complete or user cancels. A stall warning is logged if `download_rate == 0` for 300s, but it never exits. Do not add a wall-clock timeout to leech mode.
-- Swarm mode exits after `--download-timeout` (default 1800s) of continuous DHT inactivity (no results from DHT), so the container can restart.
-- `AUTHORITY_PUBKEY`, `DHT_SALT`, and `WEB_SEED_URL` are baked into the mirror Docker image as `ARG` defaults. The image runs with zero env vars. Override at build time with `--build-arg` or at runtime with `-e`.
-
-### Mirror Docker image — run without any env vars
-
-```bash
-docker run --rm -v /data:/data ghcr.io/openrai/nano-p2p-mirror:latest --once
-```
-
-### Stale doc in CLI help (fix if editing)
-
-`--download-timeout` help text says "ignored in --once mode" — that is correct. Do not reintroduce auto-setting it for leech mode.
+- `mirror_state.json` is saved in both swarm and `--once` (leech) mode.
+- Leech mode has no download timeout — runs until complete or user cancels. Stall warning at 300s of zero rate, but never exits. Do not add a wall-clock timeout.
+- Swarm mode exits after `--download-timeout` (default 1800s) of continuous DHT inactivity so the container can restart.
+- `AUTHORITY_PUBKEY`, `DHT_SALT`, and `WEB_SEED_URL` are baked into the mirror Docker image as `ARG` defaults. Image runs with zero env vars.
 
 ### Deployment — remote host `bandwidth-martyr`
 
-- Production runs as user-level systemd on the `openrai` user. **Always use `systemctl --user` / `journalctl --user`** — never system-level. Service units must NOT contain `User=`.
-- Repo lives at `/opt/nano-snapshot-swarm`. After any change: `git pull && systemctl --user daemon-reload && systemctl --user restart nano-snapshot.timer`.
-- `.env` lives at `~/.env` on the remote (not in the repo). `DHT_PRIVATE_KEY` is required; `AUTHORITY_PUBKEY` can be regenerated from it.
+- Production runs as user-level systemd on the `openrai` user. **Always `systemctl --user` / `journalctl --user`** — never system-level. Service units must NOT contain `User=`.
+- Repo at `/opt/nano-snapshot-swarm`. After code changes: `git pull && systemctl --user daemon-reload && systemctl --user restart nano-snapshot.timer`.
+- `.env` lives at `~/.env` on the remote (not in the repo). `DHT_PRIVATE_KEY` is required.
+- To manually trigger a status push (e.g. after deploying template changes):
+  ```bash
+  ssh bandwidth-martyr 'cd /opt/nano-snapshot-swarm && git pull --rebase && set -a && source ~/.env && set +a && .venv/bin/python -m producer.push_status --status-api-url https://nano-snapshot.ninzin.net --state-file publisher_state.json --torrent-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z.torrent --snapshot-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z --web-seed-url https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest/'
+  ```
 - From the repo root, refresh the checked-in authority key file with `./derive-authority-pubkey | tee AUTHORITY_PUBKEY`.
 
 ### E2E validation procedure
 
 See `docs/manual-e2e-validation.md`. Uses `DHT_SALT=validation` and `WEB_SEED_MODE=off` to isolate from production. Run against a temporary nohup seeder on the remote, not the production seeder.
+
+### Stale doc in CLI help (fix if editing)
+
+`--download-timeout` help text says "ignored in --once mode" — that is correct. Do not reintroduce auto-setting it for leech mode.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
