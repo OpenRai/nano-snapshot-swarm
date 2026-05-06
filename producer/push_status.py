@@ -33,16 +33,17 @@ def sign_push(private_key_hex: str, sequence: int, info_hash: str, timestamp: st
 
 def get_archive_listing(snapshot_path: str) -> str | None:
     try:
+        p = Path(snapshot_path).resolve()
         result = subprocess.run(
-            ["7z", "l", snapshot_path],
+            ["7z", "l", p.name],
             capture_output=True,
             text=True,
             timeout=30,
+            cwd=p.parent,
         )
         if result.returncode != 0:
             return None
         lines = result.stdout.splitlines()
-        # Find the separator line (starts with --)
         for i, line in enumerate(lines):
             if line.startswith("--"):
                 return "\n".join(lines[i:])
