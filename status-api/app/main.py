@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
@@ -23,6 +24,7 @@ AUTHORITY_PUBKEY = os.environ.get(
 DHT_SALT = os.environ.get("DHT_SALT", "daily")
 
 app = FastAPI(title="Nano Snapshot Status API")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 # Store current state in memory (reloaded from disk on startup)
 _current_status: dict | None = None
