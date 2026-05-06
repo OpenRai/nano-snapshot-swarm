@@ -29,6 +29,10 @@
         #status dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         #status dt { color: var(--muted); }
         #status dd { margin: 0; font-family: ui-monospace, monospace; word-break: break-all; }
+        .archive-listing { margin-top: 1rem; }
+        .archive-listing summary { cursor: pointer; color: var(--muted); font-size: 0.875rem; }
+        .archive-listing summary:hover { color: var(--fg); }
+        .archive-listing pre { margin-top: 0.5rem; font-size: 0.8125rem; line-height: 1.5; }
         .download-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
         .download-card { display: block; background: var(--card); border-radius: 0.5rem; padding: 1rem; text-decoration: none; color: inherit; border: 1px solid var(--border); transition: border-color 0.2s; }
         .download-card:hover { border-color: var(--accent); }

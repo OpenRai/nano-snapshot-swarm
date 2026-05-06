@@ -128,6 +128,7 @@ def push(payload: PushRequest) -> JSONResponse:
         "dht_salt": DHT_SALT,
         "verified": True,
         "timestamp": payload.timestamp,
+        "archive_listing": payload.archive_listing,
     }
 
     _save_state(status, torrent_bytes)
@@ -145,17 +146,29 @@ def get_status() -> JSONResponse:
     return JSONResponse(_current_status, headers=headers)
 
 
-@app.get("/api/status-fragment")
-def get_status_fragment() -> Response:
-    if _current_status is None:
-        raise HTTPException(status_code=404, detail="No status available yet")
+def _render_fragment() -> str:
     html = (Path(__file__).parent / "templates" / "status_fragment.html").read_text()
     rendered = html.replace("{{ sequence }}", str(_current_status["sequence"]))
     rendered = rendered.replace("{{ info_hash }}", _current_status["info_hash"])
     rendered = rendered.replace("{{ timestamp }}", _current_status["timestamp"])
     rendered = rendered.replace("{{ magnet }}", _current_status["magnet"])
     rendered = rendered.replace("{{ web_seed_url }}", _current_status["web_seed_url"])
+    listing = _current_status.get("archive_listing") or ""
+    rendered = rendered.replace("{{ archive_listing }}", listing)
+    if not listing:
+        rendered = rendered.replace(
+            '<details class="archive-listing">',
+            '<details class="archive-listing" hidden>',
+        )
     rendered += f'<span id="_push-ts" data-ts="{_current_status["timestamp"]}" hidden></span>'
+    return rendered
+
+
+@app.get("/api/status-fragment")
+def get_status_fragment() -> Response:
+    if _current_status is None:
+        raise HTTPException(status_code=404, detail="No status available yet")
+    rendered = _render_fragment()
     headers = {
         "Content-Type": "text/html",
         "Cache-Control": "public, max-age=300",
@@ -183,13 +196,7 @@ def index() -> Response:
     if _current_status is None:
         return HTMLResponse(content=html, headers={"Cache-Control": "public, max-age=300"})
 
-    fragment_path = Path(__file__).parent / "templates" / "status_fragment.html"
-    fragment = fragment_path.read_text()
-    fragment = fragment.replace("{{ sequence }}", str(_current_status["sequence"]))
-    fragment = fragment.replace("{{ info_hash }}", _current_status["info_hash"])
-    fragment = fragment.replace("{{ timestamp }}", _current_status["timestamp"])
-    fragment = fragment.replace("{{ web_seed_url }}", _current_status["web_seed_url"])
-    fragment += f'<span id="_push-ts" data-ts="{_current_status["timestamp"]}" hidden></span>'
+    fragment = _render_fragment()
 
     html = html.replace("{{ status_fragment }}", fragment)
     return HTMLResponse(content=html, headers={"Cache-Control": "public, max-age=300"})
