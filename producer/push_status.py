@@ -5,6 +5,7 @@ import base64
 import datetime
 import json
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -28,6 +29,26 @@ def sign_push(private_key_hex: str, sequence: int, info_hash: str, timestamp: st
     message = f"{sequence}:{info_hash}:{timestamp}".encode("ascii")
     signed = signing_key.sign(message)
     return signed.signature.hex()
+
+
+def get_archive_listing(snapshot_path: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["7z", "l", snapshot_path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return None
+        lines = result.stdout.splitlines()
+        # Find the separator line (starts with --)
+        for i, line in enumerate(lines):
+            if line.startswith("--"):
+                return "\n".join(lines[i:])
+        return None
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
 
 
 def push_status(
@@ -63,6 +84,10 @@ def push_status(
         "torrent_file_b64": torrent_b64,
         "signature": signature,
     }
+
+    listing = get_archive_listing(snapshot_file)
+    if listing:
+        payload["archive_listing"] = listing
 
     req = urllib.request.Request(
         f"{status_api_url.rstrip('/')}/api/push",

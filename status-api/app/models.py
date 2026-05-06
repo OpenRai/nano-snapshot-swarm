@@ -13,6 +13,7 @@ class PushRequest(BaseModel):
     timestamp: str  # ISO 8601
     torrent_file_b64: str  # base64-encoded .torrent
     signature: str  # hex Ed25519 signature
+    archive_listing: str | None = None
 
 
 class StatusResponse(BaseModel):
