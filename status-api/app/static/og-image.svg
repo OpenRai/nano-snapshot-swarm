@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="1200" y1="630" x2="0" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#070707"/>
+      <stop offset="20%" stop-color="#151323"/>
+      <stop offset="40%" stop-color="#22254c"/>
+      <stop offset="60%" stop-color="#2c3b71"/>
+      <stop offset="80%" stop-color="#3269ad"/>
+      <stop offset="100%" stop-color="#209ce9"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Nano symbol circle -->
+  <g transform="translate(100, 75)">
+    <svg viewBox="0 0 1080 1080" width="480" height="480">
+      <circle cx="540" cy="540" r="540" fill="#209CE9"/>
+      <path d="M740.509 877H793L654.016 658.179H744.939V619.785H629.627L580.858 543.005H744.922V504.619H581.676L777.649 202H727.445L542.156 486.267L360.707 202H307.195L500.509 504.619H336.791V543.005H502.197L452.727 619.785H336.791V658.179H427.984L287 877H339.061L481.572 658.179H600.141L740.509 877ZM506.568 619.785L541.304 566.459L575.516 619.785H506.568Z" fill="white"/>
+    </svg>
+  </g>
+
+  <!-- Title -->
+  <text x="640" y="260" fill="#e2e8f0" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="72" font-weight="400">Nano (XNO)</text>
+  <text x="640" y="340" fill="#e2e8f0" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="72" font-weight="400">Ledger Snapshot</text>
+
+  <!-- Accent line -->
+  <rect x="640" y="370" width="80" height="4" rx="2" fill="#209ce9"/>
+
+  <!-- Subtitle -->
+  <text x="640" y="420" fill="#94a3b8" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="32" font-weight="400">P2P Bootstrap Download</text>
+
+  <!-- Fine print -->
+  <text x="640" y="465" fill="#64748b" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="400">Verified · Signed · BitTorrent + HTTP</text>
+
+  <!-- OpenRai Initiative -->
+  <text x="1160" y="600" fill="#64748b" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="400" text-anchor="end">OpenRai Initiative</text>
+</svg>
