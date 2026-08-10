@@ -22,6 +22,8 @@ AUTHORITY_PUBKEY = os.environ.get(
     "cdbc9284015e84c225f0e67b891606505a60cf1218b127ac1c1edb6444567e6b",
 )
 DHT_SALT = os.environ.get("DHT_SALT", "daily")
+MAGNET_PEER_HOST = os.environ.get("MAGNET_PEER_HOST", "").strip()
+MAGNET_PEER_PORT = os.environ.get("MAGNET_PEER_PORT", "6881").strip()
 
 app = FastAPI(title="Nano Snapshot Status API")
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -80,6 +82,8 @@ def _build_magnet(info_hash: str, torrent_name: str) -> str:
     ]
     for tr in TRACKERS:
         params.append(f"tr={quote(tr)}")
+    if MAGNET_PEER_HOST:
+        params.append(f"x.pe={quote(f'{MAGNET_PEER_HOST}:{MAGNET_PEER_PORT}', safe='')}")
     return "magnet:?" + "&".join(params)
 
 
@@ -154,6 +158,14 @@ def _render_fragment() -> str:
     rendered = rendered.replace("{{ timestamp }}", _current_status["timestamp"])
     rendered = rendered.replace("{{ magnet }}", _current_status["magnet"])
     rendered = rendered.replace("{{ web_seed_url }}", _current_status["web_seed_url"])
+    direct_http_start = "<!-- direct-http-card-start -->"
+    direct_http_end = "<!-- direct-http-card-end -->"
+    if _current_status["web_seed_url"]:
+        rendered = rendered.replace(direct_http_start, "").replace(direct_http_end, "")
+    else:
+        start = rendered.index(direct_http_start)
+        end = rendered.index(direct_http_end, start) + len(direct_http_end)
+        rendered = rendered[:start] + rendered[end:]
     listing = _current_status.get("archive_listing") or ""
     rendered = rendered.replace("{{ archive_listing }}", listing)
     if not listing:

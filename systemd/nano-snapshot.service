@@ -8,6 +8,7 @@ Type=oneshot
 EnvironmentFile=-%h/.env
 Environment=OUTPUT_DIR=%h/nano-snapshots
 Environment=WEB_SEED_URL=https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest
+# Set WEB_SEED_MODE=off in ~/.env to publish P2P-only torrents and status links.
 # Adjust ExecStart if the repo is cloned to a different location
 ExecStart=%h/nano-snapshot-swarm/scripts/daily-snapshot.sh
 StandardOutput=journal

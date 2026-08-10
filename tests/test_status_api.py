@@ -153,6 +153,27 @@ class TestGetEndpoints:
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
+    def test_magnet_includes_configured_peer_hint(self, client, sample_push_payload):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        original_pubkey = main_module.AUTHORITY_PUBKEY
+        original_host = main_module.MAGNET_PEER_HOST
+        original_port = main_module.MAGNET_PEER_PORT
+        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        main_module.MAGNET_PEER_HOST = "bandwidth-martyr.openrai.org"
+        main_module.MAGNET_PEER_PORT = "6881"
+        try:
+            client.post("/api/push", json=payload)
+            magnet = client.get("/api/status").json()["magnet"]
+            assert "x.pe=bandwidth-martyr.openrai.org%3A6881" in magnet
+        finally:
+            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.MAGNET_PEER_HOST = original_host
+            main_module.MAGNET_PEER_PORT = original_port
+            main_module._current_status = None
+            main_module._torrent_bytes = b""
+
     def test_torrent_content_type(self, client, sample_push_payload):
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
@@ -209,6 +230,22 @@ class TestGetEndpoints:
             assert expected_short_hash in resp.text
             # It should not contain the full info_hash as a literal {{ info_hash[:16] }}
             assert "{{ info_hash[:16] }}" not in resp.text
+        finally:
+            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module._current_status = None
+            main_module._torrent_bytes = b""
+
+    def test_status_fragment_hides_direct_http_when_disabled(self, client, sample_push_payload):
+        payload, pubkey_hex = sample_push_payload
+        payload["web_seed_url"] = ""
+        import app.main as main_module
+
+        original_pubkey = main_module.AUTHORITY_PUBKEY
+        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        try:
+            client.post("/api/push", json=payload)
+            response = client.get("/api/status-fragment")
+            assert "Direct HTTP" not in response.text
         finally:
             main_module.AUTHORITY_PUBKEY = original_pubkey
             main_module._current_status = None

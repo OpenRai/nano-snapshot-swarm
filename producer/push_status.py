@@ -13,6 +13,8 @@ from pathlib import Path
 
 from nacl.signing import SigningKey
 
+from shared.web_seed import WEB_SEED_MODE_FALLBACK, WEB_SEED_MODES, resolve_web_seed_url
+
 
 def _parse_private_key(hex_key: str) -> bytes:
     key_bytes = bytes.fromhex(hex_key)
@@ -112,6 +114,12 @@ def main() -> int:
         "--web-seed-url",
         default="https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest",
     )
+    parser.add_argument(
+        "--web-seed-mode",
+        choices=sorted(WEB_SEED_MODES),
+        default=os.environ.get("WEB_SEED_MODE", WEB_SEED_MODE_FALLBACK),
+        help="Web seed policy: fallback or off (overrides WEB_SEED_MODE env)",
+    )
     parser.add_argument("--torrent-name", default="nano-ledger-snapshot.7z")
     parser.add_argument("--piece-size", type=int, default=32 * 1024 * 1024)
     args = parser.parse_args()
@@ -142,7 +150,7 @@ def main() -> int:
             sequence=sequence,
             info_hash=info_hash,
             torrent_name=args.torrent_name,
-            web_seed_url=args.web_seed_url,
+            web_seed_url=resolve_web_seed_url(args.web_seed_url, args.web_seed_mode) or "",
             piece_size=args.piece_size,
             snapshot_file=args.snapshot_file,
             torrent_file=args.torrent_file,

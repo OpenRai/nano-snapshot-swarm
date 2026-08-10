@@ -7,6 +7,8 @@ primary_region = "sjc"
 [env]
   AUTHORITY_PUBKEY = "cdbc9284015e84c225f0e67b891606505a60cf1218b127ac1c1edb6444567e6b"
   DHT_SALT = "daily"
+  MAGNET_PEER_HOST = "bandwidth-martyr.openrai.org"
+  MAGNET_PEER_PORT = "6881"
 
 [mounts]
   source = "status_data"

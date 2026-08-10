@@ -119,8 +119,13 @@ python -m producer.cli publish \
   --private-key "$DHT_PRIVATE_KEY" \
   --snapshot-file /opt/nano-snapshots/nano-ledger-snapshot.7z \
   --web-seed-url https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest \
+  --web-seed-mode fallback \
   --output-dir /opt/nano-snapshots
 ```
+
+Set `WEB_SEED_MODE=off` (or pass `--web-seed-mode off`) to create a P2P-only
+torrent without a BEP 19 HTTP web seed. The same setting is used by the mirror
+client, so producer and client web-seed policy remain compatible.
 
 Expected publish output:
 ```
