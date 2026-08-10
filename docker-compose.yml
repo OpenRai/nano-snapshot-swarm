@@ -12,7 +12,7 @@ services:
       WEB_SEED_MODE: "${WEB_SEED_MODE:-off}"
       SEED_PEERS: "${SEED_PEERS:-bandwidth-martyr.openrai.org:6881}"
     volumes:
-      - nano-data:/data
+      - ./nano-data:/data
     ports:
       - "${MIRROR_HOST_PORT:-6881}:6881/tcp"
       - "${MIRROR_HOST_PORT:-6881}:6881/udp"
@@ -27,6 +27,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  nano-data:

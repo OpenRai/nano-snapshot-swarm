@@ -256,3 +256,23 @@ class TestGetEndpoints:
         resp = client.get("/")
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
+
+    def test_index_has_direct_leech_options_and_compose_seed(self, client):
+        response = client.get("/")
+        assert response.status_code == 200
+
+        one_shot = response.text.split('<section id="one-shot">', 1)[1].split(
+            '<section id="seed"', 1
+        )[0]
+        seed = response.text.split('<section id="seed"', 1)[1].split(
+            '<section id="about">', 1
+        )[0]
+
+        assert 'data-tab="docker"' in one_shot
+        assert 'data-tab="podman"' in one_shot
+        assert 'data-tab="compose"' not in one_shot
+        assert "./nano-data:/data" in one_shot
+        assert 'data-tab="compose"' in seed
+        assert "./nano-data:/data" in seed
+        assert "nano-data:/data" not in seed.replace("./nano-data:/data", "")
+        assert "Do not run a one-shot downloader" in seed

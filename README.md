@@ -33,19 +33,19 @@ Use leech mode when you just want the newest snapshot archive or extracted ledge
 
 ```bash
 # uvx from a local git clone: read the baked-in default key from the repo root
-AUTHORITY_PUBKEY="$(<AUTHORITY_PUBKEY)" uvx --from . nano-mirror --once --extract --data-dir ./data
+AUTHORITY_PUBKEY="$(<AUTHORITY_PUBKEY)" uvx --from . nano-mirror --once --extract --data-dir ./nano-data
 
 # or, with Docker: no AUTHORITY_PUBKEY needed for the default stream
 docker run --rm \
-  -v $(pwd)/data:/data \
+  -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once --extract
 ```
 
-The snapshot archive is written into `/data` (or your chosen volume). To unpack it into the directory that the official Nano node Docker image uses, mount your Nano node data directory at `/root` and copy the extracted `data.ldb` there. The Nano docs describe Docker as using the host path supplied by `-v`/`--volume` for the node's data directory, and the container keeps the ledger under `/root`.
+The snapshot archive is written into `./nano-data` on the host. Do not run this one-shot downloader and a permanent seed against the same directory concurrently. To unpack the archive into the directory that the official Nano node Docker image uses, mount your Nano node data directory at `/root` and copy the extracted `data.ldb` there. The Nano docs describe Docker as using the host path supplied by `-v`/`--volume` for the node's data directory, and the container keeps the ledger under `/root`.
 
 ```bash
-cp data/data.ldb /path/to/nano-node-data/data.ldb
+cp nano-data/data.ldb /path/to/nano-node-data/data.ldb
 ```
 
 That extraction path needs roughly `{compressed size} + {2 * compressed size}` GB of temporary space, so as of 2026-04 a ~60 GB archive means about ~180 GB free.

@@ -22,7 +22,7 @@ This is the fire-and-forget path for anyone with spare disk and bandwidth. The c
 docker run -d \
   --name nano-mirror \
   -p 6881:6881/tcp -p 6881:6881/udp \
-  -v $(pwd)/data:/data \
+  -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest
 ```
 
@@ -176,7 +176,7 @@ docker exec nano-mirror cat /data/snapshot-meta.json
 
 ```bash
 # Check data volume size
-du -sh ./data/
+du -sh ./nano-data/
 
 # List files in the data volume
 docker exec nano-mirror ls -lh /data/
@@ -251,7 +251,7 @@ docker compose down
 docker compose up -d
 ```
 
-State is preserved in the `nano-data` volume. No data is lost on restart.
+State is preserved in the host directory `./nano-data`. No data is lost on restart. Do not run a one-shot leech and the permanent seed against the same directory concurrently.
 
 ---
 
@@ -286,7 +286,7 @@ Use `--log-level DEBUG` and look for `alert` messages to understand what's happe
 If you see errors about `/data` being unwritable:
 
 ```bash
-sudo chown -R 1000:1000 ./data
+sudo chown -R 1000:1000 ./nano-data
 ```
 
 The container runs as UID 1000 by default.

@@ -16,7 +16,7 @@ The published Docker image already has the current OpenRAI producer public key b
 
 ```bash
 docker run --rm \
-  -v $(pwd)/data:/data \
+  -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once
 ```
@@ -26,21 +26,16 @@ docker run --rm \
 ```bash
 read -r AUTHORITY_PUBKEY < AUTHORITY_PUBKEY
 export AUTHORITY_PUBKEY
-uvx --from . nano-mirror --once
+uvx --from . nano-mirror --once --data-dir ./nano-data
 ```
 
 That `uvx` snippet is only needed when running from a local git clone, because the source tree keeps the default producer key in the repo root `AUTHORITY_PUBKEY` file rather than hardcoding it into shell examples.
 
+The archive and mirror state are stored in `./nano-data`. Do not run a one-shot leech and a permanent seed against the same directory concurrently.
+
 ### With Custom Timeout
 
 Leech mode has no wall-clock download timeout. `--download-timeout` only applies to swarm mode DHT inactivity, so there is nothing to tune here for `--once`.
-
-### With Docker Compose Override
-
-```bash
-docker compose run --rm nano-mirror \
-  --once
-```
 
 ---
 
@@ -55,7 +50,7 @@ This makes leech mode easy to use in shell scripts:
 
 ```bash
 if docker run --rm \
-    -v $(pwd)/data:/data \
+    -v ./nano-data:/data \
     ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
     --once; then
   echo "Download succeeded"
@@ -120,7 +115,7 @@ If the producer publishes to a non-default DHT salt:
 
 ```bash
 docker run --rm \
-  -v $(pwd)/data:/data \
+  -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once --salt weekly
 ```
@@ -145,7 +140,7 @@ Use the dedicated validation salt for manual system validation:
 docker run --rm \
   -e DHT_SALT=validation \
   -e WEB_SEED_MODE=off \
-  -v $(pwd)/data:/data \
+  -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once
 ```
@@ -164,16 +159,16 @@ extracted `data.ldb`:
 - name: Download latest Nano ledger snapshot
   run: |
     docker run --rm \
-      -v ${{ github.workspace }}/data:/data \
+      -v ${{ github.workspace }}/nano-data:/data \
       ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
       --once
 
     echo " Ledger downloaded:"
-    ls -lh data/*.ldb.zst
+    ls -lh nano-data/*.ldb.zst
 
 - name: Decompress and verify
   run: |
-    zstd -d data/*.ldb.zst -o data.ldb
-    mdb_copy data.ldb /tmp/verify_copy
+    zstd -d nano-data/*.ldb.zst -o nano-data/data.ldb
+    mdb_copy nano-data/data.ldb /tmp/verify_copy
     echo "Ledger verified OK"
 ```

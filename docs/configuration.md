@@ -48,7 +48,6 @@ services:
   nano-mirror:
     image: ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest
     environment:
-      SEED_PEERS: "${SEED_PEERS:-}"
       DATA_DIR: /data
       DHT_SALT: "${DHT_SALT:-daily}"
       POLL_INTERVAL: "${POLL_INTERVAL:-600}"
@@ -57,8 +56,7 @@ services:
       SEED_PEERS: "${SEED_PEERS:-bandwidth-martyr.openrai.org:6881}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     volumes:
-      - nano-data:/data          # Named volume (recommended)
-      # OR: $(pwd)/data:/data   # Bind mount
+      - ./nano-data:/data
     ports:
       - "${MIRROR_HOST_PORT:-6881}:6881/tcp"
       - "${MIRROR_HOST_PORT:-6881}:6881/udp"
@@ -74,9 +72,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-volumes:
-  nano-data:
 ```
+
+The host directory `./nano-data` contains the downloaded archive and mirror state, so it can be inspected, backed up, and reused. Do not run a one-shot leech and a permanent seed against the same data directory concurrently.
 
 ### Override POLL_INTERVAL via CLI
 
@@ -91,15 +89,9 @@ Only set `AUTHORITY_PUBKEY` if you want to follow a non-default snapshot stream:
 ```bash
 docker run --rm \
   -e AUTHORITY_PUBKEY=<other_producer_pubkey> \
-  -v $(pwd)/data:/data \
+  -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once
-```
-
-### Override Command for Leech Mode
-
-```bash
-docker compose run --rm nano-mirror --once
 ```
 
 ---

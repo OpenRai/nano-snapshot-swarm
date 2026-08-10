@@ -52,6 +52,7 @@
         .download-card:hover { border-color: var(--accent); }
         .download-card h3 { margin: 0 0 0.25rem; font-size: 1rem; }
         .download-card p { margin: 0; color: var(--muted); font-size: 0.875rem; }
+        .storage-note { color: var(--muted); font-size: 0.875rem; margin: 0.75rem 0 0; }
         
         .tabs { border-bottom: 1px solid var(--border); display: flex; gap: 1rem; margin-bottom: -1px; }
         .tab-btn { background: none; border: none; color: var(--muted); padding: 0.5rem 0.25rem; cursor: pointer; font-size: 0.875rem; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; outline: none; }
@@ -126,7 +127,6 @@
             <div class="tabs" data-group="one-shot">
                 <button class="tab-btn active" data-group="one-shot" data-tab="docker">Docker</button>
                 <button class="tab-btn" data-group="one-shot" data-tab="podman">Podman</button>
-                <button class="tab-btn" data-group="one-shot" data-tab="compose">Compose</button>
             </div>
 
             <div class="tab-content active" data-group="one-shot" data-id="docker">
@@ -139,14 +139,7 @@
   -v ./nano-data:/data:Z \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest --once</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
-            <div class="tab-content" data-group="one-shot" data-id="compose">
-                <div class="copyable"><pre><code>services:
-  bootstrap:
-    image: ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest
-    command: --once
-    volumes:
-      - ./nano-data:/data</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
-            </div>
+            <p class="storage-note">The archive is saved in <code>./nano-data</code>. Do not run the one-shot downloader and a permanent seed against the same directory at the same time.</p>
         </section>
 
         <section id="seed" style="margin-top: 2rem;">
@@ -161,14 +154,14 @@
             <div class="tab-content active" data-group="seed" data-id="docker">
                 <div class="copyable"><pre><code>docker run -d --name nano-seed \
   -p 6881:6881/tcp -p 6881:6881/udp \
-  -v nano-data:/data \
+  -v ./nano-data:/data \
   --restart unless-stopped \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
             <div class="tab-content" data-group="seed" data-id="podman">
                 <div class="copyable"><pre><code>podman run -d --name nano-seed \
   -p 6881:6881/tcp -p 6881:6881/udp \
-  -v nano-data:/data:Z \
+  -v ./nano-data:/data:Z \
   --restart unless-stopped \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
@@ -180,12 +173,12 @@
       - "6881:6881/tcp"
       - "6881:6881/udp"
     volumes:
-      - nano-data:/data
+      - ./nano-data:/data
     restart: unless-stopped
 
-volumes:
-  nano-data:</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
+</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
+            <p class="storage-note">The seed uses <code>./nano-data</code> so its state is visible and reusable. Do not run a one-shot downloader and the permanent seed against the same directory concurrently.</p>
         </section>
     </section>
 
