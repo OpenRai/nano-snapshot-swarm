@@ -11,7 +11,7 @@ Environment=LOG_LEVEL=INFO
 ExecStart=%h/nano-snapshot-swarm/.venv/bin/python -m producer.seeder
 WorkingDirectory=%h/nano-snapshot-swarm
 Restart=on-failure
-RestartSec=30
+RestartSec=60
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=nano-seed
