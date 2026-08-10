@@ -81,13 +81,13 @@ jobs:
       - name: Build pull request image
         if: github.event_name == 'pull_request'
         env:
-          IMAGE_NAME: ghcr.io/${{ github.repository }}/nano-p2p-mirror
+          IMAGE_NAME: ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror
         run: ./scripts/nano-mirror-build.sh --platform "${{ matrix.platform }}"
 
       - name: Build and push mirror image
         if: github.event_name != 'pull_request'
         env:
-          IMAGE_NAME: ghcr.io/${{ github.repository }}/nano-p2p-mirror
+          IMAGE_NAME: ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror
           REGISTRY_USERNAME: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/nano-mirror-build.sh --platform "${{ matrix.platform }}" --push
