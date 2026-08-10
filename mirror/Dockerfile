@@ -4,6 +4,7 @@ FROM debian:trixie-slim
 # them avoids compiling libtorrent under QEMU during multi-platform builds.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    passwd \
     python3 \
     python3-libtorrent \
     python3-venv \
@@ -18,6 +19,12 @@ COPY pyproject.toml /app/
 RUN python3 -m venv --system-site-packages /venv \
     && uv pip install --python /venv/bin/python --no-cache -r pyproject.toml \
     && /venv/bin/python -c "import libtorrent; libtorrent.session({'enable_dht': False})"
+
+# Keep the mirror unprivileged while retaining the documented UID for bind mounts.
+RUN groupadd --gid 1000 mirror \
+    && useradd --uid 1000 --gid mirror --home-dir /app --no-create-home \
+        --shell /usr/sbin/nologin mirror \
+    && install -d --owner=mirror --group=mirror /data
 
 COPY shared/ /app/shared/
 COPY mirror/ /app/mirror/
@@ -44,6 +51,8 @@ ENV WEB_SEED_MODE=${WEB_SEED_MODE}
 ENV SEED_PEERS=${SEED_PEERS}
 
 VOLUME ["/data"]
+
+USER 1000:1000
 
 EXPOSE 6881/tcp 6881/udp
 

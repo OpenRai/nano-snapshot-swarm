@@ -128,7 +128,11 @@ if [[ "${GITHUB_ACTIONS:-false}" == true ]]; then
 fi
 
 if [[ "$PUSH" == true ]]; then
-    BUILD_ARGS+=(--push)
+    BUILD_ARGS+=(
+        --provenance=mode=max
+        --sbom=true
+        --push
+    )
 else
     BUILD_ARGS+=(--load)
 fi
