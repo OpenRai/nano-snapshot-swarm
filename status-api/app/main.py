@@ -24,6 +24,10 @@ AUTHORITY_PUBKEY = os.environ.get(
 DHT_SALT = os.environ.get("DHT_SALT", "daily")
 MAGNET_PEER_HOST = os.environ.get("MAGNET_PEER_HOST", "").strip()
 MAGNET_PEER_PORT = os.environ.get("MAGNET_PEER_PORT", "6881").strip()
+MAGNET_TRACKERS = (
+    "udp://tracker.opentrackr.org:1337/announce",
+    "udp://tracker.torrent.eu.org:451/announce",
+)
 
 app = FastAPI(title="Nano Snapshot Status API")
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -73,6 +77,8 @@ def _build_magnet(info_hash: str, torrent_name: str) -> str:
         f"xt=urn:btmh:1220{info_hash}",
         f"dn={quote(torrent_name)}",
     ]
+    for tracker in MAGNET_TRACKERS:
+        params.append(f"tr={quote(tracker, safe='')}")
     if MAGNET_PEER_HOST:
         params.append(f"x.pe={quote(f'{MAGNET_PEER_HOST}:{MAGNET_PEER_PORT}', safe='')}")
     return "magnet:?" + "&".join(params)

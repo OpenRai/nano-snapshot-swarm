@@ -166,7 +166,8 @@ class TestGetEndpoints:
             client.post("/api/push", json=payload)
             magnet = client.get("/api/status").json()["magnet"]
             assert "x.pe=bandwidth-martyr.openrai.org%3A6881" in magnet
-            assert "&tr=" not in magnet
+            assert "tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce" in magnet
+            assert "tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce" in magnet
         finally:
             main_module.AUTHORITY_PUBKEY = original_pubkey
             main_module.MAGNET_PEER_HOST = original_host
