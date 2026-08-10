@@ -50,3 +50,6 @@ htmlcov/
 *.db
 .beads-credential-key
 uv.lock
+
+# Beads / Dolt files (added by bd init)
+.beads/proxieddb/
