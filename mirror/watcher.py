@@ -13,6 +13,7 @@ from typing import Optional
 
 from mirror.config import WEB_SEED_MODE_FALLBACK, WEB_SEED_MODES, resolve_web_seeds
 from mirror.dht_discovery import DEFAULT_SALT, DHTDiscoveryResult, discover_latest_snapshot
+from mirror.download_progress import DownloadProgressLogState
 from mirror.libtorrent_session import (
     LibtorrentSession,
     TorrentMetadataSnapshot,
@@ -447,7 +448,7 @@ class MirrorWatcher:
 
     def _monitor_active_torrent_loop(self) -> None:
         tracked_hash: Optional[str] = None
-        last_progress_log = 0.0
+        progress_log = DownloadProgressLogState()
         last_state = ""
         no_peer_seconds = 0
         metadata_logged = False
@@ -457,7 +458,7 @@ class MirrorWatcher:
             info_hash = self._active_info_hash
             if not info_hash:
                 tracked_hash = None
-                last_progress_log = 0.0
+                progress_log = DownloadProgressLogState()
                 last_state = ""
                 no_peer_seconds = 0
                 metadata_logged = False
@@ -467,7 +468,7 @@ class MirrorWatcher:
 
             if info_hash != tracked_hash:
                 tracked_hash = info_hash
-                last_progress_log = 0.0
+                progress_log = DownloadProgressLogState()
                 last_state = ""
                 no_peer_seconds = 0
                 metadata_logged = False
@@ -485,20 +486,21 @@ class MirrorWatcher:
                     time.sleep(1)
                     continue
 
+                should_log_progress = progress_log.observe(
+                    status.state,
+                    status.progress,
+                    time.monotonic(),
+                )
                 self._update_transfer_state(
                     status,
                     info_hash,
                     last_state,
-                    last_progress_log,
                     no_peer_seconds,
+                    should_log_progress,
                 )
 
                 if status.state != last_state:
                     last_state = status.state
-                    last_progress_log = 0.0
-
-                if status.progress - last_progress_log >= 0.02 or status.progress == 1.0:
-                    last_progress_log = status.progress
 
                 if status.num_peers == 0:
                     no_peer_seconds += 5
@@ -544,8 +546,8 @@ class MirrorWatcher:
         status: TorrentStatusSnapshot,
         info_hash: str,
         last_state: str,
-        last_progress_log: float,
         no_peer_seconds: int,
+        should_log_progress: bool,
     ) -> None:
         if status.state != last_state:
             if last_state:
@@ -553,7 +555,7 @@ class MirrorWatcher:
             phase = "checking" if status.state == "checking_files" else status.state
             self.state.set_phase(phase)
 
-        if status.progress - last_progress_log >= 0.02 or status.progress == 1.0:
+        if should_log_progress:
             logger.info(
                 f"Download: {status.progress * 100:.1f}% | State: {status.state} | "
                 f"DL: {status.download_rate / 1000:.1f} KB/s | "

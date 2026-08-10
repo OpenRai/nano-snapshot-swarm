@@ -32,13 +32,6 @@ app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), na
 _current_status: dict | None = None
 _torrent_bytes: bytes = b""
 
-TRACKERS = [
-    "udp://router.bittorrent.com:6881",
-    "udp://router.utorrent.com:6881",
-    "udp://dht.transmissionbt.com:6881",
-]
-
-
 def _load_state() -> None:
     global _current_status, _torrent_bytes
     if STATUS_FILE.exists():
@@ -80,8 +73,6 @@ def _build_magnet(info_hash: str, torrent_name: str) -> str:
         f"xt=urn:btmh:1220{info_hash}",
         f"dn={quote(torrent_name)}",
     ]
-    for tr in TRACKERS:
-        params.append(f"tr={quote(tr)}")
     if MAGNET_PEER_HOST:
         params.append(f"x.pe={quote(f'{MAGNET_PEER_HOST}:{MAGNET_PEER_PORT}', safe='')}")
     return "magnet:?" + "&".join(params)
