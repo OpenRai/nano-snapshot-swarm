@@ -75,7 +75,6 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 |---|---|
 | `Authority public key (Nano-format): nano_...` | The DHT authority pubkey rendered in Nano address format for readability |
 | `Mode: SWARM (continuous polling every Ns)` | Running as long-lived daemon |
-| `Web seed mode: fallback` | Web transfer allowed only as fallback |
 | `libtorrent session started, listening on port 6881` | BitTorrent engine ready |
 
 **Discovery (repeats every `POLL_INTERVAL`):**
@@ -96,7 +95,7 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 | `State transition: downloading → checking_files` | Mirror phase changed |
 | `Download: 45.2% \| State: downloading \| DL: 1234.5 KB/s \| Peers: 3` | Active transfer with progress |
 | `Snapshot seeding complete` | Download finished, now seeding to others |
-| `Download: 0.0% ... Peers: 0` | No peers or web seed reachable — check connectivity |
+| `Download: 0.0% ... Peers: 0` | No reachable peers — check connectivity |
 
 **Seeding (steady state):**
 
@@ -165,8 +164,7 @@ docker exec nano-mirror cat /data/snapshot-meta.json
   "torrent_info_hash": "f6d068...",
   "dht_verified": true,
   "current_torrent_name": "nano-ledger-snapshot.7z",
-  "original_filename": "snapshot-2026-04-22T00-00-00Z.7z",
-  "source_url": "https://..."
+  "original_filename": "snapshot-2026-04-22T00-00-00Z.7z"
 }
 ```
 
@@ -190,7 +188,6 @@ The mirror needs:
 
 - **UDP port 6881** — for DHT communication (discovery and seeding coordination)
 - **TCP port 6881** — for BitTorrent peer connections
-- **Outbound HTTPS** — for web seed fallback (S3)
 
 Verify the port is reachable from the internet if you want to seed effectively:
 
@@ -199,7 +196,7 @@ Verify the port is reachable from the internet if you want to seed effectively:
 nc -zvu <your-mirror-ip> 6881
 ```
 
-If behind NAT without port forwarding, the mirror can still download (via web seed and outbound connections) but cannot serve peers effectively.
+If behind NAT without port forwarding, the mirror can still download through outbound peer connections but cannot serve peers effectively.
 
 ---
 
@@ -271,12 +268,11 @@ The mirror rejects such items and retries on the next poll cycle.
 
 ### DHT discovery takes a long time
 
-DHT bootstrap can take 5–15 minutes on a cold start, especially behind NAT. The 30-second bootstrap wait is intentionally conservative. The default mirror image is P2P-only; configure an explicit web seed only when a deployment needs that fallback.
+DHT bootstrap can take 5–15 minutes on a cold start, especially behind NAT. The 30-second bootstrap wait is intentionally conservative. Mirror downloads are P2P-only.
 
 ### Download appears stuck at 0%
 
-Check `num_peers: 0`. If the torrent has no peers and no explicitly configured web seed is reachable, the download cannot proceed. This can happen if:
-- The configured web seed URL is unreachable from your network
+Check `num_peers: 0`. If the torrent has no reachable peers, the download cannot proceed. This can happen if:
 - The torrent info-hash is not yet announced to any tracker (if trackers are used)
 
 Use `--log-level DEBUG` and look for `alert` messages to understand what's happening.

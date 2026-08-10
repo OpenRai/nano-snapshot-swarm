@@ -178,7 +178,6 @@ class LibtorrentSession:
         info_hash: str,
         save_path: Optional[str] = None,
         torrent_file: Optional[str] = None,
-        web_seeds: Optional[list[str]] = None,
     ) -> lt.torrent_handle:
         if self._session is None:
             raise RuntimeError("Session not started")
@@ -204,9 +203,6 @@ class LibtorrentSession:
             else:
                 # v2: 32 bytes (64 hex chars) — use btmh with SHA-256 multihash prefix
                 magnet_uri = f"magnet:?xt=urn:btmh:1220{info_hash}"
-            if web_seeds:
-                for ws in web_seeds:
-                    magnet_uri += f"&ws={ws}"
             params = lt.parse_magnet_uri(magnet_uri)
             params.save_path = save_path
             params.flags = lt.torrent_flags.auto_managed
@@ -231,14 +227,12 @@ class LibtorrentSession:
         self,
         info_hash: str,
         save_path: Optional[str] = None,
-        web_seeds: Optional[list[str]] = None,
     ) -> None:
         if self.has_torrent(info_hash):
             return
         self.add_torrent(
             info_hash=info_hash,
             save_path=save_path,
-            web_seeds=web_seeds,
         )
 
     def pause_torrent(self, info_hash: str) -> None:

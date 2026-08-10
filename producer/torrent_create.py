@@ -17,7 +17,6 @@ def _v2_flags(lt):
 
 def create_torrent(
     filepath: str,
-    web_seed_url: str | None = None,
     piece_size: int = 32 * 1024 * 1024,
     output_path: str | None = None,
     comment: str | None = None,
@@ -28,7 +27,7 @@ def create_torrent(
     Args:
         snapshot_meta: JSON string embedded as 'x-snapshot' in the info dict.
             Survives magnet link metadata exchange (BEP 9). Only include
-            stable fields (source_url, original_filename) — not timestamps,
+            stable fields such as original_filename — not timestamps,
             since changes affect the info hash.
         comment: Stored in the outer torrent dict. NOT available via magnet
             links — only when loading from a .torrent file.
@@ -39,20 +38,9 @@ def create_torrent(
         output_path = filepath + ".torrent"
 
     fs = lt.file_storage()
-    filename = os.path.basename(filepath)
     lt.add_files(fs, filepath)
 
     ct = lt.create_torrent(fs, piece_size=piece_size, flags=_v2_flags(lt))
-
-    if web_seed_url:
-        seed_url = web_seed_url
-        if seed_url.endswith("/"):
-            seed_url += filename
-
-        if hasattr(ct, "set_web_seeds"):
-            ct.set_web_seeds([seed_url])
-        else:
-            ct.add_url_seed(seed_url)
 
     if comment:
         ct.set_comment(comment)
@@ -82,7 +70,6 @@ def create_torrent(
 def create_torrent_from_directory(
     directory: str,
     filenames: list[str],
-    web_seed_url: str | None = None,
     piece_size: int = 32 * 1024 * 1024,
     output_path: str | None = None,
 ) -> tuple[str, str]:
@@ -98,14 +85,6 @@ def create_torrent_from_directory(
         fs.add_file(fname, file_size)
 
     ct = lt.create_torrent(fs, piece_size=piece_size, flags=_v2_flags(lt))
-
-    if web_seed_url:
-        for fname in filenames:
-            seed_url = f"{web_seed_url.rstrip('/')}/{fname}"
-            if hasattr(ct, "set_web_seeds"):
-                ct.set_web_seeds([seed_url])
-            else:
-                ct.add_url_seed(seed_url)
 
     lt.set_piece_hashes(ct, directory)
 
@@ -123,14 +102,13 @@ def create_torrent_from_directory(
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: torrent_create.py <filepath> [web_seed_url] [output_path]", file=sys.stderr)
+        print("Usage: torrent_create.py <filepath> [output_path]", file=sys.stderr)
         sys.exit(1)
 
     filepath = sys.argv[1]
-    web_seed_url = sys.argv[2] if len(sys.argv) > 2 else None
-    output_path = sys.argv[3] if len(sys.argv) > 3 else None
+    output_path = sys.argv[2] if len(sys.argv) > 2 else None
 
-    torrent_path, info_hash = create_torrent(filepath, web_seed_url, output_path=output_path)
+    torrent_path, info_hash = create_torrent(filepath, output_path=output_path)
     print(f"torrent={torrent_path}")
     print(f"info_hash_v2={info_hash}")
 

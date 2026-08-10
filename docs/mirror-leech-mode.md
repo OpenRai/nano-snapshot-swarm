@@ -127,10 +127,9 @@ docker run --rm \
 1. Waits 15 seconds for DHT to bootstrap (shorter than swarm mode since no polling is needed)
 2. Queries DHT for the latest mutable item under the configured authority key and salt
 3. On success: adds the torrent, begins P2P download
-4. If `--web-seed-mode fallback` is enabled, libtorrent may use the configured web seed when peers are unavailable
-5. Tracks progress every 5 seconds
-6. On seeding complete: logs file path, exits `0`
-7. On error: logs error, exits `1`
+4. Tracks progress every 5 seconds
+5. On seeding complete: logs file path, exits `0`
+6. On error: logs error, exits `1`
 
 ## Validation Stream Example
 
@@ -139,7 +138,6 @@ Use the dedicated validation salt for manual system validation:
 ```bash
 docker run --rm \
   -e DHT_SALT=validation \
-  -e WEB_SEED_MODE=off \
   -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once

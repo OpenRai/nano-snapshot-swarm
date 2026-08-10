@@ -19,11 +19,6 @@ from producer.validation_fixture import (  # noqa: E402
     create_validation_fixture,
     parse_size_bytes,
 )
-from shared.web_seed import (  # noqa: E402
-    WEB_SEED_MODE_FALLBACK,
-    WEB_SEED_MODES,
-    resolve_web_seed_url,
-)
 
 
 def cmd_publish(args: argparse.Namespace) -> None:
@@ -31,11 +26,6 @@ def cmd_publish(args: argparse.Namespace) -> None:
     if not private_key:
         print("ERROR: DHT_PRIVATE_KEY not set (env or --private-key)", file=sys.stderr)
         sys.exit(1)
-
-    web_seed_url = resolve_web_seed_url(
-        args.web_seed_url or os.environ.get("WEB_SEED_URL", ""),
-        args.web_seed_mode,
-    )
 
     # Resolve snapshot file path
     snapshot_file = args.snapshot_file
@@ -60,8 +50,6 @@ def cmd_publish(args: argparse.Namespace) -> None:
     # Build snapshot metadata for the info dict (survives magnet exchange)
     # Only include stable fields — timestamps go in the outer comment
     snapshot_meta = {}
-    if args.source_url:
-        snapshot_meta["source_url"] = args.source_url
     if args.original_filename:
         snapshot_meta["original_filename"] = args.original_filename
     snapshot_meta_json = json.dumps(snapshot_meta, separators=(",", ":")) if snapshot_meta else None
@@ -74,7 +62,6 @@ def cmd_publish(args: argparse.Namespace) -> None:
 
     torrent_path, info_hash = create_torrent(
         filepath=snapshot_file,
-        web_seed_url=web_seed_url,
         piece_size=args.piece_size,
         output_path=snapshot_file + ".torrent",
         comment=comment,
@@ -111,11 +98,8 @@ def cmd_validation_fixture_publish(args: argparse.Namespace) -> None:
     archive_path = os.path.join(output_dir, args.archive_name)
     publish_args = argparse.Namespace(
         private_key=args.private_key,
-        web_seed_url=args.web_seed_url,
-        web_seed_mode=args.web_seed_mode,
         snapshot_file=archive_path,
         output_dir=output_dir,
-        source_url=args.source_url,
         original_filename=args.archive_name,
         piece_size=args.piece_size,
         state_file=args.state_file,
@@ -149,26 +133,10 @@ def main() -> None:
         help="Ed25519 private key hex (overrides DHT_PRIVATE_KEY env)",
     )
     pub_parser.add_argument(
-        "--web-seed-url",
-        default=None,
-        help="Web seed URL (overrides WEB_SEED_URL env)",
-    )
-    pub_parser.add_argument(
-        "--web-seed-mode",
-        choices=sorted(WEB_SEED_MODES),
-        default=os.environ.get("WEB_SEED_MODE", WEB_SEED_MODE_FALLBACK),
-        help="Web seed policy: fallback or off (overrides WEB_SEED_MODE env)",
-    )
-    pub_parser.add_argument(
         "--piece-size",
         type=int,
         default=32 * 1024 * 1024,
         help="Torrent piece size in bytes (default: 32 MiB)",
-    )
-    pub_parser.add_argument(
-        "--source-url",
-        default=None,
-        help="Resolved source URL of the snapshot (embedded in torrent comment)",
     )
     pub_parser.add_argument(
         "--original-filename",
@@ -242,22 +210,6 @@ def main() -> None:
         "--private-key",
         default=None,
         help="Ed25519 private key hex (overrides DHT_PRIVATE_KEY env)",
-    )
-    publish_validation_parser.add_argument(
-        "--web-seed-url",
-        default=None,
-        help="Optional validation web seed URL (overrides WEB_SEED_URL env)",
-    )
-    publish_validation_parser.add_argument(
-        "--web-seed-mode",
-        choices=sorted(WEB_SEED_MODES),
-        default=os.environ.get("WEB_SEED_MODE", WEB_SEED_MODE_FALLBACK),
-        help="Web seed policy: fallback or off (overrides WEB_SEED_MODE env)",
-    )
-    publish_validation_parser.add_argument(
-        "--source-url",
-        default=None,
-        help="Resolved source URL to record in torrent metadata",
     )
     publish_validation_parser.add_argument(
         "--piece-size",

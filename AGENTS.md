@@ -34,7 +34,7 @@ uv run ruff check shared/ producer/ mirror/ tests/ status-api/
 - `mirror_state.json` is saved in both swarm and `--once` (leech) mode.
 - Leech mode has no download timeout — runs until complete or user cancels. Stall warning at 300s of zero rate, but never exits. Do not add a wall-clock timeout.
 - Swarm mode exits after `--download-timeout` (default 1800s) of continuous DHT inactivity so the container can restart.
-- `AUTHORITY_PUBKEY`, `DHT_SALT`, and `WEB_SEED_URL` are baked into the mirror Docker image as `ARG` defaults. Image runs with zero env vars.
+- `AUTHORITY_PUBKEY` and `DHT_SALT` are baked into the mirror Docker image as `ARG` defaults. Image runs with zero env vars.
 
 ### Deployment — remote host `bandwidth-martyr`
 
@@ -43,13 +43,13 @@ uv run ruff check shared/ producer/ mirror/ tests/ status-api/
 - `.env` lives at `~/.env` on the remote (not in the repo). `DHT_PRIVATE_KEY` is required.
 - To manually trigger a status push (e.g. after deploying template changes):
   ```bash
-  ssh bandwidth-martyr 'cd /opt/nano-snapshot-swarm && git pull --rebase && set -a && source ~/.env && set +a && .venv/bin/python -m producer.push_status --status-api-url https://nano-snapshot.ninzin.net --state-file publisher_state.json --torrent-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z.torrent --snapshot-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z --web-seed-url https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest/'
+  ssh bandwidth-martyr 'cd /opt/nano-snapshot-swarm && git pull --rebase && set -a && source ~/.env && set +a && .venv/bin/python -m producer.push_status --status-api-url https://nano-snapshot.ninzin.net --state-file publisher_state.json --torrent-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z.torrent --snapshot-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z'
   ```
 - From the repo root, refresh the checked-in authority key file with `./derive-authority-pubkey | tee AUTHORITY_PUBKEY`.
 
 ### E2E validation procedure
 
-See `docs/manual-e2e-validation.md`. Uses `DHT_SALT=validation` and `WEB_SEED_MODE=off` to isolate from production. Run against a temporary nohup seeder on the remote, not the production seeder.
+See `docs/manual-e2e-validation.md`. Uses `DHT_SALT=validation` to isolate from production. Run against a temporary nohup seeder on the remote, not the production seeder.
 
 ### Stale doc in CLI help (fix if editing)
 

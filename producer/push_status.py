@@ -13,8 +13,6 @@ from pathlib import Path
 
 from nacl.signing import SigningKey
 
-from shared.web_seed import WEB_SEED_MODE_FALLBACK, WEB_SEED_MODES, resolve_web_seed_url
-
 
 def _parse_private_key(hex_key: str) -> bytes:
     key_bytes = bytes.fromhex(hex_key)
@@ -60,7 +58,6 @@ def push_status(
     sequence: int,
     info_hash: str,
     torrent_name: str,
-    web_seed_url: str,
     piece_size: int,
     snapshot_file: str,
     torrent_file: str,
@@ -71,16 +68,10 @@ def push_status(
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
     signature = sign_push(private_key_hex, sequence, info_hash, timestamp)
 
-    # Construct full web seed URL (follow BEP 19 logic: append if ends in slash)
-    full_web_seed = web_seed_url
-    if full_web_seed.endswith("/"):
-        full_web_seed += torrent_name
-
     payload = {
         "sequence": sequence,
         "info_hash": info_hash,
         "torrent_name": torrent_name,
-        "web_seed_url": full_web_seed,
         "piece_size": piece_size,
         "snapshot_size_bytes": Path(snapshot_file).stat().st_size,
         "timestamp": timestamp,
@@ -110,16 +101,6 @@ def main() -> int:
     parser.add_argument("--meta-file", default="snapshot-meta.json")
     parser.add_argument("--torrent-file", required=True)
     parser.add_argument("--snapshot-file", required=True)
-    parser.add_argument(
-        "--web-seed-url",
-        default="https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest",
-    )
-    parser.add_argument(
-        "--web-seed-mode",
-        choices=sorted(WEB_SEED_MODES),
-        default=os.environ.get("WEB_SEED_MODE", WEB_SEED_MODE_FALLBACK),
-        help="Web seed policy: fallback or off (overrides WEB_SEED_MODE env)",
-    )
     parser.add_argument("--torrent-name", default="nano-ledger-snapshot.7z")
     parser.add_argument("--piece-size", type=int, default=32 * 1024 * 1024)
     args = parser.parse_args()
@@ -150,7 +131,6 @@ def main() -> int:
             sequence=sequence,
             info_hash=info_hash,
             torrent_name=args.torrent_name,
-            web_seed_url=resolve_web_seed_url(args.web_seed_url, args.web_seed_mode) or "",
             piece_size=args.piece_size,
             snapshot_file=args.snapshot_file,
             torrent_file=args.torrent_file,

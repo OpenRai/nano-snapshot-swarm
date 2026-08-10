@@ -22,15 +22,10 @@ if [ -z "${DHT_PRIVATE_KEY:-}" ] && [ -f "$HOME/.env" ]; then
     source "$HOME/.env"
 fi
 
-RESOLVED_WEB_SEED=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('source_url', '${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest/}'))" 2>/dev/null || echo "${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest/}")
-RESOLVED_WEB_SEED_MODE=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('web_seed_mode', '${WEB_SEED_MODE:-fallback}'))" 2>/dev/null || echo "${WEB_SEED_MODE:-fallback}")
-
 python -m producer.push_status \
     --status-api-url "$STATUS_API_URL" \
     --private-key "$DHT_PRIVATE_KEY" \
     --state-file "$STATE_FILE" \
     --meta-file "$META_FILE" \
     --torrent-file "$TORRENT_FILE" \
-    --snapshot-file "$SNAPSHOT_FILE" \
-    --web-seed-url "$RESOLVED_WEB_SEED" \
-    --web-seed-mode "$RESOLVED_WEB_SEED_MODE"
+    --snapshot-file "$SNAPSHOT_FILE"

@@ -3,8 +3,8 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
-WEB_SEED_URL="${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
-WEB_SEED_MODE="${WEB_SEED_MODE:-fallback}"
+UPSTREAM_SNAPSHOT_INDEX_URL="${UPSTREAM_SNAPSHOT_INDEX_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
+TORRENT_FORMAT_VERSION=2
 AGENT="nano-snapshot-swarm/1.0"
 
 log() {
@@ -27,12 +27,12 @@ log "Resolving latest snapshot URL"
 
 # Bug 2+3 fix: use -f to fail on HTTP errors, capture exit code explicitly
 RAW_URL=""
-if ! RAW_URL=$(curl -sSfL -A "$AGENT" "$WEB_SEED_URL" | tr -d '"\r\n '); then
-    log "ERROR: Could not fetch latest snapshot URL from $WEB_SEED_URL (curl exit $?)"
+if ! RAW_URL=$(curl -sSfL -A "$AGENT" "$UPSTREAM_SNAPSHOT_INDEX_URL" | tr -d '"\r\n '); then
+    log "ERROR: Could not fetch latest snapshot URL from $UPSTREAM_SNAPSHOT_INDEX_URL (curl exit $?)"
     exit 1
 fi
 if [ -z "$RAW_URL" ]; then
-    log "ERROR: Empty response from $WEB_SEED_URL"
+    log "ERROR: Empty response from $UPSTREAM_SNAPSHOT_INDEX_URL"
     exit 1
 fi
 
@@ -75,8 +75,8 @@ PARTIAL_FILE="${TARGET_FILE}.partial"
 if [ -f "$META_FILE" ] && [ -f "$STABLE_FILE" ] && [ -s "$STABLE_FILE" ]; then
     PREV_FILENAME=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('original_filename',''))" 2>/dev/null || true)
     PREV_TORRENT=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('torrent_info_hash',''))" 2>/dev/null || true)
-    PREV_WEB_SEED_MODE=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('web_seed_mode','fallback'))" 2>/dev/null || true)
-    if [ "$PREV_FILENAME" = "$FILENAME" ] && [ -n "$PREV_TORRENT" ] && [ "$PREV_WEB_SEED_MODE" = "$WEB_SEED_MODE" ]; then
+    PREV_TORRENT_FORMAT_VERSION=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('torrent_format_version',''))" 2>/dev/null || true)
+    if [ "$PREV_FILENAME" = "$FILENAME" ] && [ -n "$PREV_TORRENT" ] && [ "$PREV_TORRENT_FORMAT_VERSION" = "$TORRENT_FORMAT_VERSION" ]; then
         log "Snapshot unchanged (${FILENAME}, torrent ${PREV_TORRENT}) — re-publishing to DHT"
 
         cd "$REPO_DIR"
@@ -253,8 +253,7 @@ json.dump({
     'original_filename': '$FILENAME',
     'sha256': '$SHA256',
     'size_bytes': $FILE_SIZE,
-    'source_url': '$LATEST_URL',
-    'web_seed_mode': '$WEB_SEED_MODE',
+    'torrent_format_version': $TORRENT_FORMAT_VERSION,
     'downloaded_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
 }, open('$META_FILE', 'w'), indent=2)
 "
@@ -272,9 +271,6 @@ fi
 PUBLISH_OUTPUT=$(python -m producer.cli publish \
     --private-key "$DHT_PRIVATE_KEY" \
     --snapshot-file "$STABLE_FILE" \
-    --web-seed-url "$LATEST_URL" \
-    --web-seed-mode "$WEB_SEED_MODE" \
-    --source-url "$LATEST_URL" \
     --original-filename "$FILENAME")
 
 echo "$PUBLISH_OUTPUT"

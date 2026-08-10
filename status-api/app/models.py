@@ -7,7 +7,6 @@ class PushRequest(BaseModel):
     sequence: int
     info_hash: str
     torrent_name: str
-    web_seed_url: str
     piece_size: int
     snapshot_size_bytes: int
     timestamp: str  # ISO 8601
@@ -21,7 +20,6 @@ class StatusResponse(BaseModel):
     info_hash: str
     torrent_name: str
     magnet: str
-    web_seed_url: str
     torrent_download_url: str
     snapshot_size_bytes: int
     piece_size: int

@@ -115,7 +115,6 @@ def push(payload: PushRequest) -> JSONResponse:
         "info_hash": payload.info_hash,
         "torrent_name": payload.torrent_name,
         "magnet": magnet,
-        "web_seed_url": payload.web_seed_url,
         "torrent_download_url": "/api/torrent",
         "snapshot_size_bytes": payload.snapshot_size_bytes,
         "piece_size": payload.piece_size,
@@ -148,15 +147,6 @@ def _render_fragment() -> str:
     rendered = rendered.replace("{{ torrent_name }}", _current_status["torrent_name"] + ".torrent")
     rendered = rendered.replace("{{ timestamp }}", _current_status["timestamp"])
     rendered = rendered.replace("{{ magnet }}", _current_status["magnet"])
-    rendered = rendered.replace("{{ web_seed_url }}", _current_status["web_seed_url"])
-    direct_http_start = "<!-- direct-http-card-start -->"
-    direct_http_end = "<!-- direct-http-card-end -->"
-    if _current_status["web_seed_url"]:
-        rendered = rendered.replace(direct_http_start, "").replace(direct_http_end, "")
-    else:
-        start = rendered.index(direct_http_start)
-        end = rendered.index(direct_http_end, start) + len(direct_http_end)
-        rendered = rendered[:start] + rendered[end:]
     listing = _current_status.get("archive_listing") or ""
     rendered = rendered.replace("{{ archive_listing }}", listing)
     if not listing:

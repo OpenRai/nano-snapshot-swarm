@@ -14,8 +14,6 @@ The default OpenRAI mirror stream is baked into the published Docker image and s
 | `DATA_DIR` | `/data` | No | Directory for ledger data and state |
 | `DHT_SALT` | `daily` | No | DHT mutable item salt namespace |
 | `POLL_INTERVAL` | `600` | No | DHT poll interval in seconds (swarm mode only) |
-| `WEB_SEED_URL` | _(empty)_ | No | Optional build/runtime HTTP/HTTPS web-seed URL |
-| `WEB_SEED_MODE` | `off` | No | Web seed policy: `fallback` or `off` |
 | `SEED_PEERS` | `bandwidth-martyr.openrai.org:6881` in the public image | No | Comma-separated explicit P2P peers for initial connection |
 | `LOG_LEVEL` | `INFO` | No | Python log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
@@ -33,8 +31,6 @@ python -m mirror.watcher [flags]
 | `--data-dir` | `DATA_DIR` | `/data` | Data directory |
 | `--salt` | `DHT_SALT` | `daily` | DHT salt |
 | `--poll-interval` | `POLL_INTERVAL` | `600` | Poll interval in seconds |
-| `--web-seed-url` | `WEB_SEED_URL` | _(see above)_ | Web seed URL |
-| `--web-seed-mode` | `WEB_SEED_MODE` | `off` | Web seed policy: `fallback` or `off` |
 | `--log-level` | `LOG_LEVEL` | `INFO` | Log level |
 | `--once` | — | `False` | Leech mode: download once then exit |
 | `--download-timeout` | — | `1800` | Swarm-only inactivity timeout in seconds (`0`=never exit; ignored in `--once` mode) |
@@ -51,8 +47,6 @@ services:
       DATA_DIR: /data
       DHT_SALT: "${DHT_SALT:-daily}"
       POLL_INTERVAL: "${POLL_INTERVAL:-600}"
-      WEB_SEED_URL: "${WEB_SEED_URL:-}"
-      WEB_SEED_MODE: "${WEB_SEED_MODE:-off}"
       SEED_PEERS: "${SEED_PEERS:-bandwidth-martyr.openrai.org:6881}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     volumes:
@@ -102,8 +96,6 @@ docker run --rm \
 |---|---|---|---|
 | `OUTPUT_DIR` | `.` | No | Output directory for `.7z`, `.torrent`, and metadata files |
 | `DHT_PRIVATE_KEY` | — | **Yes** | Ed25519 private key (hex, 64 chars) |
-| `WEB_SEED_URL` | _(empty)_ | No | S3/HTTP URL added as web seed to torrent |
-| `WEB_SEED_MODE` | `fallback` | No | Producer web-seed policy: `fallback` adds `url-list`; `off` omits it |
 | `DHT_SALT` | `daily` | No | DHT salt namespace |
 | `STATUS_API_URL` | _(empty)_ | No | URL of the status API to push snapshot metadata (e.g. `https://nano-snapshots.openrai.org`) |
 
@@ -124,10 +116,7 @@ python -m producer.cli validation-fixture publish [flags]
 | `--snapshot-file` | Path to the `.7z` archive to torrent (defaults to `OUTPUT_DIR/nano-ledger-snapshot.7z`) |
 | `--output-dir` | Output directory for auto-detecting the snapshot file |
 | `--private-key` | Ed25519 private key hex (overrides `DHT_PRIVATE_KEY`) |
-| `--web-seed-url` | Web seed URL (overrides `WEB_SEED_URL`) |
-| `--web-seed-mode` | Web seed policy (overrides `WEB_SEED_MODE`): `fallback` or `off` |
 | `--piece-size` | Torrent piece size in bytes (default: 32 MiB) |
-| `--source-url` | Source URL stored in torrent metadata |
 | `--original-filename` | Original snapshot filename stored in torrent metadata |
 | `--state-file` | Path to publisher state file (default: `publisher_state.json`) |
 | `--dry-run` | Create torrent metadata but don't publish to DHT |
@@ -145,8 +134,6 @@ Push snapshot metadata and `.torrent` file to the status API after publishing.
 | `--meta-file` | Path to snapshot metadata file (default: `snapshot-meta.json`) |
 | `--torrent-file` | Path to `.torrent` file |
 | `--snapshot-file` | Path to `.7z` snapshot file |
-| `--web-seed-url` | Base web seed URL (overrides `WEB_SEED_URL`) |
-| `--web-seed-mode` | Web seed policy (overrides `WEB_SEED_MODE`): `fallback` or `off` |
 | `--torrent-name` | Torrent name/filename (default: `nano-ledger-snapshot.7z`) |
 | `--piece-size` | Torrent piece size in bytes (default: 32 MiB) |
 
@@ -167,8 +154,6 @@ Push snapshot metadata and `.torrent` file to the status API after publishing.
 | `--output-dir` | Directory containing the validation archive |
 | `--archive-name` | Validation archive filename |
 | `--private-key` | Ed25519 private key hex (overrides `DHT_PRIVATE_KEY`) |
-| `--web-seed-url` | Optional validation web seed URL |
-| `--source-url` | Source URL stored in torrent metadata |
 | `--piece-size` | Torrent piece size in bytes (default: 32 MiB) |
 | `--state-file` | Path to validation publisher state file |
 | `--dry-run` | Create torrent metadata but don't publish to DHT |

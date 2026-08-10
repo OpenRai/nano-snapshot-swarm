@@ -21,6 +21,8 @@ class SnapshotMetadata:
             loaded = json.loads(p.read_text())
             if isinstance(loaded, dict):
                 self.data = loaded
+                if self.data.pop("source_url", None) is not None:
+                    self._save()
         except json.JSONDecodeError as e:
             logger.warning("Corrupted snapshot metadata file, resetting: %s", e)
             self.data = {}

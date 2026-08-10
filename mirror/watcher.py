@@ -11,12 +11,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from mirror.config import (
-    DEFAULT_WEB_SEED_MODE,
-    DEFAULT_WEB_SEED_URL,
-    WEB_SEED_MODES,
-    resolve_web_seeds,
-)
 from mirror.dht_discovery import DEFAULT_SALT, DHTDiscoveryResult, discover_latest_snapshot
 from mirror.download_progress import DownloadProgressLogState
 from mirror.libtorrent_session import (
@@ -37,7 +31,6 @@ DEFAULT_DHT_INACTIVITY_TIMEOUT = 1800  # swarm: exit if DHT returns nothing for 
 STATE_FILENAME = "mirror_state.json"
 SNAPSHOT_META_FILENAME = "snapshot-meta.json"
 
-WEB_SEED_URL = os.environ.get("WEB_SEED_URL", DEFAULT_WEB_SEED_URL)
 DEFAULT_AUTHORITY_PUBKEY_FILE = Path(__file__).resolve().parent.parent / "AUTHORITY_PUBKEY"
 
 
@@ -59,24 +52,20 @@ class MirrorWatcher:
         authority_pubkey_hex: str,
         data_dir: str = DEFAULT_DATA_DIR,
         poll_interval: int = DEFAULT_POLL_INTERVAL,
-        web_seed_url: str = WEB_SEED_URL,
         salt: str = DEFAULT_SALT,
         download_timeout: int = 0,  # unused in leech mode; swarm DHT inactivity timeout
         stall_warn_seconds: int = DEFAULT_STALL_WARN_SECONDS,
         extract: bool = False,
         seed_peers: Optional[list[tuple[str, int]]] = None,
-        web_seed_mode: str = os.environ.get("WEB_SEED_MODE", DEFAULT_WEB_SEED_MODE),
     ):
         self.authority_pubkey_hex = authority_pubkey_hex
         self.data_dir = data_dir
         self.poll_interval = poll_interval
-        self.web_seed_url = web_seed_url
         self.salt = salt
         self.download_timeout = download_timeout  # swarm DHT inactivity timeout
         self.stall_warn_seconds = stall_warn_seconds
         self.extract = extract
         self.seed_peers = seed_peers or []
-        self.web_seed_mode = web_seed_mode
 
         self.pub_key_bytes = bytes.fromhex(self.authority_pubkey_hex)
         self.nano_address = public_key_to_nano_address(self.pub_key_bytes)
@@ -101,9 +90,6 @@ class MirrorWatcher:
         logger.info(f"Authority public key (Nano-format): {self.nano_address}")
         logger.info(f"Authority public key: {self.authority_pubkey_hex[:16]}...")
         logger.info(f"Data directory: {self.data_dir}")
-        if resolve_web_seeds(self.web_seed_url, self.web_seed_mode):
-            logger.info(f"Web seed URL: {self.web_seed_url}")
-            logger.info(f"Web seed mode: {self.web_seed_mode}")
         logger.info(f"DHT salt: '{self.salt}'")
         if once:
             logger.info("Mode: LEECH (download-once, exit when done)")
@@ -395,7 +381,6 @@ class MirrorWatcher:
                 self.session.ensure_torrent(
                     info_hash=target.info_hash,
                     save_path=self.data_dir,
-                    web_seeds=resolve_web_seeds(self.web_seed_url, self.web_seed_mode),
                 )
                 self._connect_seed_peers(target.info_hash)
                 self._active_info_hash = target.info_hash
@@ -441,14 +426,11 @@ class MirrorWatcher:
 
         self.snapshot_meta.update(
             original_filename=meta.get("original_filename"),
-            source_url=meta.get("source_url"),
         )
 
         parts = []
         if "original_filename" in meta:
             parts.append(f"file={meta['original_filename']}")
-        if "source_url" in meta:
-            parts.append(f"url={meta['source_url']}")
         if parts:
             logger.info(f"Snapshot metadata: {', '.join(parts)}")
 
@@ -608,11 +590,6 @@ def main() -> None:
         help=f"DHT poll interval in seconds (default: {DEFAULT_POLL_INTERVAL})",
     )
     parser.add_argument(
-        "--web-seed-url",
-        default=WEB_SEED_URL,
-        help="Web seed URL for fallback downloads",
-    )
-    parser.add_argument(
         "--log-level",
         default=os.environ.get("LOG_LEVEL", "INFO"),
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -642,12 +619,6 @@ def main() -> None:
         "--extract",
         action="store_true",
         help="Extract .7z after download and delete archive (only in --once mode)",
-    )
-    parser.add_argument(
-        "--web-seed-mode",
-        default=os.environ.get("WEB_SEED_MODE", DEFAULT_WEB_SEED_MODE),
-        choices=sorted(WEB_SEED_MODES),
-        help="Web seed policy: fallback or off",
     )
     parser.add_argument(
         "--seed-peer",
@@ -709,12 +680,10 @@ def main() -> None:
         authority_pubkey_hex=pubkey,
         data_dir=args.data_dir,
         poll_interval=args.poll_interval,
-        web_seed_url=args.web_seed_url,
         salt=args.salt,
         download_timeout=download_timeout,
         extract=extract,
         seed_peers=seed_peers,
-        web_seed_mode=args.web_seed_mode,
     )
     watcher.start(once=args.once)
 
