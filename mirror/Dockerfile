@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     python3 \
     python3-libtorrent \
+    python3-venv \
     zstd \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -14,12 +15,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 COPY pyproject.toml /app/
-RUN uv pip install --system --no-cache -r pyproject.toml
+RUN python3 -m venv --system-site-packages /venv \
+    && uv pip install --python /venv/bin/python --no-cache -r pyproject.toml \
+    && /venv/bin/python -c "import libtorrent; libtorrent.session({'enable_dht': False})"
 
 COPY shared/ /app/shared/
 COPY mirror/ /app/mirror/
 
 ENV PYTHONPATH=/app
+ENV PATH="/venv/bin:$PATH"
 ENV DATA_DIR=/data
 ENV POLL_INTERVAL=600
 ENV LOG_LEVEL=INFO
