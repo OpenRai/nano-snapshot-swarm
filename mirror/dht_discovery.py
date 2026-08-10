@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-from shared.bep46 import parse_dht_value
+from shared.bep46 import parse_dht_value, verify_mutable_item
 from shared.nano_identity import compute_bep46_target_id
 
 logger = logging.getLogger("mirror.discovery")
@@ -107,10 +107,28 @@ def _process_mutable_item_snapshot(
             f"keys={list(item.keys()) if isinstance(item, dict) else 'N/A'}"
         )
 
-        # Note: signature verification requires raw signature bytes which
-        # we don't currently extract in AlertSnapshot. For now, trust seq > 0
-        # items from the DHT (the DHT protocol itself validates signatures).
-        verified = seq > 0
+        signature_hex = snap.extra.get("signature")
+        returned_pubkey_hex = snap.extra.get("key")
+        if not isinstance(signature_hex, str) or not isinstance(returned_pubkey_hex, str):
+            logger.warning("DHT item missing its mutable-item signature or public key")
+            return None
+
+        try:
+            returned_pubkey = bytes.fromhex(returned_pubkey_hex)
+            signature = bytes.fromhex(signature_hex)
+        except ValueError:
+            logger.warning("DHT item has malformed mutable-item signature or public key")
+            return None
+
+        if returned_pubkey != expected_pub_key:
+            logger.warning("DHT item public key does not match the configured authority")
+            return None
+
+        if not verify_mutable_item(expected_pub_key, value_bytes, seq, signature, salt):
+            logger.warning("DHT item signature verification failed")
+            return None
+
+        verified = True
 
         parsed = parse_dht_value(value_bytes)
         info_hash_raw = parsed.get(b"info_hash", b"")
@@ -134,8 +152,8 @@ def _process_mutable_item_snapshot(
             sequence=seq,
             value_bytes=value_bytes,
             verified=verified,
-            signature_hex=snap.extra.get("signature"),
-            dht_pubkey_hex=snap.extra.get("key"),
+            signature_hex=signature_hex,
+            dht_pubkey_hex=returned_pubkey_hex,
         )
     except Exception as e:
         logger.error(f"Error processing DHT mutable item alert: {e}")

@@ -21,7 +21,10 @@ class SnapshotMetadata:
             loaded = json.loads(p.read_text())
             if isinstance(loaded, dict):
                 self.data = loaded
-                if self.data.pop("source_url", None) is not None:
+                removed_source_url = self.data.pop("source_url", None) is not None
+                removed_nano_pubkey = self.data.pop("authority_pubkey_nano", None) is not None
+                removed_legacy_fields = removed_source_url or removed_nano_pubkey
+                if removed_legacy_fields:
                     self._save()
         except json.JSONDecodeError as e:
             logger.warning("Corrupted snapshot metadata file, resetting: %s", e)

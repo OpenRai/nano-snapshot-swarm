@@ -20,7 +20,6 @@ from mirror.libtorrent_session import (
 )
 from mirror.reconcile import DesiredSnapshot, ReconcileDecision, reconcile_snapshot
 from mirror.state import MirrorState, SnapshotMetadata
-from shared.nano_identity import public_key_to_nano_address
 
 logger = logging.getLogger("mirror.watcher")
 
@@ -68,7 +67,6 @@ class MirrorWatcher:
         self.seed_peers = seed_peers or []
 
         self.pub_key_bytes = bytes.fromhex(self.authority_pubkey_hex)
-        self.nano_address = public_key_to_nano_address(self.pub_key_bytes)
 
         self.state = MirrorState(os.path.join(data_dir, STATE_FILENAME))
         self.snapshot_meta = SnapshotMetadata(os.path.join(data_dir, SNAPSHOT_META_FILENAME))
@@ -87,7 +85,6 @@ class MirrorWatcher:
     def start(self, *, once: bool = False) -> None:
         logger.info("=" * 60)
         logger.info("Nano P2P Mirror Service Starting")
-        logger.info(f"Authority public key (Nano-format): {self.nano_address}")
         logger.info(f"Authority public key: {self.authority_pubkey_hex[:16]}...")
         logger.info(f"Data directory: {self.data_dir}")
         logger.info(f"DHT salt: '{self.salt}'")
@@ -331,7 +328,6 @@ class MirrorWatcher:
             self.state.update(result.sequence, result.info_hash_hex)
             self.snapshot_meta.update(
                 authority_pubkey=self.authority_pubkey_hex,
-                authority_pubkey_nano=self.nano_address,
                 dht_pubkey=result.dht_pubkey_hex or self.authority_pubkey_hex,
                 dht_signature=result.signature_hex,
                 dht_seq=result.sequence,

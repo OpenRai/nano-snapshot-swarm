@@ -44,10 +44,10 @@ def publish_to_dht(
     state = load_state(state_path)
     seq = state.get("last_seq", 0) + 1
 
-    pub_key_bytes, nano_address = derive_nano_address(private_key_hex)
+    pub_key_bytes, _ = derive_nano_address(private_key_hex)
     target_id = compute_bep46_target_id(pub_key_bytes, salt)
 
-    print(f"Publisher DHT pubkey (Nano-format): {nano_address}")
+    print(f"Publisher DHT pubkey: {pub_key_bytes.hex()}")
     print(f"DHT target ID (SHA-1): {target_id.hex()}")
     print(f"Publishing seq={seq}, info_hash={info_hash_hex}, salt='{salt}'")
 
@@ -60,7 +60,6 @@ def publish_to_dht(
         return {
             "seq": seq,
             "info_hash_hex": info_hash_hex,
-            "nano_address": nano_address,
             "dry_run": True,
         }
 
@@ -124,7 +123,6 @@ def publish_to_dht(
     return {
         "seq": seq,
         "info_hash_hex": info_hash_hex,
-        "nano_address": nano_address,
         "confirmed": confirmed,
     }
 

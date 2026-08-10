@@ -126,7 +126,7 @@ they do not contain an HTTP download URL.
 
 Expected publish output:
 ```
-Publisher DHT pubkey (Nano-format): nano_...
+Publisher DHT pubkey: <64-char hex>
 DHT target ID (SHA-1): <target>
 Publishing seq=1, info_hash=<info_hash>
 Signature: <sig_hex>

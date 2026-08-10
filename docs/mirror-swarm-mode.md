@@ -73,7 +73,7 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 
 | Log | Meaning |
 |---|---|
-| `Authority public key (Nano-format): nano_...` | The DHT authority pubkey rendered in Nano address format for readability |
+| `Authority public key: <hex>...` | The configured DHT authority public key |
 | `Mode: SWARM (continuous polling every Ns)` | Running as long-lived daemon |
 | `libtorrent session started, listening on port 6881` | BitTorrent engine ready |
 
@@ -156,7 +156,6 @@ docker exec nano-mirror cat /data/snapshot-meta.json
 ```json
 {
   "authority_pubkey": "2b845d...",
-  "authority_pubkey_nano": "nano_...",
   "dht_pubkey": "2b845d...",
   "dht_signature": "ed05ae...",
   "dht_seq": 70,
@@ -167,8 +166,6 @@ docker exec nano-mirror cat /data/snapshot-meta.json
   "original_filename": "snapshot-2026-04-22T00-00-00Z.7z"
 }
 ```
-
-`authority_pubkey_nano` is only a Nano-format rendering of the DHT authority pubkey. It is not proof that the producer controls a Nano account with that same address.
 
 ### Disk Usage
 
@@ -251,10 +248,6 @@ docker compose up -d
 ---
 
 ## Troubleshooting
-
-### "Authority public key (Nano-format)" doesn't match expected
-
-If you overrode `AUTHORITY_PUBKEY`, it may be wrong or byteswapped. The hex is interpreted as raw bytes of the DHT Ed25519 public key. The Nano-format rendering in logs is only that same pubkey encoded with Nano's address alphabet and checksum; it is not derived from the producer's Nano account keypair.
 
 ### "Signature verification FAILED"
 

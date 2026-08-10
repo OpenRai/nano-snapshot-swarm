@@ -92,10 +92,16 @@ def test_snapshot_metadata_loads_existing_file(tmp_path) -> None:
     assert meta.data["original_filename"] == "nano-ledger-snapshot-123.7z"
 
 
-def test_snapshot_metadata_removes_legacy_source_url(tmp_path) -> None:
+def test_snapshot_metadata_removes_legacy_fields(tmp_path) -> None:
     meta_path = tmp_path / "snapshot-meta.json"
-    meta_path.write_text('{"source_url": "https://example.test/snapshot", "dht_seq": 1}\n')
+    meta_path.write_text(
+        '{"source_url": "https://example.test/snapshot", '
+        '"authority_pubkey_nano": "obsolete", '
+        '"dht_seq": 1}\n'
+    )
 
     SnapshotMetadata(str(meta_path))
 
-    assert "source_url" not in json.loads(meta_path.read_text())
+    metadata = json.loads(meta_path.read_text())
+    assert "source_url" not in metadata
+    assert "authority_pubkey_nano" not in metadata
