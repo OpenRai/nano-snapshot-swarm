@@ -1,51 +1,14 @@
-FROM python:3.13-trixie AS builder-cpp
+FROM debian:trixie-slim
 
+# Debian ships native libtorrent Python bindings for amd64 and arm64. Using
+# them avoids compiling libtorrent under QEMU during multi-platform builds.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    git \
-    libboost-system-dev \
-    libboost-dev \
-    libboost-python-dev \
-    libssl-dev \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN pip install --no-cache-dir setuptools
-
-WORKDIR /build
-
-RUN git clone --depth 1 --branch v2.0.11 --recurse-submodules https://github.com/arvidn/libtorrent.git
-
-WORKDIR /build/libtorrent
-RUN mkdir build && cd build && \
-    cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr/local \
-    -DBUILD_SHARED_LIBS=ON \
-    -DBUILD_TESTS=OFF \
-    -DBUILD_EXAMPLES=OFF \
-    -Dpython-bindings=ON \
-    -Dpython-egg-info=OFF \
-    -Dpython-install-system-dir=ON && \
-    make -j2 && \
-    make install && \
-    ldconfig /usr/local/lib
-
-
-FROM python:3.13-trixie
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    zstd \
     ca-certificates \
-    libboost-system1.83.0 \
-    libboost-python1.83.0 \
+    python3 \
+    python3-libtorrent \
+    zstd \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
-
-COPY --from=builder-cpp /usr/local/lib/libtorrent*.so* /usr/local/lib/
-COPY --from=builder-cpp /usr/local/lib/python3.13/ /usr/local/lib/python3.13/
-RUN ldconfig /usr/local/lib
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
