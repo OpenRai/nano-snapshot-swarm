@@ -235,12 +235,13 @@ environment:
 ## Updating the Container
 
 ```bash
-# Rebuild from a local clone using the repo's default authority key
-read -r AUTHORITY_PUBKEY < AUTHORITY_PUBKEY
-docker build \
-  --build-arg AUTHORITY_PUBKEY="$AUTHORITY_PUBKEY" \
-  -f mirror/Dockerfile \
-  -t nano-bootstrap-mirror .
+# Rebuild a native image from a local clone using the repo's default authority key
+./scripts/nano-mirror-build.sh
+
+# Build and publish both supported platforms after authenticating to GHCR
+./scripts/nano-mirror-build.sh --platform linux/amd64 --build-id local --push
+./scripts/nano-mirror-build.sh --platform linux/arm64 --build-id local --push
+BUILD_ID=local ./scripts/nano-mirror-publish.sh
 
 # Pull latest published image
 docker pull ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest
