@@ -2,7 +2,18 @@ from __future__ import annotations
 
 import pytest
 
-from mirror.config import resolve_web_seed_url, resolve_web_seeds
+from mirror.config import (
+    DEFAULT_WEB_SEED_MODE,
+    DEFAULT_WEB_SEED_URL,
+    WEB_SEED_MODE_OFF,
+    resolve_web_seed_url,
+    resolve_web_seeds,
+)
+
+
+def test_web_seed_defaults_are_p2p_only() -> None:
+    assert DEFAULT_WEB_SEED_URL == ""
+    assert DEFAULT_WEB_SEED_MODE == WEB_SEED_MODE_OFF
 
 
 def test_resolve_web_seeds_returns_empty_list_when_disabled() -> None:

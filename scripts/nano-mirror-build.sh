@@ -15,6 +15,9 @@ GITHUB_SHA and identifies the temporary platform image used by publication.
 Environment:
   IMAGE_NAME           Image without tag (default: $DEFAULT_IMAGE_NAME).
   AUTHORITY_PUBKEY     Override the key read from AUTHORITY_PUBKEY.
+  WEB_SEED_URL         Optional build-time web-seed URL; empty by default.
+  WEB_SEED_MODE        Optional build-time web-seed policy; off by default.
+  SEED_PEERS           Build-time HOST:PORT peers; defaults to the public seeder.
   BUILD_ID             Temporary image tag suffix; defaults to GITHUB_SHA.
   REGISTRY_USERNAME    Username for an authenticated push.
   REGISTRY_TOKEN       Password/token for an authenticated push.
@@ -22,6 +25,9 @@ EOF
 }
 
 IMAGE_NAME="${IMAGE_NAME:-$DEFAULT_IMAGE_NAME}"
+WEB_SEED_URL="${WEB_SEED_URL-}"
+WEB_SEED_MODE="${WEB_SEED_MODE-off}"
+SEED_PEERS="${SEED_PEERS-bandwidth-martyr.openrai.org:6881}"
 PLATFORM=""
 BUILD_ID="${BUILD_ID:-${GITHUB_SHA:-}}"
 PUSH=false
@@ -105,6 +111,9 @@ BUILD_ARGS=(
     docker buildx build
     --platform "$PLATFORM"
     --build-arg "AUTHORITY_PUBKEY=$PUBKEY"
+    --build-arg "WEB_SEED_URL=$WEB_SEED_URL"
+    --build-arg "WEB_SEED_MODE=$WEB_SEED_MODE"
+    --build-arg "SEED_PEERS=$SEED_PEERS"
     --file mirror/Dockerfile
     --tag "$IMAGE_TAG"
 )

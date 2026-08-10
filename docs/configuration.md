@@ -14,8 +14,9 @@ The default OpenRAI mirror stream is baked into the published Docker image and s
 | `DATA_DIR` | `/data` | No | Directory for ledger data and state |
 | `DHT_SALT` | `daily` | No | DHT mutable item salt namespace |
 | `POLL_INTERVAL` | `600` | No | DHT poll interval in seconds (swarm mode only) |
-| `WEB_SEED_URL` | `https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest` | No | Fallback HTTP/HTTPS URL for torrent web-seeds |
-| `WEB_SEED_MODE` | `fallback` | No | Web seed policy: `fallback` or `off` |
+| `WEB_SEED_URL` | _(empty)_ | No | Optional build/runtime HTTP/HTTPS web-seed URL |
+| `WEB_SEED_MODE` | `off` | No | Web seed policy: `fallback` or `off` |
+| `SEED_PEERS` | `bandwidth-martyr.openrai.org:6881` in the public image | No | Comma-separated explicit P2P peers for initial connection |
 | `LOG_LEVEL` | `INFO` | No | Python log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 
 ---
@@ -33,7 +34,7 @@ python -m mirror.watcher [flags]
 | `--salt` | `DHT_SALT` | `daily` | DHT salt |
 | `--poll-interval` | `POLL_INTERVAL` | `600` | Poll interval in seconds |
 | `--web-seed-url` | `WEB_SEED_URL` | _(see above)_ | Web seed URL |
-| `--web-seed-mode` | `WEB_SEED_MODE` | `fallback` | Web seed policy: `fallback` or `off` |
+| `--web-seed-mode` | `WEB_SEED_MODE` | `off` | Web seed policy: `fallback` or `off` |
 | `--log-level` | `LOG_LEVEL` | `INFO` | Log level |
 | `--once` | — | `False` | Leech mode: download once then exit |
 | `--download-timeout` | — | `1800` | Swarm-only inactivity timeout in seconds (`0`=never exit; ignored in `--once` mode) |
@@ -51,8 +52,9 @@ services:
       DATA_DIR: /data
       DHT_SALT: "${DHT_SALT:-daily}"
       POLL_INTERVAL: "${POLL_INTERVAL:-600}"
-      WEB_SEED_URL: "${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
-      WEB_SEED_MODE: "${WEB_SEED_MODE:-fallback}"
+      WEB_SEED_URL: "${WEB_SEED_URL:-}"
+      WEB_SEED_MODE: "${WEB_SEED_MODE:-off}"
+      SEED_PEERS: "${SEED_PEERS:-bandwidth-martyr.openrai.org:6881}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
     volumes:
       - nano-data:/data          # Named volume (recommended)

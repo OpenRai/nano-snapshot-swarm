@@ -31,8 +31,9 @@ ENV LOG_LEVEL=INFO
 # Public build-time defaults — AUTHORITY_PUBKEY comes from the repo root AUTHORITY_PUBKEY file
 ARG AUTHORITY_PUBKEY
 ARG DHT_SALT=daily
-ARG WEB_SEED_URL=https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest
-ARG WEB_SEED_MODE=fallback
+ARG WEB_SEED_URL=
+ARG WEB_SEED_MODE=off
+ARG SEED_PEERS=bandwidth-martyr.openrai.org:6881
 
 RUN test -n "$AUTHORITY_PUBKEY"
 
@@ -40,6 +41,7 @@ ENV AUTHORITY_PUBKEY=${AUTHORITY_PUBKEY}
 ENV DHT_SALT=${DHT_SALT}
 ENV WEB_SEED_URL=${WEB_SEED_URL}
 ENV WEB_SEED_MODE=${WEB_SEED_MODE}
+ENV SEED_PEERS=${SEED_PEERS}
 
 VOLUME ["/data"]
 

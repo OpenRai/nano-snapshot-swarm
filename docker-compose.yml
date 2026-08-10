@@ -9,8 +9,9 @@ services:
       DHT_SALT: "${DHT_SALT:-daily}"
       POLL_INTERVAL: "${POLL_INTERVAL:-600}"
       LOG_LEVEL: "${LOG_LEVEL:-INFO}"
-      WEB_SEED_URL: "${WEB_SEED_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
-      WEB_SEED_MODE: "${WEB_SEED_MODE:-fallback}"
+      WEB_SEED_URL: "${WEB_SEED_URL:-}"
+      WEB_SEED_MODE: "${WEB_SEED_MODE:-off}"
+      SEED_PEERS: "${SEED_PEERS:-bandwidth-martyr.openrai.org:6881}"
     volumes:
       - nano-data:/data
     ports:

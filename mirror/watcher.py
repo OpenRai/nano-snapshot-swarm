@@ -11,7 +11,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from mirror.config import WEB_SEED_MODE_FALLBACK, WEB_SEED_MODES, resolve_web_seeds
+from mirror.config import (
+    DEFAULT_WEB_SEED_MODE,
+    DEFAULT_WEB_SEED_URL,
+    WEB_SEED_MODES,
+    resolve_web_seeds,
+)
 from mirror.dht_discovery import DEFAULT_SALT, DHTDiscoveryResult, discover_latest_snapshot
 from mirror.download_progress import DownloadProgressLogState
 from mirror.libtorrent_session import (
@@ -32,7 +37,7 @@ DEFAULT_DHT_INACTIVITY_TIMEOUT = 1800  # swarm: exit if DHT returns nothing for 
 STATE_FILENAME = "mirror_state.json"
 SNAPSHOT_META_FILENAME = "snapshot-meta.json"
 
-WEB_SEED_URL = "https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest"
+WEB_SEED_URL = os.environ.get("WEB_SEED_URL", DEFAULT_WEB_SEED_URL)
 DEFAULT_AUTHORITY_PUBKEY_FILE = Path(__file__).resolve().parent.parent / "AUTHORITY_PUBKEY"
 
 
@@ -60,7 +65,7 @@ class MirrorWatcher:
         stall_warn_seconds: int = DEFAULT_STALL_WARN_SECONDS,
         extract: bool = False,
         seed_peers: Optional[list[tuple[str, int]]] = None,
-        web_seed_mode: str = WEB_SEED_MODE_FALLBACK,
+        web_seed_mode: str = os.environ.get("WEB_SEED_MODE", DEFAULT_WEB_SEED_MODE),
     ):
         self.authority_pubkey_hex = authority_pubkey_hex
         self.data_dir = data_dir
@@ -96,8 +101,9 @@ class MirrorWatcher:
         logger.info(f"Authority public key (Nano-format): {self.nano_address}")
         logger.info(f"Authority public key: {self.authority_pubkey_hex[:16]}...")
         logger.info(f"Data directory: {self.data_dir}")
-        logger.info(f"Web seed URL: {self.web_seed_url}")
-        logger.info(f"Web seed mode: {self.web_seed_mode}")
+        if resolve_web_seeds(self.web_seed_url, self.web_seed_mode):
+            logger.info(f"Web seed URL: {self.web_seed_url}")
+            logger.info(f"Web seed mode: {self.web_seed_mode}")
         logger.info(f"DHT salt: '{self.salt}'")
         if once:
             logger.info("Mode: LEECH (download-once, exit when done)")
@@ -639,7 +645,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--web-seed-mode",
-        default=os.environ.get("WEB_SEED_MODE", WEB_SEED_MODE_FALLBACK),
+        default=os.environ.get("WEB_SEED_MODE", DEFAULT_WEB_SEED_MODE),
         choices=sorted(WEB_SEED_MODES),
         help="Web seed policy: fallback or off",
     )
