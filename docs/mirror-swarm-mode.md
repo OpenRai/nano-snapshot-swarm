@@ -239,8 +239,8 @@ environment:
 ./scripts/nano-mirror-build.sh
 
 # Build and publish both supported platforms after authenticating to GHCR
-./scripts/nano-mirror-build.sh --platform linux/amd64 --build-id local --push
-./scripts/nano-mirror-build.sh --platform linux/arm64 --build-id local --push
+BUILD_ID=local ./scripts/nano-mirror-build.sh --platform linux/amd64 --push
+BUILD_ID=local ./scripts/nano-mirror-build.sh --platform linux/arm64 --push
 BUILD_ID=local ./scripts/nano-mirror-publish.sh
 
 # Pull latest published image

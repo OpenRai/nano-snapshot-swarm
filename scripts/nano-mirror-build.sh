@@ -3,61 +3,38 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ME="${0##*/}"
 DEFAULT_IMAGE_NAME="ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror"
 
 usage() {
     cat <<EOF
-Usage: $ME [OPTIONS]
+Usage: ${0##*/} [--platform PLATFORM] [--push]
 
-Build one platform of the mirror image.
-
-Options:
-  --platform PLATFORM   Target platform (default: host platform).
-  --build-id ID         Tag the image as IMAGE_NAME:build-ID-PLATFORM.
-  --tag IMAGE:TAG       Explicit output tag.
-  --push                Push the image instead of loading it locally.
-  --no-push             Build and load locally, even when PUSH_IMAGE is set.
-  -h, --help            Show this help.
+Build one platform of the mirror image. The build ID comes from BUILD_ID or
+GITHUB_SHA and identifies the temporary platform image used by publication.
 
 Environment:
   IMAGE_NAME           Image without tag (default: $DEFAULT_IMAGE_NAME).
   AUTHORITY_PUBKEY     Override the key read from AUTHORITY_PUBKEY.
-  PUSH_IMAGE           Set to true to push without passing --push.
+  BUILD_ID             Temporary image tag suffix; defaults to GITHUB_SHA.
   REGISTRY_USERNAME    Username for an authenticated push.
   REGISTRY_TOKEN       Password/token for an authenticated push.
 EOF
 }
 
 IMAGE_NAME="${IMAGE_NAME:-$DEFAULT_IMAGE_NAME}"
-PLATFORM="${NANO_MIRROR_PLATFORM:-}"
-BUILD_ID="${BUILD_ID:-}"
-IMAGE_TAG=""
-PUSH="${PUSH_IMAGE:-false}"
+PLATFORM=""
+BUILD_ID="${BUILD_ID:-${GITHUB_SHA:-}}"
+PUSH=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --platform)
-            [[ -n "${2:-}" ]] || { usage; exit 1; }
+            [[ -n "${2:-}" ]] || { usage >&2; exit 1; }
             PLATFORM="$2"
-            shift 2
-            ;;
-        --build-id)
-            [[ -n "${2:-}" ]] || { usage; exit 1; }
-            BUILD_ID="$2"
-            shift 2
-            ;;
-        --tag)
-            [[ -n "${2:-}" ]] || { usage; exit 1; }
-            IMAGE_TAG="$2"
             shift 2
             ;;
         --push)
             PUSH=true
-            shift
-            ;;
-        --no-push)
-            PUSH=false
             shift
             ;;
         -h|--help)
@@ -89,23 +66,20 @@ if [[ "$PLATFORM" != */* || "$PLATFORM" == *,* ]]; then
 fi
 
 PLATFORM_SUFFIX="${PLATFORM##*/}"
-if [[ -z "$IMAGE_TAG" ]]; then
-    if [[ -n "$BUILD_ID" ]]; then
-        IMAGE_TAG="$IMAGE_NAME:build-${BUILD_ID}-${PLATFORM_SUFFIX}"
-    else
-        IMAGE_TAG="$IMAGE_NAME:latest"
-    fi
+if [[ -n "$BUILD_ID" ]]; then
+    IMAGE_TAG="$IMAGE_NAME:build-${BUILD_ID}-${PLATFORM_SUFFIX}"
+else
+    IMAGE_TAG="$IMAGE_NAME:latest"
 fi
 
 AUTHORITY_PUBKEY_FILE="$REPO_DIR/AUTHORITY_PUBKEY"
 if [[ -n "${AUTHORITY_PUBKEY:-}" ]]; then
     PUBKEY="$AUTHORITY_PUBKEY"
-else
-    if [[ ! -f "$AUTHORITY_PUBKEY_FILE" ]]; then
-        echo "ERROR: missing $AUTHORITY_PUBKEY_FILE" >&2
-        exit 1
-    fi
+elif [[ -f "$AUTHORITY_PUBKEY_FILE" ]]; then
     IFS= read -r PUBKEY < "$AUTHORITY_PUBKEY_FILE"
+else
+    echo "ERROR: missing $AUTHORITY_PUBKEY_FILE" >&2
+    exit 1
 fi
 
 PUBKEY="${PUBKEY#"${PUBKEY%%[![:space:]]*}"}"
