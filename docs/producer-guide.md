@@ -151,7 +151,7 @@ python -m producer.cli publish \
 
 And on a mirror following that separate stream:
 ```bash
-docker run --rm -e AUTHORITY_PUBKEY=<pubkey> -e DHT_SALT=weekly ghcr.io/openrai/nano-p2p-mirror:latest --once
+docker run --rm -e AUTHORITY_PUBKEY=<pubkey> -e DHT_SALT=weekly ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest --once
 ```
 
 For the default OpenRAI stream, the published mirror image already has the current producer public key baked in, so mirror and leech users do not need to set `AUTHORITY_PUBKEY`.

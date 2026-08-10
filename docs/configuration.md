@@ -45,7 +45,7 @@ python -m mirror.watcher [flags]
 ```yaml
 services:
   nano-mirror:
-    image: ghcr.io/openrai/nano-p2p-mirror:latest
+    image: ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest
     environment:
       SEED_PEERS: "${SEED_PEERS:-}"
       DATA_DIR: /data
@@ -90,7 +90,7 @@ Only set `AUTHORITY_PUBKEY` if you want to follow a non-default snapshot stream:
 docker run --rm \
   -e AUTHORITY_PUBKEY=<other_producer_pubkey> \
   -v $(pwd)/data:/data \
-  ghcr.io/openrai/nano-p2p-mirror:latest \
+  ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once
 ```
 

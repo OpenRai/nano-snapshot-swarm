@@ -38,7 +38,7 @@ AUTHORITY_PUBKEY="$(<AUTHORITY_PUBKEY)" uvx --from . nano-mirror --once --extrac
 # or, with Docker: no AUTHORITY_PUBKEY needed for the default stream
 docker run --rm \
   -v $(pwd)/data:/data \
-  ghcr.io/openrai/nano-p2p-mirror:latest \
+  ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once --extract
 ```
 

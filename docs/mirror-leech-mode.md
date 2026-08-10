@@ -17,7 +17,7 @@ The published Docker image already has the current OpenRAI producer public key b
 ```bash
 docker run --rm \
   -v $(pwd)/data:/data \
-  ghcr.io/openrai/nano-p2p-mirror:latest \
+  ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once
 ```
 
@@ -56,7 +56,7 @@ This makes leech mode easy to use in shell scripts:
 ```bash
 if docker run --rm \
     -v $(pwd)/data:/data \
-    ghcr.io/openrai/nano-p2p-mirror:latest \
+    ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
     --once; then
   echo "Download succeeded"
   # decompress and use the ledger
@@ -121,7 +121,7 @@ If the producer publishes to a non-default DHT salt:
 ```bash
 docker run --rm \
   -v $(pwd)/data:/data \
-  ghcr.io/openrai/nano-p2p-mirror:latest \
+  ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once --salt weekly
 ```
 
@@ -146,7 +146,7 @@ docker run --rm \
   -e DHT_SALT=validation \
   -e WEB_SEED_MODE=off \
   -v $(pwd)/data:/data \
-  ghcr.io/openrai/nano-p2p-mirror:latest \
+  ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once
 ```
 
@@ -165,7 +165,7 @@ extracted `data.ldb`:
   run: |
     docker run --rm \
       -v ${{ github.workspace }}/data:/data \
-      ghcr.io/openrai/nano-p2p-mirror:latest \
+      ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
       --once
 
     echo " Ledger downloaded:"

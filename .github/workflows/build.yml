@@ -74,6 +74,11 @@ jobs:
         id: authority
         run: echo "value=$(tr -d '\n' < AUTHORITY_PUBKEY)" >> "$GITHUB_OUTPUT"
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: all
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -92,6 +97,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha
@@ -101,6 +107,7 @@ jobs:
         with:
           context: .
           file: mirror/Dockerfile
+          platforms: linux/amd64,linux/arm64
           build-args: |
             AUTHORITY_PUBKEY=${{ steps.authority.outputs.value }}
           push: ${{ github.event_name != 'pull_request' }}

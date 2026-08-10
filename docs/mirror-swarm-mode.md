@@ -23,7 +23,7 @@ docker run -d \
   --name nano-mirror \
   -p 6881:6881/tcp -p 6881:6881/udp \
   -v $(pwd)/data:/data \
-  ghcr.io/openrai/nano-p2p-mirror:latest
+  ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest
 ```
 
 ---
@@ -243,7 +243,7 @@ docker build \
   -t nano-bootstrap-mirror .
 
 # Pull latest published image
-docker pull ghcr.io/openrai/nano-p2p-mirror:latest
+docker pull ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest
 
 # Restart with new image
 docker compose down
