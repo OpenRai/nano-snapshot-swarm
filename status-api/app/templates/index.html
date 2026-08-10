@@ -139,11 +139,10 @@
   -v ./nano-data:/data:Z \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest --once</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
-            <p class="storage-note">The archive is saved in <code>./nano-data</code>. Do not run the one-shot downloader and a permanent seed against the same directory at the same time.</p>
         </section>
 
         <section id="seed" style="margin-top: 2rem;">
-            <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Run as a permanent seed</h3>
+            <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Run as a permanent snapshot seeder</h3>
 
             <div class="tabs" data-group="seed">
                 <button class="tab-btn active" data-group="seed" data-tab="docker">Docker</button>
@@ -178,7 +177,6 @@
 
 </code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
-            <p class="storage-note">The seed uses <code>./nano-data</code> so its state is visible and reusable. Do not run a one-shot downloader and the permanent seed against the same directory concurrently.</p>
         </section>
     </section>
 

@@ -31,8 +31,6 @@ uvx --from . nano-mirror --once --data-dir ./nano-data
 
 That `uvx` snippet is only needed when running from a local git clone, because the source tree keeps the default producer key in the repo root `AUTHORITY_PUBKEY` file rather than hardcoding it into shell examples.
 
-The archive and mirror state are stored in `./nano-data`. Do not run a one-shot leech and a permanent seed against the same directory concurrently.
-
 ### With Custom Timeout
 
 Leech mode has no wall-clock download timeout. `--download-timeout` only applies to swarm mode DHT inactivity, so there is nothing to tune here for `--once`.

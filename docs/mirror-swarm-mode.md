@@ -248,8 +248,6 @@ docker compose down
 docker compose up -d
 ```
 
-State is preserved in the host directory `./nano-data`. No data is lost on restart. Do not run a one-shot leech and the permanent seed against the same directory concurrently.
-
 ---
 
 ## Troubleshooting

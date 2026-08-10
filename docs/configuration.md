@@ -68,8 +68,6 @@ services:
 
 ```
 
-The host directory `./nano-data` contains the downloaded archive and mirror state, so it can be inspected, backed up, and reused. Do not run a one-shot leech and a permanent seed against the same data directory concurrently.
-
 ### Override POLL_INTERVAL via CLI
 
 ```bash

@@ -258,4 +258,3 @@ class TestGetEndpoints:
         assert 'data-tab="compose"' in seed
         assert "./nano-data:/data" in seed
         assert "nano-data:/data" not in seed.replace("./nano-data:/data", "")
-        assert "Do not run a one-shot downloader" in seed

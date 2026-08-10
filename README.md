@@ -42,7 +42,7 @@ docker run --rm \
   --once --extract
 ```
 
-The snapshot archive is written into `./nano-data` on the host. Do not run this one-shot downloader and a permanent seed against the same directory concurrently. To unpack the archive into the directory that the official Nano node Docker image uses, mount your Nano node data directory at `/root` and copy the extracted `data.ldb` there. The Nano docs describe Docker as using the host path supplied by `-v`/`--volume` for the node's data directory, and the container keeps the ledger under `/root`.
+To unpack the archive into the directory that the official Nano node Docker image uses, mount your Nano node data directory at `/root` and copy the extracted `data.ldb` there. The Nano docs describe Docker as using the host path supplied by `-v`/`--volume` for the node's data directory, and the container keeps the ledger under `/root`.
 
 ```bash
 cp nano-data/data.ldb /path/to/nano-node-data/data.ldb
