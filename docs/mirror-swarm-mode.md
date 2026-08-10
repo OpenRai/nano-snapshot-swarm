@@ -271,12 +271,12 @@ The mirror rejects such items and retries on the next poll cycle.
 
 ### DHT discovery takes a long time
 
-DHT bootstrap can take 5–15 minutes on a cold start, especially behind NAT. The 30-second bootstrap wait is intentionally conservative. If peers never appear, the mirror will still download via the web seed (S3 fallback).
+DHT bootstrap can take 5–15 minutes on a cold start, especially behind NAT. The 30-second bootstrap wait is intentionally conservative. The default mirror image is P2P-only; configure an explicit web seed only when a deployment needs that fallback.
 
 ### Download appears stuck at 0%
 
-Check `num_peers: 0`. If the torrent has no peers and no web seed is reachable, the download cannot proceed. This can happen if:
-- The web seed URL is unreachable from your network
+Check `num_peers: 0`. If the torrent has no peers and no explicitly configured web seed is reachable, the download cannot proceed. This can happen if:
+- The configured web seed URL is unreachable from your network
 - The torrent info-hash is not yet announced to any tracker (if trackers are used)
 
 Use `--log-level DEBUG` and look for `alert` messages to understand what's happening.
