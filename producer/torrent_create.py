@@ -3,6 +3,11 @@ from __future__ import annotations
 import os
 import sys
 
+PUBLIC_TRACKERS = (
+    "udp://tracker.opentrackr.org:1337/announce",
+    "udp://tracker.torrent.eu.org:451/announce",
+)
+
 
 def _v2_flags(lt):
     """Build v2-only + merkle flags, compatible with libtorrent 2.0.x and 2.1+."""
@@ -41,6 +46,9 @@ def create_torrent(
     lt.add_files(fs, filepath)
 
     ct = lt.create_torrent(fs, piece_size=piece_size, flags=_v2_flags(lt))
+
+    for tracker in PUBLIC_TRACKERS:
+        ct.add_tracker(tracker)
 
     if comment:
         ct.set_comment(comment)
@@ -85,6 +93,9 @@ def create_torrent_from_directory(
         fs.add_file(fname, file_size)
 
     ct = lt.create_torrent(fs, piece_size=piece_size, flags=_v2_flags(lt))
+
+    for tracker in PUBLIC_TRACKERS:
+        ct.add_tracker(tracker)
 
     lt.set_piece_hashes(ct, directory)
 
