@@ -107,7 +107,7 @@ jobs:
 
       - name: Publish multi-platform image
         env:
-          IMAGE_NAME: ghcr.io/${{ github.repository }}/nano-p2p-mirror
+          IMAGE_NAME: ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror
           REGISTRY_USERNAME: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: BUILD_ID="${{ github.sha }}" ./scripts/nano-mirror-publish.sh
