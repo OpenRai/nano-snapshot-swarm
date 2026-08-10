@@ -54,3 +54,5 @@
 # - github.repo
 
 sync.remote: "https://github.com/OpenRai/nano-snapshot-swarm.git"
+dolt:
+    port: 65501

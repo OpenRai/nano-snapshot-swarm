@@ -2,6 +2,7 @@
   "database": "dolt",
   "backend": "dolt",
   "dolt_mode": "server",
+  "dolt_server_port": 65501,
   "dolt_database": "nano_bootstrap_swarm",
   "project_id": "9b2fc070-b9d1-4363-9d15-34412f68acbe"
 }
