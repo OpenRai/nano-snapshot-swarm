@@ -50,8 +50,15 @@ def discover_latest_snapshot(
 
         session.dht_get_mutable_item(pub_key_bytes, salt)
 
-        snap = session.wait_for_dht_mutable_item(salt=salt, timeout=timeout)
+        snap = session.wait_for_dht_mutable_item(
+            salt=salt,
+            timeout=timeout,
+            authoritative_only=True,
+        )
         if snap is not None:
+            if snap.extra.get("authoritative") is not True:
+                logger.warning("Ignoring non-authoritative DHT mutable-item response")
+                continue
             result = _process_mutable_item_snapshot(snap, pub_key_bytes, salt)
             if result is not None:
                 if result.sequence >= min_sequence:

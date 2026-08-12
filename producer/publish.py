@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import sys
 import time
@@ -18,6 +19,8 @@ DHT_BOOTSTRAP_TIMEOUT = 120
 DHT_PUBLISH_ATTEMPTS = 3
 DHT_RETRY_DELAY = 5
 DHT_VERIFY_TIMEOUT = 120
+
+logger = logging.getLogger("producer.publish")
 
 
 def load_state(state_path: str = STATE_FILE) -> dict:
@@ -110,8 +113,12 @@ def _wait_for_verified_snapshot(
         alert = session.wait_for_dht_mutable_item(
             salt=salt,
             timeout=min(15.0, remaining),
+            authoritative_only=True,
         )
         if alert is None:
+            continue
+        if alert.extra.get("authoritative") is not True:
+            logger.debug("Ignoring non-authoritative DHT mutable-item read-back")
             continue
         verified = _verified_snapshot_from_alert(
             alert,

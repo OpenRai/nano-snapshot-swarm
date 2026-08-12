@@ -384,11 +384,17 @@ class LibtorrentSession:
         *,
         salt: str,
         timeout: float = 60.0,
+        authoritative_only: bool = False,
     ) -> Optional[AlertSnapshot]:
+        def matches(snap: AlertSnapshot) -> bool:
+            if snap.extra.get("salt", "") != salt:
+                return False
+            return not authoritative_only or snap.extra.get("authoritative") is True
+
         return self.wait_for_alert(
             "dht_mutable_item_alert",
             timeout=timeout,
-            predicate=lambda snap: snap.extra.get("salt", "") == salt,
+            predicate=matches,
         )
 
     def wait_for_dht_put(

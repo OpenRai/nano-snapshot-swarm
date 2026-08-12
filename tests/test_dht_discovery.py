@@ -13,6 +13,7 @@ def signed_snapshot(
     sequence: int = 1,
     key_hex: str | None = None,
     signature_hex: str | None = None,
+    authoritative: bool = True,
 ):
     signature, public_key = sign_mutable_item(
         PRIVATE_KEY_HEX, value, seq=sequence, salt="daily"
@@ -23,6 +24,7 @@ def signed_snapshot(
             "item": value,
             "key": key_hex or public_key.hex(),
             "signature": signature_hex or signature.hex(),
+            "authoritative": authoritative,
         }
     ), public_key
 
@@ -68,7 +70,10 @@ def test_discovery_retries_stale_verified_item_until_minimum_sequence(monkeypatc
         def dht_get_mutable_item(self, pubkey: bytes, salt: str) -> None:
             self.get_calls += 1
 
-        def wait_for_dht_mutable_item(self, *, salt: str, timeout: float):
+        def wait_for_dht_mutable_item(
+            self, *, salt: str, timeout: float, authoritative_only: bool
+        ):
+            assert authoritative_only is True
             return self.snapshots.pop(0)
 
     session = FakeSession()
@@ -83,4 +88,37 @@ def test_discovery_retries_stale_verified_item_until_minimum_sequence(monkeypatc
     assert result is not None
     assert result.sequence == 9
     assert result.info_hash_hex == "cd" * 32
+    assert session.get_calls == 2
+
+
+def test_discovery_requires_authoritative_response(monkeypatch):
+    non_authoritative, public_key = signed_snapshot(
+        value=bytes.fromhex("cd" * 32), sequence=9, authoritative=False
+    )
+    authoritative, _ = signed_snapshot(
+        value=bytes.fromhex("ef" * 32), sequence=10, authoritative=True
+    )
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.snapshots = [non_authoritative, authoritative]
+            self.get_calls = 0
+
+        def dht_get_mutable_item(self, pubkey: bytes, salt: str) -> None:
+            self.get_calls += 1
+
+        def wait_for_dht_mutable_item(
+            self, *, salt: str, timeout: float, authoritative_only: bool
+        ):
+            assert authoritative_only is True
+            return self.snapshots.pop(0)
+
+    session = FakeSession()
+    monkeypatch.setattr("mirror.dht_discovery.time.sleep", lambda _seconds: None)
+
+    result = discover_latest_snapshot(session, public_key.hex())
+
+    assert result is not None
+    assert result.sequence == 10
+    assert result.info_hash_hex == "ef" * 32
     assert session.get_calls == 2

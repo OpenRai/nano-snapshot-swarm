@@ -152,6 +152,10 @@ local dashboard publication sequence. The producer signing public key is a
 copyable trust anchor and is logged in full; internal torrent info hashes and
 DHT target IDs are shortened in routine logs.
 
+Discovery accepts the authoritative response from the DHT lookup, not the first
+signed response. A lookup can return several signed responses while it is
+collecting results, and an earlier response can describe an older sequence.
+
 If `last_seq` is `0`, the mirror has never successfully discovered a snapshot.
 
 When a later v2 info-hash is discovered, the mirror keeps the canonical archive

@@ -24,7 +24,12 @@ def _public_key() -> bytes:
     return bytes(nacl.signing.SigningKey(bytes.fromhex(PRIVATE_KEY)).verify_key)
 
 
-def _mutable_alert(info_hash: str, sequence: int) -> AlertSnapshot:
+def _mutable_alert(
+    info_hash: str,
+    sequence: int,
+    *,
+    authoritative: bool = True,
+) -> AlertSnapshot:
     public_key = _public_key()
     value = build_dht_value(info_hash)
     signature, _ = sign_mutable_item(PRIVATE_KEY, value, sequence, "daily")
@@ -38,6 +43,7 @@ def _mutable_alert(info_hash: str, sequence: int) -> AlertSnapshot:
             "seq": sequence,
             "salt": "daily",
             "item": value,
+            "authoritative": authoritative,
         },
     )
 
@@ -75,7 +81,14 @@ class FakeDHTSession:
     def dht_get_mutable_item(self, _public_key: bytes, _salt: str) -> None:
         pass
 
-    def wait_for_dht_mutable_item(self, *, salt: str, timeout: float) -> AlertSnapshot:
+    def wait_for_dht_mutable_item(
+        self,
+        *,
+        salt: str,
+        timeout: float,
+        authoritative_only: bool,
+    ) -> AlertSnapshot:
+        assert authoritative_only is True
         return _mutable_alert(self.info_hash, 55)
 
 
@@ -100,8 +113,50 @@ def test_publication_requires_verified_readback_and_persists_dht_sequence(
 
 
 class NeverVerifiesSession(FakeDHTSession):
-    def wait_for_dht_mutable_item(self, *, salt: str, timeout: float) -> AlertSnapshot:
+    def wait_for_dht_mutable_item(
+        self,
+        *,
+        salt: str,
+        timeout: float,
+        authoritative_only: bool,
+    ) -> AlertSnapshot:
+        assert authoritative_only is True
         return _mutable_alert("cd" * 32, 55)
+
+
+class StaleThenAuthoritativeSession(FakeDHTSession):
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self.reads = 0
+
+    def wait_for_dht_mutable_item(
+        self,
+        *,
+        salt: str,
+        timeout: float,
+        authoritative_only: bool,
+    ) -> AlertSnapshot:
+        assert authoritative_only is True
+        self.reads += 1
+        if self.reads == 1:
+            return _mutable_alert("ab" * 32, 133, authoritative=False)
+        return _mutable_alert(self.info_hash, 1305, authoritative=True)
+
+
+def test_publication_ignores_non_authoritative_signed_readback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(publish_module, "LibtorrentSession", StaleThenAuthoritativeSession)
+    state_path = tmp_path / "publisher-state.json"
+
+    result = publish_module.publish_to_dht(
+        private_key_hex=PRIVATE_KEY,
+        info_hash_hex="ab" * 32,
+        state_path=str(state_path),
+        salt="daily",
+    )
+
+    assert result["dht_seq"] == 1305
 
 
 def test_publication_does_not_persist_state_without_verified_readback(

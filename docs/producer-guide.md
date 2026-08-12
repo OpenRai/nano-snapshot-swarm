@@ -310,6 +310,10 @@ for DHT ordering and must not be manually edited. A publication is not pushed to
 the dashboard until the exact DHT value has been verified and the seeder reports
 the matching torrent as loaded.
 
+Producer read-back requires libtorrent's authoritative mutable-item response.
+The first signed response from a DHT lookup may be an older network view, so it
+must not be used to confirm a new publication.
+
 The daily pipeline sends `SIGHUP` to an active `nano-seed.service` so it reloads
 the canonical torrent without destroying its DHT session or retained swarms. If
 the seeder is stopped, the pipeline starts it, exercising the restart recovery
