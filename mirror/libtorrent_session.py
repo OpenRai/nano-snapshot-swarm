@@ -129,6 +129,9 @@ class LibtorrentSession:
             "listen_interfaces": f"0.0.0.0:{self._listen_port},[::]:{self._listen_port}",
             "enable_dht": self._enable_dht,
             "enable_lsd": True,
+            # Do not wait for tracker stopped responses during process teardown.
+            # The session destructor otherwise waits on unresponsive trackers.
+            "stop_tracker_timeout": 0,
             "enable_incoming_utp": True,
             "enable_outgoing_utp": True,
             "enable_incoming_tcp": True,
@@ -162,14 +165,14 @@ class LibtorrentSession:
     def stop(self) -> None:
         self._running = False
         if self._alert_thread:
+            logger.info("Stopping libtorrent alert loop...")
             self._alert_thread.join(timeout=10)
+            if self._alert_thread.is_alive():
+                logger.warning("Libtorrent alert loop did not stop within 10s")
         if self._session:
+            logger.info("Saving DHT state before releasing libtorrent session...")
             self.save_dht_state()
-            for handle in self._handles.values():
-                try:
-                    handle.save_resume_data(lt.torrent_handle.save_settings)
-                except Exception:
-                    pass
+            logger.info("Releasing libtorrent session...")
             self._session = None
         logger.info("libtorrent session stopped")
 

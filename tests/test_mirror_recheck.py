@@ -77,6 +77,24 @@ def test_configured_seed_peer_attempt_is_forwarded(tmp_path) -> None:
     assert session.calls == [("connect", "cd" * 32, "seed.example", 6881)]
 
 
+def test_libtorrent_stop_does_not_request_unhandled_resume_data(tmp_path) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    from mirror.libtorrent_session import LibtorrentSession
+
+    class FakeNativeSession:
+        pass
+
+    session = LibtorrentSession(data_dir=str(tmp_path))
+    session._session = FakeNativeSession()
+    saved: list[str] = []
+    session.save_dht_state = lambda: saved.append("dht")
+
+    session.stop()
+
+    assert saved == ["dht"]
+    assert session._session is None
+
+
 def test_old_authority_pubkey_environment_is_ignored(monkeypatch, caplog) -> None:
     sys.modules.setdefault("libtorrent", SimpleNamespace())
     from mirror.watcher import resolve_producer_signing_pubkey
