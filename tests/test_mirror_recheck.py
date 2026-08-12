@@ -65,8 +65,14 @@ def test_swarm_mode_keeps_monitoring_after_seeding(tmp_path, monkeypatch) -> Non
     import mirror.watcher as watcher_module
 
     class SeedingSession:
+        def __init__(self) -> None:
+            self.calls: list[tuple] = []
+
         def torrent_metadata(self, info_hash: str):
             return None
+
+        def connect_peer(self, info_hash: str, host: str, port: int) -> None:
+            self.calls.append((info_hash, host, port))
 
         def torrent_status(self, info_hash: str):
             from mirror.libtorrent_session import TorrentStatusSnapshot
@@ -83,19 +89,27 @@ def test_swarm_mode_keeps_monitoring_after_seeding(tmp_path, monkeypatch) -> Non
     watcher = watcher_module.MirrorWatcher(
         producer_signing_pubkey_hex="ab" * 32,
         data_dir=str(tmp_path),
+        seed_peers=[("seed.example", 6881)],
     )
-    watcher.session = SeedingSession()
+    session = SeedingSession()
+    watcher.session = session
     watcher._active_info_hash = "cd" * 32
     watcher._running = True
 
-    def stop_after_one_poll(_seconds: float) -> None:
-        watcher._running = False
+    polls = 0
 
-    monkeypatch.setattr(watcher_module.time, "sleep", stop_after_one_poll)
+    def stop_after_twelve_polls(_seconds: float) -> None:
+        nonlocal polls
+        polls += 1
+        if polls == 12:
+            watcher._running = False
+
+    monkeypatch.setattr(watcher_module.time, "sleep", stop_after_twelve_polls)
 
     watcher._monitor_active_torrent_loop()
 
     assert watcher._stop_reason is None
+    assert session.calls == []
 
 
 def test_once_mode_stops_monitoring_after_seeding(tmp_path, monkeypatch) -> None:

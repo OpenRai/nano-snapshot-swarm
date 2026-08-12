@@ -534,7 +534,7 @@ class MirrorWatcher:
                 if status.state != last_state:
                     last_state = status.state
 
-                if status.num_peers == 0:
+                if status.num_peers == 0 and not status.is_seeding:
                     no_peer_seconds += 5
                     if no_peer_seconds >= 60:
                         logger.warning(
