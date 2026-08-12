@@ -165,6 +165,7 @@ class TestGetEndpoints:
             assert "authority_pubkey" not in data
             assert data["verified"] is True
             assert "magnet" in data
+            assert resp.headers["cache-control"] == "no-store"
         finally:
             main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
@@ -310,6 +311,7 @@ class TestGetEndpoints:
             assert resp.status_code == 200
             assert resp.headers["access-control-allow-origin"] == "*"
             assert resp.headers["content-type"] == "text/html"
+            assert resp.headers["cache-control"] == "no-store"
         finally:
             main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
@@ -338,6 +340,12 @@ class TestGetEndpoints:
         resp = client.get("/")
         assert resp.status_code == 200
         assert "text/html" in resp.headers["content-type"]
+        assert resp.headers["cache-control"] == "no-store"
+
+    def test_health_is_not_cached(self, client):
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        assert resp.headers["cache-control"] == "no-store"
 
     def test_index_has_direct_leech_options_and_compose_seed(self, client):
         response = client.get("/")

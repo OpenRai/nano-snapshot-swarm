@@ -252,7 +252,7 @@ systemctl --user enable nano-status-push.timer
 
 ### Cloudflare Caching (Recommended)
 
-Place Cloudflare in front of the Fly app to cache `.torrent` files and status JSON at the edge. See `status-api/deploy/fly.io/README.md` §5 for exact DNS and cache-rule settings.
+Place Cloudflare in front of the Fly app to cache immutable `.torrent` files at the edge. Keep the dashboard and live status routes bypassed so a reload cannot combine responses from different snapshot sequences. See `status-api/deploy/fly.io/README.md` §5 for exact DNS and cache-rule settings.
 
 Expected Fly.io cost: **under $5/month** (mostly idle 256 MB VM + 1 GB volume).
 

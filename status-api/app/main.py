@@ -188,7 +188,7 @@ def push(payload: PushRequest) -> JSONResponse:
 def get_status() -> JSONResponse:
     if _current_status is None:
         raise HTTPException(status_code=404, detail="No status available yet")
-    headers = {"Cache-Control": "public, max-age=600"}
+    headers = {"Cache-Control": "no-store"}
     return JSONResponse(_current_status, headers=headers)
 
 
@@ -217,7 +217,7 @@ def get_status_fragment() -> Response:
     rendered = _render_fragment()
     headers = {
         "Content-Type": "text/html",
-        "Cache-Control": "public, max-age=300",
+        "Cache-Control": "no-store",
         "Access-Control-Allow-Origin": "*",
     }
     return Response(content=rendered, headers=headers)
@@ -270,12 +270,12 @@ def index() -> Response:
     template_path = Path(__file__).parent / "templates" / "index.html"
     html = template_path.read_text()
     if _current_status is None:
-        return HTMLResponse(content=html, headers={"Cache-Control": "public, max-age=300"})
+        return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
     fragment = _render_fragment()
 
     html = html.replace("{{ status_fragment }}", fragment)
-    return HTMLResponse(content=html, headers={"Cache-Control": "public, max-age=300"})
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/health")
@@ -285,4 +285,4 @@ def health() -> JSONResponse:
         "sequence": _current_status.get("sequence", 0) if _current_status else 0,
         "updated_at": _current_status.get("timestamp", "") if _current_status else "",
     }
-    return JSONResponse(body)
+    return JSONResponse(body, headers={"Cache-Control": "no-store"})

@@ -101,9 +101,9 @@ The canonical public URL is `https://nano-snapshots.openrai.org`, fronted by Clo
    - **TXT** `_fly-ownership.nano-snapshots` → `app-0pd61ql` (DNS only)
 3. In Cloudflare SSL/TLS: set mode to **Full (strict)**
 4. Optionally add Cloudflare Cache Rules:
+   - `nano-snapshots.openrai.org/` and `/api/status*` → **Cache Level: Bypass**
    - `nano-snapshots.openrai.org/api/torrent` and `/api/latest.magnet` → **Cache Level: Bypass**
    - `nano-snapshots.openrai.org/api/torrents/*` → **Cache Level: Cache Everything**, **Edge TTL: 1 year**
-   - `nano-snapshots.openrai.org/api/status*` → **Cache Level: Cache Everything**, **Edge TTL: 5–10 minutes**
    - `nano-snapshots.openrai.org/api/push` → **Cache Level: Bypass**
 
 Cache bypass does not disable Cloudflare security rules. If `POST /api/push` returns HTTP 403, add a narrowly scoped WAF/security skip for that path or keep the Producer on the direct Fly hostname.
