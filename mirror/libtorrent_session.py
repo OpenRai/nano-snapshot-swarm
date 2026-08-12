@@ -271,13 +271,7 @@ class LibtorrentSession:
         if handle is None:
             raise KeyError(f"Unknown torrent: {info_hash}")
         ip = socket.gethostbyname(host)
-        logger.info(
-            "Attempting connection to seed peer %s:%d (%s); "
-            "request is asynchronous and does not confirm a BitTorrent peer yet",
-            host,
-            port,
-            ip,
-        )
+        logger.info("Attempting connection to seed peer %s:%d (%s)", host, port, ip)
         handle.connect_peer((ip, port))
         logger.info("Seed-peer connection request queued for %s:%d", host, port)
 
