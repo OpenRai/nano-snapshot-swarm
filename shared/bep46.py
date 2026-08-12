@@ -3,11 +3,9 @@ from __future__ import annotations
 import hashlib
 
 try:
-    from nacl.exceptions import BadSignatureError
     from nacl.signing import SigningKey
 except ImportError:
     SigningKey = None
-    BadSignatureError = Exception
 
 
 def _bencode_value(value: bytes) -> bytes:
@@ -15,21 +13,12 @@ def _bencode_value(value: bytes) -> bytes:
 
 
 def build_signature_buffer(seq: int, value: bytes, salt: str = "") -> bytes:
-    parts = []
+    parts: list[bytes] = []
     if salt:
-        parts.append(_bencode_value(b"salt"))
-        parts.append(_bencode_value(salt.encode("utf-8")))
+        parts.append(b"4:salt" + _bencode_value(salt.encode("utf-8")))
     parts.append(b"3:seqi" + str(seq).encode("ascii") + b"e")
     parts.append(b"1:v" + _bencode_value(value))
-    # Remove the length prefix from the value part — bencode format is key+length+value
-    # The value portion in the signature buffer uses the raw bencoded form
-    # Correcting: "3:seqi<seq>e1:v<len>:<value>"
-    result = b""
-    if salt:
-        result += b"4:salt" + _bencode_value(salt.encode("utf-8"))
-    result += b"3:seqi" + str(seq).encode("ascii") + b"e"
-    result += b"1:v" + str(len(value)).encode("ascii") + b":" + value
-    return result
+    return b"".join(parts)
 
 
 def _parse_private_key(hex_key: str) -> bytes:
@@ -72,7 +61,7 @@ def verify_mutable_item(
     try:
         verify_key.verify(message, signature)
         return True
-    except (BadSignatureError, Exception):
+    except (BadSignatureError, TypeError, ValueError):
         return False
 
 
@@ -108,8 +97,8 @@ def parse_dht_value(raw_value: bytes) -> dict:
     try:
         import bencodepy
         return bencodepy.decode(raw_value)
-    except Exception:
-        raise ValueError(f"Cannot parse DHT value: {len(raw_value)} bytes")
+    except (bencodepy.DecodingError, TypeError, ValueError) as exc:
+        raise ValueError(f"Cannot parse DHT value: {len(raw_value)} bytes") from exc
 
 
 def verify_bep46_test_vectors() -> bool:

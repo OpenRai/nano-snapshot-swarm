@@ -124,17 +124,17 @@
         <section id="one-shot">
             <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Download once and stop</h3>
 
-            <div class="tabs" data-group="one-shot">
-                <button class="tab-btn active" data-group="one-shot" data-tab="docker">Docker</button>
-                <button class="tab-btn" data-group="one-shot" data-tab="podman">Podman</button>
+            <div class="tabs" role="tablist" aria-label="Download once options" data-group="one-shot">
+                <button id="one-shot-tab-docker" class="tab-btn active" role="tab" aria-selected="true" aria-controls="one-shot-panel-docker" tabindex="0" data-group="one-shot" data-tab="docker">Docker</button>
+                <button id="one-shot-tab-podman" class="tab-btn" role="tab" aria-selected="false" aria-controls="one-shot-panel-podman" tabindex="-1" data-group="one-shot" data-tab="podman">Podman</button>
             </div>
 
-            <div class="tab-content active" data-group="one-shot" data-id="docker">
+            <div id="one-shot-panel-docker" class="tab-content active" role="tabpanel" aria-labelledby="one-shot-tab-docker" data-group="one-shot" data-id="docker">
                 <div class="copyable"><pre><code>docker run --rm -it \
   -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest --once</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
-            <div class="tab-content" data-group="one-shot" data-id="podman">
+            <div id="one-shot-panel-podman" class="tab-content" role="tabpanel" aria-labelledby="one-shot-tab-podman" hidden data-group="one-shot" data-id="podman">
                 <div class="copyable"><pre><code>podman run --rm -it \
   -v ./nano-data:/data:Z \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest --once</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
@@ -144,27 +144,27 @@
         <section id="seed" style="margin-top: 2rem;">
             <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Run as a permanent snapshot seeder</h3>
 
-            <div class="tabs" data-group="seed">
-                <button class="tab-btn active" data-group="seed" data-tab="docker">Docker</button>
-                <button class="tab-btn" data-group="seed" data-tab="podman">Podman</button>
-                <button class="tab-btn" data-group="seed" data-tab="compose">Compose</button>
+            <div class="tabs" role="tablist" aria-label="Seeder options" data-group="seed">
+                <button id="seed-tab-docker" class="tab-btn active" role="tab" aria-selected="true" aria-controls="seed-panel-docker" tabindex="0" data-group="seed" data-tab="docker">Docker</button>
+                <button id="seed-tab-podman" class="tab-btn" role="tab" aria-selected="false" aria-controls="seed-panel-podman" tabindex="-1" data-group="seed" data-tab="podman">Podman</button>
+                <button id="seed-tab-compose" class="tab-btn" role="tab" aria-selected="false" aria-controls="seed-panel-compose" tabindex="-1" data-group="seed" data-tab="compose">Compose</button>
             </div>
 
-            <div class="tab-content active" data-group="seed" data-id="docker">
+            <div id="seed-panel-docker" class="tab-content active" role="tabpanel" aria-labelledby="seed-tab-docker" data-group="seed" data-id="docker">
                 <div class="copyable"><pre><code>docker run -d --name nano-seed \
   -p 6881:6881/tcp -p 6881:6881/udp \
   -v ./nano-data:/data \
   --restart unless-stopped \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
-            <div class="tab-content" data-group="seed" data-id="podman">
+            <div id="seed-panel-podman" class="tab-content" role="tabpanel" aria-labelledby="seed-tab-podman" hidden data-group="seed" data-id="podman">
                 <div class="copyable"><pre><code>podman run -d --name nano-seed \
   -p 6881:6881/tcp -p 6881:6881/udp \
   -v ./nano-data:/data:Z \
   --restart unless-stopped \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
-            <div class="tab-content" data-group="seed" data-id="compose">
+            <div id="seed-panel-compose" class="tab-content" role="tabpanel" aria-labelledby="seed-tab-compose" hidden data-group="seed" data-id="compose">
                 <div class="copyable"><pre><code>services:
   seed:
     image: ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest
@@ -236,16 +236,38 @@
 
     <script>
         // Tab switcher
+        function activateTab(btn) {
+            const tabs = btn.closest('.tabs');
+            if (!tabs) return;
+            const group = tabs.dataset.group;
+            const tab = btn.dataset.tab;
+            const panel = document.querySelector(`.tab-content[data-group="${group}"][data-id="${tab}"]`);
+            if (!panel) return;
+
+            document.querySelectorAll(`.tab-btn[data-group="${group}"]`).forEach(tabBtn => {
+                const active = tabBtn === btn;
+                tabBtn.classList.toggle('active', active);
+                tabBtn.setAttribute('aria-selected', String(active));
+                tabBtn.tabIndex = active ? 0 : -1;
+            });
+            document.querySelectorAll(`.tab-content[data-group="${group}"]`).forEach(tabPanel => {
+                const active = tabPanel === panel;
+                tabPanel.classList.toggle('active', active);
+                tabPanel.hidden = !active;
+            });
+        }
+
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', () => activateTab(btn));
+            btn.addEventListener('keydown', event => {
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                 const tabs = btn.closest('.tabs');
                 if (!tabs) return;
-                const group = tabs.dataset.group;
-                const tab = btn.dataset.tab;
-                document.querySelectorAll(`.tab-btn[data-group="${group}"]`).forEach(b => b.classList.remove('active'));
-                document.querySelectorAll(`.tab-content[data-group="${group}"]`).forEach(c => c.classList.remove('active'));
-                btn.classList.add('active');
-                document.querySelector(`.tab-content[data-group="${group}"][data-id="${tab}"]`).classList.add('active');
+                const buttons = [...tabs.querySelectorAll('.tab-btn')];
+                const offset = event.key === 'ArrowRight' ? 1 : -1;
+                const next = buttons[(buttons.indexOf(btn) + offset + buttons.length) % buttons.length];
+                activateTab(next);
+                next.focus();
             });
         });
 
@@ -265,7 +287,6 @@
         }, 5000);
 
         // Unified copy-to-clipboard for all .copy-btn elements
-        const COPY_SVG = document.querySelector('.copy-btn svg')?.outerHTML ?? '';
         const CHECK_SVG = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,8 6,12 14,4"/></svg>`;
 
         async function copyText(text) {

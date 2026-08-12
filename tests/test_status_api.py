@@ -519,6 +519,12 @@ class TestGetEndpoints:
         assert 'data-tab="compose"' in seed
         assert "./nano-data:/data" in seed
         assert "nano-data:/data" not in seed.replace("./nano-data:/data", "")
+        assert 'role="tablist"' in one_shot
+        assert 'role="tab"' in one_shot
+        assert 'aria-selected="true"' in one_shot
+        assert 'role="tabpanel"' in one_shot
+        assert 'aria-controls="one-shot-panel-docker"' in one_shot
+        assert 'hidden data-group="one-shot" data-id="podman"' in one_shot
         assert (
             'href="/nano-snapshot-swarm.producer-signing-pubkey.txt">an Ed25519 key</a>'
             in response.text

@@ -8,6 +8,8 @@ import logging
 import os
 import re
 import tempfile
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
 
@@ -49,9 +51,6 @@ JINJA = Environment(
     autoescape=select_autoescape(["html", "xml"]),
 )
 
-app = FastAPI(title="Nano Snapshot Status API")
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
-
 # Store current state in memory (reloaded from disk on startup)
 _current_status: dict | None = None
 _torrent_bytes: bytes = b""
@@ -90,6 +89,16 @@ def _load_state() -> None:
         )
         if old_pubkey_field is not None or not named_path.exists():
             _save_state(_current_status, _torrent_bytes)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    _load_state()
+    yield
+
+
+app = FastAPI(title="Nano Snapshot Status API", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 
 def _save_state(status: dict, torrent_bytes: bytes) -> None:
@@ -168,11 +177,6 @@ def verify_push(payload: PushRequest, producer_signing_pubkey_hex: str) -> bool:
         return True
     except (BadSignatureError, TypeError, ValueError):
         return False
-
-
-@app.on_event("startup")
-def startup() -> None:
-    _load_state()
 
 
 @app.post("/api/push")

@@ -195,11 +195,17 @@ The mirror needs:
 - **UDP port 6881** — for DHT communication (discovery and seeding coordination)
 - **TCP port 6881** — for BitTorrent peer connections
 
-Verify the port is reachable from the internet if you want to seed effectively:
+A UDP netcat probe does not prove reachability: UDP has no connection
+handshake, so netcat can report success without a response from the mirror.
+Confirm the local listener, then observe real DHT or BitTorrent traffic while
+testing from another machine:
 
 ```bash
-# From another machine:
-nc -zvu <your-mirror-ip> 6881
+# On the mirror host: this only proves that the process has bound the UDP port.
+ss -lunp | grep ':6881'
+
+# On the mirror host, while a remote peer is discovering or downloading:
+sudo tcpdump -ni any 'udp port 6881'
 ```
 
 If behind NAT without port forwarding, the mirror can still download through outbound peer connections but cannot serve peers effectively.

@@ -28,6 +28,9 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check shared/ producer/ mirror/ tests/ status-api/
 
+      - name: Verify producer identity configuration
+        run: uv run python scripts/verify-producer-identity.py
+
       - name: Prune uv cache for CI
         run: uv cache prune --ci
 
