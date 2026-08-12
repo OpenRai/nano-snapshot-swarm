@@ -180,6 +180,7 @@ class MirrorWatcher:
                 session=self.session,
                 producer_signing_pubkey_hex=self.producer_signing_pubkey_hex,
                 salt=self.salt,
+                min_sequence=self.state.last_seq,
             )
         except Exception:
             logger.exception("DHT discovery failed")
@@ -284,6 +285,7 @@ class MirrorWatcher:
                     session=self.session,
                     producer_signing_pubkey_hex=self.producer_signing_pubkey_hex,
                     salt=self.salt,
+                    min_sequence=self.state.last_seq,
                 )
 
                 if result is not None:
@@ -315,6 +317,11 @@ class MirrorWatcher:
     def _set_desired_snapshot(self, result: DHTDiscoveryResult) -> None:
         with self._state_lock:
             if result.sequence < self.state.last_seq:
+                logger.warning(
+                    "Ignoring stale DHT item: seq=%d is below stored seq=%d",
+                    result.sequence,
+                    self.state.last_seq,
+                )
                 return
 
             if (

@@ -31,6 +31,7 @@ def discover_latest_snapshot(
     producer_signing_pubkey_hex: str,
     salt: str = DEFAULT_SALT,
     timeout: float = DHT_TIMEOUT,
+    min_sequence: int = 0,
 ) -> Optional[DHTDiscoveryResult]:
     pub_key_bytes = bytes.fromhex(producer_signing_pubkey_hex)
     target_id = compute_bep46_target_id(pub_key_bytes, salt)
@@ -51,7 +52,14 @@ def discover_latest_snapshot(
         if snap is not None:
             result = _process_mutable_item_snapshot(snap, pub_key_bytes, salt)
             if result is not None:
-                return result
+                if result.sequence >= min_sequence:
+                    return result
+                logger.warning(
+                    "Ignoring stale DHT item: seq=%d is below stored seq=%d; "
+                    "querying again",
+                    result.sequence,
+                    min_sequence,
+                )
             found = True
         else:
             found = False
