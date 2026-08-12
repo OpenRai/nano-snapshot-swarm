@@ -482,6 +482,7 @@ class MirrorWatcher:
         no_peer_seconds = 0
         metadata_logged = False
         stall_seconds = 0
+        last_seeding_heartbeat: Optional[float] = None
 
         while self._running:
             info_hash = self._active_info_hash
@@ -492,6 +493,7 @@ class MirrorWatcher:
                 no_peer_seconds = 0
                 metadata_logged = False
                 stall_seconds = 0
+                last_seeding_heartbeat = None
                 time.sleep(1)
                 continue
 
@@ -502,6 +504,7 @@ class MirrorWatcher:
                 no_peer_seconds = 0
                 metadata_logged = False
                 stall_seconds = 0
+                last_seeding_heartbeat = None
 
             try:
                 if not metadata_logged:
@@ -518,10 +521,11 @@ class MirrorWatcher:
 
                 self._resume_after_recheck(info_hash, status.state)
 
+                now = time.monotonic()
                 should_log_progress = progress_log.observe(
                     status.state,
                     status.progress,
-                    time.monotonic(),
+                    now,
                 )
                 self._update_transfer_state(
                     status,
@@ -530,6 +534,20 @@ class MirrorWatcher:
                     no_peer_seconds,
                     should_log_progress,
                 )
+
+                if status.is_seeding and not self._once_mode:
+                    if last_seeding_heartbeat is None:
+                        last_seeding_heartbeat = now
+                    elif now - last_seeding_heartbeat >= 300:
+                        logger.info(
+                            "Seeding | Peers: %d | UL: %.1f KB/s | Total UL: %.1f MiB",
+                            status.num_peers,
+                            status.upload_rate / 1024,
+                            status.total_upload / (1024**2),
+                        )
+                        last_seeding_heartbeat = now
+                else:
+                    last_seeding_heartbeat = None
 
                 if status.state != last_state:
                     last_state = status.state

@@ -112,6 +112,63 @@ def test_swarm_mode_keeps_monitoring_after_seeding(tmp_path, monkeypatch) -> Non
     assert session.calls == []
 
 
+def test_swarm_mode_logs_seeding_heartbeat_every_five_minutes(
+    tmp_path, monkeypatch, caplog
+) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    import mirror.watcher as watcher_module
+
+    class SeedingSession:
+        def torrent_metadata(self, info_hash: str):
+            return None
+
+        def torrent_status(self, info_hash: str):
+            from mirror.libtorrent_session import TorrentStatusSnapshot
+
+            return TorrentStatusSnapshot(
+                progress=1.0,
+                state="seeding",
+                num_peers=2,
+                download_rate=0,
+                upload_rate=2048,
+                is_seeding=True,
+                total_upload=3 * 1024**2,
+            )
+
+    watcher = watcher_module.MirrorWatcher(
+        producer_signing_pubkey_hex="ab" * 32,
+        data_dir=str(tmp_path),
+    )
+    watcher.session = SeedingSession()
+    watcher._active_info_hash = "cd" * 32
+    watcher._running = True
+
+    now = 0.0
+
+    def monotonic() -> float:
+        nonlocal now
+        current = now
+        now += 5.0
+        return current
+
+    polls = 0
+
+    def stop_after_62_polls(_seconds: float) -> None:
+        nonlocal polls
+        polls += 1
+        if polls == 62:
+            watcher._running = False
+
+    monkeypatch.setattr(watcher_module.time, "monotonic", monotonic)
+    monkeypatch.setattr(watcher_module.time, "sleep", stop_after_62_polls)
+
+    with caplog.at_level("INFO", logger="mirror.watcher"):
+        watcher._monitor_active_torrent_loop()
+
+    heartbeats = [line for line in caplog.messages if line.startswith("Seeding |")]
+    assert heartbeats == ["Seeding | Peers: 2 | UL: 2.0 KB/s | Total UL: 3.0 MiB"]
+
+
 def test_once_mode_stops_monitoring_after_seeding(tmp_path, monkeypatch) -> None:
     sys.modules.setdefault("libtorrent", SimpleNamespace())
     import mirror.watcher as watcher_module

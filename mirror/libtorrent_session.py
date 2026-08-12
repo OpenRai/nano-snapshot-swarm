@@ -39,6 +39,7 @@ class TorrentStatusSnapshot:
     download_rate: int
     upload_rate: int
     is_seeding: bool
+    total_upload: int = 0
 
 
 @dataclass(frozen=True)
@@ -294,6 +295,7 @@ class LibtorrentSession:
             download_rate=status.download_rate,
             upload_rate=status.upload_rate,
             is_seeding=status.is_seeding,
+            total_upload=status.total_upload,
         )
 
     def torrent_metadata(self, info_hash: str) -> Optional[TorrentMetadataSnapshot]:
