@@ -37,6 +37,55 @@ if ! flock -n 9; then
     exit 0
 fi
 
+wait_for_authoritative_seeder() {
+    local expected_hash="$1"
+    if ! systemctl --user is-enabled nano-seed.service &>/dev/null; then
+        log "ERROR: nano-seed.service must be enabled for authoritative publication"
+        return 1
+    fi
+
+    if systemctl --user is-active nano-seed.service &>/dev/null; then
+        log "Requesting nano-seed.service to reload the updated torrent"
+        systemctl --user kill --signal=HUP nano-seed.service
+    else
+        log "Starting nano-seed.service to seed updated snapshot"
+        systemctl --user start nano-seed.service
+    fi
+
+    local stats_file="${OUTPUT_DIR}/seeder-stats.json"
+    local state_file="${REPO_DIR}/publisher_state.json"
+    for _ in $(seq 1 180); do
+        if [ -f "$stats_file" ] && python3 - "$stats_file" "$state_file" "$expected_hash" <<'PY'
+import json
+import sys
+
+try:
+    stats = json.loads(open(sys.argv[1]).read())
+    state = json.loads(open(sys.argv[2]).read())
+except (OSError, json.JSONDecodeError):
+    raise SystemExit(1)
+
+expected_hash = sys.argv[3]
+if (
+    stats.get("torrent_info_hash") == expected_hash
+    and stats.get("dht_verified") is True
+    and stats.get("dht_sequence") == state.get("last_dht_seq")
+    and state.get("last_dht_info_hash") == expected_hash
+    and state.get("last_info_hash") == expected_hash
+):
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+        then
+            log "Seeder verified authoritative DHT publication: ${expected_hash:0:16}..."
+            return 0
+        fi
+        sleep 1
+    done
+    log "ERROR: Seeder did not authoritatively verify the published torrent within 180s"
+    return 1
+}
+
 # --- Step 1: Resolve or create the latest snapshot ---
 if [[ "$USE_PLACEHOLDER_SNAPSHOT" == 1 ]]; then
     log "USE_PLACEHOLDER_SNAPSHOT=1 — creating a local 128 MiB placeholder"
@@ -95,7 +144,7 @@ done
 # Use .partial file for download, then atomically rename on success
 PARTIAL_FILE="${TARGET_FILE}.partial"
 
-# --- Early exit: if metadata says this filename is already fully processed, re-publish to DHT ---
+# --- Early exit: if metadata says this filename is already fully processed, refresh DHT through seeder ---
 # DHT entries expire after a few hours, so we must re-publish even when snapshot is unchanged.
 if [ -f "$META_FILE" ] && [ -f "$STABLE_FILE" ] && [ -s "$STABLE_FILE" ]; then
     readarray -t PREVIOUS_METADATA < <(python3 - "$META_FILE" <<'PY'
@@ -122,20 +171,8 @@ PY
             source "$HOME/.env"
         fi
 
-        # Re-publish using existing info hash — skip expensive torrent re-creation
-        python3 - "$PREV_TORRENT" "${DHT_SALT:-daily}" <<'PY' || log "WARNING: DHT re-publish failed (non-fatal)"
-import os
-import sys
-
-from producer.publish import publish_to_dht
-
-result = publish_to_dht(
-    private_key_hex=os.environ["DHT_PRIVATE_KEY"],
-    info_hash_hex=sys.argv[1],
-    salt=sys.argv[2],
-)
-print(result)
-PY
+        # Re-publish through the long-lived seeder; it owns the DHT session.
+        wait_for_authoritative_seeder "$PREV_TORRENT"
 
         # --- Step 7: Push status to API (re-publish path) ---
         if [ -n "${STATUS_API_URL:-}" ]; then
@@ -330,8 +367,8 @@ with open(sys.argv[1], "w") as metadata_file:
 PY
 log "Wrote ${META_FILE}"
 
-# --- Step 5: Create torrent and publish to DHT ---
-log "Creating torrent and publishing to DHT"
+# --- Step 5: Create the torrent; the long-lived seeder owns DHT publication ---
+log "Creating torrent; deferring DHT publication to the long-lived seeder"
 
 cd "$REPO_DIR"
 source .venv/bin/activate
@@ -342,7 +379,8 @@ fi
 PUBLISH_OUTPUT=$(python -m producer.cli publish \
     --private-key "$DHT_PRIVATE_KEY" \
     --snapshot-file "$STABLE_FILE" \
-    --original-filename "$FILENAME")
+    --original-filename "$FILENAME" \
+    --defer-dht-publish)
 
 echo "$PUBLISH_OUTPUT"
 
@@ -364,46 +402,10 @@ PY
     log "Updated metadata with torrent hash: $TORRENT_HASH"
 fi
 
-# --- Step 6: Ask the long-lived seeder to reload the new torrent ---
+# --- Step 6: Ask the long-lived seeder to reload and publish the new torrent ---
 # SIGHUP preserves the producer's libtorrent/DHT session and retained swarms.
-# A fully stopped seeder is started normally, which exercises restart recovery.
-if systemctl --user is-enabled nano-seed.service &>/dev/null; then
-    if systemctl --user is-active nano-seed.service &>/dev/null; then
-        log "Requesting nano-seed.service to reload the updated torrent"
-        systemctl --user kill --signal=HUP nano-seed.service
-    else
-        log "Starting nano-seed.service to seed updated snapshot"
-        systemctl --user start nano-seed.service
-    fi
-
-    SEEDER_STATS_FILE="${OUTPUT_DIR}/seeder-stats.json"
-    SEEDER_READY=0
-    for _ in $(seq 1 180); do
-        if [ -f "$SEEDER_STATS_FILE" ] && python3 - "$SEEDER_STATS_FILE" "$TORRENT_HASH" <<'PY'
-import json
-import sys
-
-try:
-    status = json.loads(open(sys.argv[1]).read())
-except (OSError, json.JSONDecodeError):
-    raise SystemExit(1)
-
-if status.get("torrent_info_hash") == sys.argv[2] and status.get("dht_verified") is True:
-    raise SystemExit(0)
-raise SystemExit(1)
-PY
-        then
-            SEEDER_READY=1
-            break
-        fi
-        sleep 1
-    done
-    if [ "$SEEDER_READY" -ne 1 ]; then
-        log "ERROR: Seeder did not verify the published torrent within 180s"
-        exit 1
-    fi
-    log "Seeder verified current torrent and DHT publication"
-fi
+# The seeder writes publisher_state.json only after authoritative verification.
+wait_for_authoritative_seeder "$TORRENT_HASH"
 
 # --- Step 7: Push status to API ---
 if [ -n "${STATUS_API_URL:-}" ]; then

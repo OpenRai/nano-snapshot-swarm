@@ -36,6 +36,41 @@ SNAPSHOT_NAME = "nano-ledger-snapshot.7z"
 DHT_REPUBLISH_INTERVAL = 1800  # 30 minutes
 
 
+def _record_verified_publication(
+    info_hash_hex: str,
+    dht_sequence: int,
+    state_path: str | None = None,
+) -> None:
+    """Persist dashboard state only after the live seeder verified DHT state."""
+    path = Path(
+        state_path
+        or os.environ.get("PUBLISHER_STATE_FILE", str(PROJECT_ROOT / "publisher_state.json"))
+    )
+    try:
+        state = json.loads(path.read_text()) if path.exists() else {}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"could not read publisher state {path}: {exc}") from exc
+
+    if state.get("last_info_hash") != info_hash_hex:
+        state["last_seq"] = int(state.get("last_seq", 0)) + 1
+        state["last_info_hash"] = info_hash_hex
+    state["last_dht_seq"] = dht_sequence
+    state["last_dht_info_hash"] = info_hash_hex
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    temporary.write_text(json.dumps(state, indent=2) + "\n")
+    os.replace(temporary, path)
+    logger.info(
+        "Publisher state updated after authoritative DHT verification: "
+        "dashboard sequence=%s, DHT mutable-item sequence=%s, "
+        "torrent v2 info hash=%s...",
+        state.get("last_seq", 0),
+        dht_sequence,
+        info_hash_hex[:16],
+    )
+
+
 def _load_dht_keys() -> tuple[bytes, bytes] | None:
     """Load DHT private key from env, return (privkey_64, pubkey_32) or None.
 
@@ -295,6 +330,7 @@ def main() -> None:
         )
         last_dht_publish = time.time()
         last_dht_sequence = int(result["sequence"])
+        _record_verified_publication(current_info_hash, last_dht_sequence)
         dht_verified = True
 
     try:

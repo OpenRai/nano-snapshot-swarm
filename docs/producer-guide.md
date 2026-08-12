@@ -317,4 +317,7 @@ must not be used to confirm a new publication.
 The daily pipeline sends `SIGHUP` to an active `nano-seed.service` so it reloads
 the canonical torrent without destroying its DHT session or retained swarms. If
 the seeder is stopped, the pipeline starts it, exercising the restart recovery
-path.
+path. The normal pipeline creates the torrent first and defers the only DHT put
+to that long-lived seeder. The seeder updates `publisher_state.json` only after
+authoritative verification, so the dashboard cannot be advanced by a separate
+short-lived publisher race.

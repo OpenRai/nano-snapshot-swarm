@@ -22,6 +22,9 @@ def test_daily_pipeline_reloads_seeder_without_destroying_its_dht_session() -> N
     assert "systemctl --user kill --signal=HUP nano-seed.service" in script
     assert "systemctl --user restart nano-seed.service" not in script
     assert '"dht_verified"' in script
+    assert "--defer-dht-publish" in script
+    assert "last_dht_info_hash" in script
+    assert "from producer.publish import publish_to_dht" not in script
 
 
 def test_shell_special_filename_stays_data_when_passed_as_an_argument(tmp_path) -> None:

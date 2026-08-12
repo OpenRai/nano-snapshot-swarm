@@ -78,6 +78,10 @@ def cmd_publish(args: argparse.Namespace) -> None:
     print(f"Info-hash (v1): {hashes.v1}")
     print(f"Info-hash (v2): {hashes.v2}")
 
+    if getattr(args, "defer_dht_publish", False):
+        print("DHT publication deferred to the long-lived producer seeder")
+        return
+
     result = publish_to_dht(
         private_key_hex=private_key,
         info_hash_hex=hashes.v2,
@@ -158,6 +162,11 @@ def main() -> None:
         help="Path to publisher state file",
     )
     pub_parser.add_argument("--dry-run", action="store_true", help="Don't publish to DHT")
+    pub_parser.add_argument(
+        "--defer-dht-publish",
+        action="store_true",
+        help="Create the torrent but let the long-lived producer seeder publish it",
+    )
     pub_parser.add_argument(
         "--salt",
         default=os.environ.get("DHT_SALT", DEFAULT_SALT),
