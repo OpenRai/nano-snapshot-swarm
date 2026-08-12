@@ -281,8 +281,10 @@ DHT bootstrap can take 5–15 minutes on a cold start, especially behind NAT. Th
 `Attempting connection to seed peer ...` means libtorrent queued an asynchronous
 connection request. It does not confirm a TCP connection or BitTorrent handshake.
 `No peers` is based on torrent status and means that no usable torrent peer has
-connected yet. The mirror retries configured seed-peer requests after each
-60-second no-peer warning. The seed peer must be reachable on TCP port 6881.
+connected yet while the download is incomplete. The mirror queues another
+configured seed-peer request after each 60-second no-peer warning during the
+download. A queued request does not confirm a TCP connection or BitTorrent
+handshake. The seed peer must be reachable on TCP port 6881.
 
 ### Download appears stuck at 0%
 

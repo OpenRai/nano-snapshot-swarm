@@ -543,8 +543,8 @@ class MirrorWatcher:
                         )
                         if self.seed_peers:
                             logger.info(
-                                "Retrying configured seed-peer connection attempts; "
-                                "the previous requests did not produce a connected torrent peer"
+                                "No peer observed; queueing another configured seed-peer "
+                                "connection attempt"
                             )
                             self._connect_seed_peers(info_hash)
                         no_peer_seconds = 0

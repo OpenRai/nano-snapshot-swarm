@@ -276,7 +276,11 @@ class LibtorrentSession:
         ip = socket.gethostbyname(host)
         logger.info("Attempting connection to seed peer %s:%d (%s)", host, port, ip)
         handle.connect_peer((ip, port))
-        logger.info("Seed-peer connection request queued for %s:%d", host, port)
+        logger.info(
+            "Seed-peer connection attempt queued for %s:%d; connection not yet confirmed",
+            host,
+            port,
+        )
 
     def torrent_status(self, info_hash: str) -> Optional[TorrentStatusSnapshot]:
         handle = self._handles.get(info_hash)
