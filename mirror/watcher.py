@@ -82,6 +82,7 @@ class MirrorWatcher:
         self._desired_snapshot = self._load_desired_snapshot()
         self._active_info_hash: Optional[str] = None
         self._active_started_at: Optional[float] = None
+        self._once_mode = False
         self._running = False
         self._monitor_thread: Optional[threading.Thread] = None
         self._discovery_thread: Optional[threading.Thread] = None
@@ -94,6 +95,7 @@ class MirrorWatcher:
         self._recheck_checking_observed = False
 
     def start(self, *, once: bool = False) -> None:
+        self._once_mode = once
         logger.info("=" * 60)
         logger.info("Nano P2P Mirror Service Starting")
         logger.info("Producer signing public key: %s", self.producer_signing_pubkey_hex)
@@ -564,7 +566,7 @@ class MirrorWatcher:
                 else:
                     stall_seconds = 0
 
-                if status.is_seeding:
+                if status.is_seeding and self._once_mode:
                     self._stop_reason = DownloadStatus.SEEDING
                     self._running = False
                     break

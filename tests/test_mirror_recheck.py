@@ -60,6 +60,80 @@ def test_replacement_waits_for_metadata_recheck_before_resuming(tmp_path) -> Non
     assert session.calls[-2:] == [("recheck", "ef" * 32), ("resume", "ef" * 32)]
 
 
+def test_swarm_mode_keeps_monitoring_after_seeding(tmp_path, monkeypatch) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    import mirror.watcher as watcher_module
+
+    class SeedingSession:
+        def torrent_metadata(self, info_hash: str):
+            return None
+
+        def torrent_status(self, info_hash: str):
+            from mirror.libtorrent_session import TorrentStatusSnapshot
+
+            return TorrentStatusSnapshot(
+                progress=1.0,
+                state="seeding",
+                num_peers=0,
+                download_rate=0,
+                upload_rate=0,
+                is_seeding=True,
+            )
+
+    watcher = watcher_module.MirrorWatcher(
+        producer_signing_pubkey_hex="ab" * 32,
+        data_dir=str(tmp_path),
+    )
+    watcher.session = SeedingSession()
+    watcher._active_info_hash = "cd" * 32
+    watcher._running = True
+
+    def stop_after_one_poll(_seconds: float) -> None:
+        watcher._running = False
+
+    monkeypatch.setattr(watcher_module.time, "sleep", stop_after_one_poll)
+
+    watcher._monitor_active_torrent_loop()
+
+    assert watcher._stop_reason is None
+
+
+def test_once_mode_stops_monitoring_after_seeding(tmp_path, monkeypatch) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    import mirror.watcher as watcher_module
+
+    class SeedingSession:
+        def torrent_metadata(self, info_hash: str):
+            return None
+
+        def torrent_status(self, info_hash: str):
+            from mirror.libtorrent_session import TorrentStatusSnapshot
+
+            return TorrentStatusSnapshot(
+                progress=1.0,
+                state="seeding",
+                num_peers=0,
+                download_rate=0,
+                upload_rate=0,
+                is_seeding=True,
+            )
+
+    watcher = watcher_module.MirrorWatcher(
+        producer_signing_pubkey_hex="ab" * 32,
+        data_dir=str(tmp_path),
+    )
+    watcher.session = SeedingSession()
+    watcher._active_info_hash = "cd" * 32
+    watcher._once_mode = True
+    watcher._running = True
+    monkeypatch.setattr(watcher_module.time, "sleep", lambda _seconds: None)
+
+    watcher._monitor_active_torrent_loop()
+
+    assert watcher._stop_reason.value == "seeding"
+    assert watcher._running is False
+
+
 def test_configured_seed_peer_attempt_is_forwarded(tmp_path) -> None:
     sys.modules.setdefault("libtorrent", SimpleNamespace())
     from mirror.watcher import MirrorWatcher
