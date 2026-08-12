@@ -109,10 +109,12 @@ class LibtorrentSession:
         listen_port: int = 6881,
         data_dir: str = "/data",
         enable_dht: bool = True,
+        load_dht_state: bool = True,
     ):
         self.data_dir = data_dir
         self._listen_port = listen_port
         self._enable_dht = enable_dht
+        self._load_dht_state = load_dht_state
         self._session: Optional[lt.session] = None
         self._alert_thread: Optional[threading.Thread] = None
         self._running = False
@@ -146,13 +148,15 @@ class LibtorrentSession:
 
         # Load saved DHT state for faster re-bootstrap
         self._dht_state_path = Path(self.data_dir) / ".dht_state"
-        if self._dht_state_path.exists():
+        if self._load_dht_state and self._dht_state_path.exists():
             try:
                 state = lt.bdecode(self._dht_state_path.read_bytes())
                 self._session.load_state(state, lt.save_state_flags_t.save_dht_state)
                 logger.info("Loaded saved DHT state from %s", self._dht_state_path)
             except Exception as e:
                 logger.warning("Failed to load DHT state: %s", e)
+        elif not self._load_dht_state:
+            logger.info("Starting DHT with fresh mutable-item state")
 
         for host, port in DHT_BOOTSTRAP_NODES:
             self._session.add_dht_node((host, port))

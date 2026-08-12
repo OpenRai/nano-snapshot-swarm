@@ -163,6 +163,7 @@ def publish_to_dht(
     dht_session = LibtorrentSession(
         data_dir=str(Path(state_path).resolve().parent),
         listen_port=6883,
+        load_dht_state=False,
     )
     dht_session.start()
     try:

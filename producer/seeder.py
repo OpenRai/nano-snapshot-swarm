@@ -227,6 +227,7 @@ def main() -> None:
     session = LibtorrentSession(
         data_dir=data_dir,
         listen_port=6881,
+        load_dht_state=False,
     )
     session.start()
 
