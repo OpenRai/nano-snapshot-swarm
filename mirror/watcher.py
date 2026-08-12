@@ -603,7 +603,10 @@ class MirrorWatcher:
 
         if status.is_seeding:
             self.state.set_phase("seeding")
-            logger.info(f"Snapshot seeding complete: {info_hash[:16]}...")
+            if status.state != last_state:
+                logger.info(
+                    f"Snapshot download complete; now seeding: {info_hash[:16]}..."
+                )
 
         if status.num_peers == 0 and no_peer_seconds >= 60:
             logger.warning(

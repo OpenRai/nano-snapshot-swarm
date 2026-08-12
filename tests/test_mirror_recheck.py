@@ -134,6 +134,31 @@ def test_once_mode_stops_monitoring_after_seeding(tmp_path, monkeypatch) -> None
     assert watcher._running is False
 
 
+def test_seeding_completion_log_only_emits_on_state_transition(tmp_path, caplog) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    from mirror.libtorrent_session import TorrentStatusSnapshot
+    from mirror.watcher import MirrorWatcher
+
+    watcher = MirrorWatcher(
+        producer_signing_pubkey_hex="ab" * 32,
+        data_dir=str(tmp_path),
+    )
+    status = TorrentStatusSnapshot(
+        progress=1.0,
+        state="seeding",
+        num_peers=0,
+        download_rate=0,
+        upload_rate=0,
+        is_seeding=True,
+    )
+
+    with caplog.at_level("INFO", logger="mirror.watcher"):
+        watcher._update_transfer_state(status, "cd" * 32, "", 0, False)
+        watcher._update_transfer_state(status, "cd" * 32, "seeding", 0, False)
+
+    assert caplog.text.count("Snapshot download complete; now seeding") == 1
+
+
 def test_configured_seed_peer_attempt_is_forwarded(tmp_path) -> None:
     sys.modules.setdefault("libtorrent", SimpleNamespace())
     from mirror.watcher import MirrorWatcher
