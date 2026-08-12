@@ -234,10 +234,10 @@ The `fly.toml` and `Dockerfile` live directly in `status-api/` (the service root
 Add `STATUS_API_URL` to the producer's `~/.env`:
 
 ```bash
-STATUS_API_URL=https://nano-snapshots.openrai.org
+STATUS_API_URL=https://nano-snapshot-hub.fly.dev
 ```
 
-The `daily-snapshot.sh` pipeline will then push after every DHT publish. Push failures are non-fatal.
+The `daily-snapshot.sh` pipeline will then push after every DHT publish. Push failures are non-fatal. The public dashboard is available at `https://nano-snapshots.openrai.org`; use the direct Fly hostname for producer pushes unless Cloudflare explicitly permits `POST /api/push`.
 
 You can also push manually or via systemd:
 

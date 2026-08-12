@@ -43,7 +43,7 @@ uv run ruff check shared/ producer/ mirror/ tests/ status-api/
 - `.env` lives at `~/.env` on the remote (not in the repo). `DHT_PRIVATE_KEY` is required.
 - To manually trigger a status push (e.g. after deploying template changes):
   ```bash
-  ssh bandwidth-martyr 'cd /opt/nano-snapshot-swarm && git pull --rebase && set -a && source ~/.env && set +a && .venv/bin/python -m producer.push_status --status-api-url https://nano-snapshot.ninzin.net --state-file publisher_state.json --torrent-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z.torrent --snapshot-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z'
+  ssh bandwidth-martyr 'cd /opt/nano-snapshot-swarm && git pull --rebase && set -a && source ~/.env && set +a && .venv/bin/python -m producer.push_status --status-api-url https://nano-snapshot-hub.fly.dev --state-file publisher_state.json --torrent-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z.torrent --snapshot-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z'
   ```
 - From the repo root, refresh the checked-in authority key file with `./derive-authority-pubkey | tee AUTHORITY_PUBKEY`.
 

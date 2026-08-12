@@ -83,7 +83,7 @@ fly status --app nano-snapshot-hub
 fly logs --app nano-snapshot-hub
 
 # Test the API directly
-curl https://nano-snapshot.ninzin.net/health
+curl https://nano-snapshots.openrai.org/health
 ```
 
 Initially, `GET /api/status`, `GET /api/torrent`, and `GET /api/latest.magnet` return `404` until the Producer pushes the first snapshot.
@@ -92,20 +92,21 @@ Initially, `GET /api/status`, `GET /api/torrent`, and `GET /api/latest.magnet` r
 
 ## 5. DNS & Cloudflare (Recommended)
 
-The canonical public URL is `https://nano-snapshot.ninzin.net`, fronted by Cloudflare to protect the tiny Fly VM.
+The canonical public URL is `https://nano-snapshots.openrai.org`, fronted by Cloudflare.
 
-1. In Fly: `fly certs add nano-snapshot.ninzin.net --app nano-snapshot-hub`
-2. In Cloudflare DNS for `ninzin.net`:
-   - **A** `nano-snapshot` → `66.241.124.49` (orange cloud / proxied)
-   - **AAAA** `nano-snapshot` → `2a09:8280:1::109:b32e:0` (orange cloud / proxied)
-   - **CNAME** `_acme-challenge.nano-snapshot` → `nano-snapshot.ninzin.net.0pd61ql.flydns.net` (DNS only, **not proxied**)
-   - **TXT** `_fly-ownership.nano-snapshot` → `app-0pd61ql` (DNS only)
+1. In Fly: `fly certs add nano-snapshots.openrai.org --app nano-snapshot-hub`
+2. In Cloudflare DNS for `openrai.org`:
+   - **A** `nano-snapshots` → `66.241.124.49` (orange cloud / proxied)
+   - **AAAA** `nano-snapshots` → `2a09:8280:1::109:b32e:0` (orange cloud / proxied)
+   - **TXT** `_fly-ownership.nano-snapshots` → `app-0pd61ql` (DNS only)
 3. In Cloudflare SSL/TLS: set mode to **Full (strict)**
 4. Optionally add Cloudflare Cache Rules:
-   - `nano-snapshot.ninzin.net/api/torrent` and `/api/latest.magnet` → **Cache Level: Bypass**
-   - `nano-snapshot.ninzin.net/api/torrents/*` → **Cache Level: Cache Everything**, **Edge TTL: 1 year**
-   - `nano-snapshot.ninzin.net/api/status*` → **Cache Level: Cache Everything**, **Edge TTL: 5–10 minutes**
-   - `nano-snapshot.ninzin.net/api/push` → **Cache Level: Bypass**
+   - `nano-snapshots.openrai.org/api/torrent` and `/api/latest.magnet` → **Cache Level: Bypass**
+   - `nano-snapshots.openrai.org/api/torrents/*` → **Cache Level: Cache Everything**, **Edge TTL: 1 year**
+   - `nano-snapshots.openrai.org/api/status*` → **Cache Level: Cache Everything**, **Edge TTL: 5–10 minutes**
+   - `nano-snapshots.openrai.org/api/push` → **Cache Level: Bypass**
+
+Cache bypass does not disable Cloudflare security rules. If `POST /api/push` returns HTTP 403, add a narrowly scoped WAF/security skip for that path or keep the Producer on the direct Fly hostname.
 
 The `_acme-challenge` and `_fly-ownership` records are only needed for initial certificate issuance and can be removed afterwards.
 
@@ -162,7 +163,7 @@ Once the Status API is live, set `STATUS_API_URL` on the Producer:
 
 ```bash
 # ~/.env on the producer server
-STATUS_API_URL=https://nano-snapshot.ninzin.net
+STATUS_API_URL=https://nano-snapshot-hub.fly.dev
 ```
 
 The `daily-snapshot.sh` pipeline will automatically push to the API after each DHT publish (both full pipeline and re-publish paths). Push failures are logged as warnings but are **non-fatal** — DHT remains the source of truth.
