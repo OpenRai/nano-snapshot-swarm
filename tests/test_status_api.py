@@ -72,15 +72,15 @@ class TestPush:
         # Temporarily override the authority pubkey
         import app.main as main_module
 
-        original_pubkey = main_module.AUTHORITY_PUBKEY
-        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         try:
             resp = client.post("/api/push", json=payload)
             assert resp.status_code == 200
             assert resp.json()["ok"] is True
             assert resp.json()["sequence"] == 42
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
@@ -94,21 +94,21 @@ class TestPush:
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
 
-        original_pubkey = main_module.AUTHORITY_PUBKEY
-        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         try:
             payload["torrent_name"] = "upstream-snapshot.7z"
             resp = client.post("/api/push", json=payload)
             assert resp.status_code == 422
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
 
     def test_push_replay_rejected(self, client, sample_push_payload):
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
 
-        original_pubkey = main_module.AUTHORITY_PUBKEY
-        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         try:
             # First push at seq 42
             resp = client.post("/api/push", json=payload)
@@ -126,7 +126,7 @@ class TestPush:
             resp = client.post("/api/push", json=payload)
             assert resp.status_code == 409
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
@@ -151,8 +151,8 @@ class TestGetEndpoints:
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
 
-        original_pubkey = main_module.AUTHORITY_PUBKEY
-        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         try:
             client.post("/api/push", json=payload)
             resp = client.get("/api/status")
@@ -161,10 +161,12 @@ class TestGetEndpoints:
             assert data["sequence"] == 42
             assert data["info_hash"] == payload["info_hash"]
             assert data["info_hash_v1"] == payload["info_hash_v1"]
+            assert data["producer_signing_pubkey"] == pubkey_hex
+            assert "authority_pubkey" not in data
             assert data["verified"] is True
             assert "magnet" in data
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
@@ -172,10 +174,10 @@ class TestGetEndpoints:
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
 
-        original_pubkey = main_module.AUTHORITY_PUBKEY
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
         original_host = main_module.MAGNET_PEER_HOST
         original_port = main_module.MAGNET_PEER_PORT
-        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         main_module.MAGNET_PEER_HOST = "bandwidth-martyr.openrai.org"
         main_module.MAGNET_PEER_PORT = "6881"
         try:
@@ -187,7 +189,7 @@ class TestGetEndpoints:
             assert "tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce" in magnet
             assert "tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce" in magnet
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module.MAGNET_PEER_HOST = original_host
             main_module.MAGNET_PEER_PORT = original_port
             main_module._current_status = None
@@ -197,8 +199,8 @@ class TestGetEndpoints:
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
 
-        original_pubkey = main_module.AUTHORITY_PUBKEY
-        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         try:
             client.post("/api/push", json=payload)
             redirect = client.get("/api/torrent", follow_redirects=False)
@@ -218,7 +220,7 @@ class TestGetEndpoints:
             assert resp.headers["cache-control"] == "public, max-age=31536000, immutable"
             assert resp.content == b"fake-torrent-data"
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
@@ -226,8 +228,8 @@ class TestGetEndpoints:
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
 
-        original_pubkey = main_module.AUTHORITY_PUBKEY
-        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         try:
             client.post("/api/push", json=payload)
             resp = client.get("/api/latest.magnet")
@@ -237,23 +239,56 @@ class TestGetEndpoints:
             assert resp.text.startswith("magnet:?")
             assert "ws=" not in resp.text
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
     def test_public_key_endpoint_returns_plain_text_key(self, client):
         import app.main as main_module
 
-        original_pubkey = main_module.AUTHORITY_PUBKEY
-        main_module.AUTHORITY_PUBKEY = "ab" * 32
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = "ab" * 32
         try:
-            resp = client.get("/nano-snapshot-swarm.pubkey.txt")
+            resp = client.get("/nano-snapshot-swarm.producer-signing-pubkey.txt")
             assert resp.status_code == 200
             assert resp.headers["content-type"].startswith("text/plain")
             assert resp.headers["cache-control"] == "public, max-age=3600"
             assert resp.text == ("ab" * 32) + "\n"
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+
+    def test_old_authority_pubkey_environment_is_ignored(self, monkeypatch, caplog):
+        import app.main as main_module
+
+        monkeypatch.setenv("AUTHORITY_PUBKEY", "00" * 32)
+        monkeypatch.setenv("PRODUCER_SIGNING_PUBKEY", "ab" * 32)
+
+        with caplog.at_level("WARNING"):
+            assert main_module._producer_signing_pubkey_from_env() == "ab" * 32
+
+        assert "AUTHORITY_PUBKEY is ignored; use PRODUCER_SIGNING_PUBKEY." in caplog.text
+
+    def test_startup_migrates_persisted_authority_pubkey(self, client):
+        import app.main as main_module
+
+        status = {
+            "sequence": 42,
+            "info_hash": "ab" * 32,
+            "torrent_name": "nano-ledger-snapshot.7z",
+            "authority_pubkey": "00" * 32,
+        }
+        main_module._save_state(status, b"fake-torrent-data")
+        main_module._current_status = None
+        main_module._torrent_bytes = b""
+
+        main_module._load_state()
+
+        assert main_module._current_status is not None
+        assert "authority_pubkey" not in main_module._current_status
+        assert (
+            main_module._current_status["producer_signing_pubkey"]
+            == main_module.PRODUCER_SIGNING_PUBKEY
+        )
 
     def test_health_ok_before_push(self, client):
         import app.main as main_module
@@ -267,8 +302,8 @@ class TestGetEndpoints:
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
 
-        original_pubkey = main_module.AUTHORITY_PUBKEY
-        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         try:
             client.post("/api/push", json=payload)
             resp = client.get("/api/status-fragment")
@@ -276,15 +311,15 @@ class TestGetEndpoints:
             assert resp.headers["access-control-allow-origin"] == "*"
             assert resp.headers["content-type"] == "text/html"
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
     def test_status_fragment_renders_truncated_info_hash(self, client, sample_push_payload):
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
-        original_pubkey = main_module.AUTHORITY_PUBKEY
-        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         try:
             client.post("/api/push", json=payload)
             resp = client.get("/api/status-fragment")
@@ -295,7 +330,7 @@ class TestGetEndpoints:
             # It should not contain the full info_hash as a literal {{ info_hash[:16] }}
             assert "{{ info_hash[:16] }}" not in resp.text
         finally:
-            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
@@ -322,5 +357,8 @@ class TestGetEndpoints:
         assert 'data-tab="compose"' in seed
         assert "./nano-data:/data" in seed
         assert "nano-data:/data" not in seed.replace("./nano-data:/data", "")
-        assert 'href="/nano-snapshot-swarm.pubkey.txt">an Ed25519 key</a>' in response.text
+        assert (
+            'href="/nano-snapshot-swarm.producer-signing-pubkey.txt">an Ed25519 key</a>'
+            in response.text
+        )
         assert 'href="https://openrai.org/">The OpenRai Initiative</a>' in response.text

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
 import re
 import tempfile
@@ -20,10 +21,17 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 STATUS_FILE = DATA_DIR / "status.json"
 TORRENT_FILE = DATA_DIR / "torrent.bin"
 TORRENTS_DIR = DATA_DIR / "torrents"
-AUTHORITY_PUBKEY = os.environ.get(
-    "AUTHORITY_PUBKEY",
-    "cdbc9284015e84c225f0e67b891606505a60cf1218b127ac1c1edb6444567e6b",
-)
+DEFAULT_PRODUCER_SIGNING_PUBKEY = "cdbc9284015e84c225f0e67b891606505a60cf1218b127ac1c1edb6444567e6b"
+logger = logging.getLogger("status_api")
+
+
+def _producer_signing_pubkey_from_env() -> str:
+    if "AUTHORITY_PUBKEY" in os.environ:
+        logger.warning("AUTHORITY_PUBKEY is ignored; use PRODUCER_SIGNING_PUBKEY.")
+    return os.environ.get("PRODUCER_SIGNING_PUBKEY", DEFAULT_PRODUCER_SIGNING_PUBKEY)
+
+
+PRODUCER_SIGNING_PUBKEY = _producer_signing_pubkey_from_env()
 DHT_SALT = os.environ.get("DHT_SALT", "daily")
 MAGNET_PEER_HOST = os.environ.get("MAGNET_PEER_HOST", "").strip()
 MAGNET_PEER_PORT = os.environ.get("MAGNET_PEER_PORT", "6881").strip()
@@ -66,10 +74,13 @@ def _load_state() -> None:
     else:
         _torrent_bytes = b""
     if _current_status and _torrent_bytes:
+        old_pubkey_field = _current_status.pop("authority_pubkey", None)
+        if old_pubkey_field is not None:
+            _current_status["producer_signing_pubkey"] = PRODUCER_SIGNING_PUBKEY
         named_path = _named_torrent_path(
             _current_status["info_hash"], _current_status["torrent_name"]
         )
-        if not named_path.exists():
+        if old_pubkey_field is not None or not named_path.exists():
             _save_state(_current_status, _torrent_bytes)
 
 
@@ -113,8 +124,8 @@ def _build_magnet(info_hash: str, torrent_name: str, info_hash_v1: str | None = 
     return "magnet:?" + "&".join(params)
 
 
-def verify_push(payload: PushRequest, authority_pubkey_hex: str) -> bool:
-    pubkey_bytes = bytes.fromhex(authority_pubkey_hex)
+def verify_push(payload: PushRequest, producer_signing_pubkey_hex: str) -> bool:
+    pubkey_bytes = bytes.fromhex(producer_signing_pubkey_hex)
     verify_key = VerifyKey(pubkey_bytes)
     message = f"{payload.sequence}:{payload.info_hash}:{payload.timestamp}".encode("ascii")
     try:
@@ -133,7 +144,7 @@ def startup() -> None:
 def push(payload: PushRequest) -> JSONResponse:
     global _current_status, _torrent_bytes
 
-    if not verify_push(payload, AUTHORITY_PUBKEY):
+    if not verify_push(payload, PRODUCER_SIGNING_PUBKEY):
         raise HTTPException(status_code=401, detail="Invalid signature")
     if payload.torrent_name != CANONICAL_TORRENT_NAME:
         raise HTTPException(status_code=422, detail="Unexpected torrent name")
@@ -159,7 +170,7 @@ def push(payload: PushRequest) -> JSONResponse:
         ),
         "snapshot_size_bytes": payload.snapshot_size_bytes,
         "piece_size": payload.piece_size,
-        "authority_pubkey": AUTHORITY_PUBKEY,
+        "producer_signing_pubkey": PRODUCER_SIGNING_PUBKEY,
         "dht_salt": DHT_SALT,
         "verified": True,
         "timestamp": payload.timestamp,
@@ -244,11 +255,11 @@ def get_latest_magnet() -> Response:
     )
 
 
-@app.get("/nano-snapshot-swarm.pubkey.txt")
+@app.get("/nano-snapshot-swarm.producer-signing-pubkey.txt")
 def get_public_key() -> Response:
-    """Serve the current snapshot authority public key as plain text."""
+    """Serve the current producer signing public key as plain text."""
     return Response(
-        content=f"{AUTHORITY_PUBKEY}\n",
+        content=f"{PRODUCER_SIGNING_PUBKEY}\n",
         media_type="text/plain",
         headers={"Cache-Control": "public, max-age=3600"},
     )

@@ -25,7 +25,7 @@ class StatusResponse(BaseModel):
     torrent_download_url: str
     snapshot_size_bytes: int
     piece_size: int
-    authority_pubkey: str
+    producer_signing_pubkey: str
     dht_salt: str
     verified: bool
     timestamp: str

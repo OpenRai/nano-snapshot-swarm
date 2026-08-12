@@ -60,7 +60,7 @@ fly volumes create status_data --size 1 --region sjc --app nano-snapshot-hub
 
 ### 3.3 Verify `fly.toml`
 
-The checked-in `status-api/fly.toml` already embeds the OpenRAI `AUTHORITY_PUBKEY` and `DHT_SALT`. You should not need to edit it unless you are running a custom stream.
+The checked-in `status-api/fly.toml` already embeds the OpenRAI `PRODUCER_SIGNING_PUBKEY` and `DHT_SALT`. You should not need to edit it unless you are running a custom stream.
 
 ### 3.4 Deploy
 

@@ -112,6 +112,18 @@ def main() -> None:
     snapshot_path = Path(data_dir) / SNAPSHOT_NAME
     torrent_path = Path(data_dir) / f"{SNAPSHOT_NAME}.torrent"
 
+    # Load and identify the DHT signer before checking the current artifact, so
+    # an operator can recover the mirror-facing public key from any startup log.
+    dht_keys = _load_dht_keys()
+    if dht_keys:
+        logger.info("DHT publishing enabled (DHT_PRIVATE_KEY set)")
+        logger.info(
+            "Producer signing public key (PRODUCER_SIGNING_PUBKEY): %s",
+            dht_keys[1].hex(),
+        )
+    else:
+        logger.info("DHT publishing disabled (no DHT_PRIVATE_KEY)")
+
     if not snapshot_path.exists():
         logger.error(f"Snapshot file not found: {snapshot_path}")
         sys.exit(1)
@@ -122,13 +134,6 @@ def main() -> None:
     snapshot_size = snapshot_path.stat().st_size
     logger.info(f"Seeding: {snapshot_path} ({snapshot_size / (1024**3):.1f} GiB)")
     logger.info(f"Torrent: {torrent_path}")
-
-    # Load DHT publishing keys (optional)
-    dht_keys = _load_dht_keys()
-    if dht_keys:
-        logger.info("DHT publishing enabled (DHT_PRIVATE_KEY set)")
-    else:
-        logger.info("DHT publishing disabled (no DHT_PRIVATE_KEY)")
 
     session = LibtorrentSession(
         data_dir=data_dir,

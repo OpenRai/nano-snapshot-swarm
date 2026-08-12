@@ -30,14 +30,22 @@ DEFAULT_DHT_INACTIVITY_TIMEOUT = 1800  # swarm: exit if DHT returns nothing for 
 STATE_FILENAME = "mirror_state.json"
 SNAPSHOT_META_FILENAME = "snapshot-meta.json"
 
-DEFAULT_AUTHORITY_PUBKEY_FILE = Path(__file__).resolve().parent.parent / "AUTHORITY_PUBKEY"
+DEFAULT_PRODUCER_SIGNING_PUBKEY_FILE = (
+    Path(__file__).resolve().parent.parent / "PRODUCER_SIGNING_PUBKEY"
+)
 
 
-def load_default_authority_pubkey() -> str:
+def load_default_producer_signing_pubkey() -> str:
     try:
-        return DEFAULT_AUTHORITY_PUBKEY_FILE.read_text(encoding="ascii").strip()
+        return DEFAULT_PRODUCER_SIGNING_PUBKEY_FILE.read_text(encoding="ascii").strip()
     except FileNotFoundError:
         return ""
+
+
+def resolve_producer_signing_pubkey() -> str:
+    if "AUTHORITY_PUBKEY" in os.environ:
+        logger.warning("AUTHORITY_PUBKEY is ignored; use PRODUCER_SIGNING_PUBKEY.")
+    return os.environ.get("PRODUCER_SIGNING_PUBKEY") or load_default_producer_signing_pubkey()
 
 
 class DownloadStatus(Enum):
@@ -48,7 +56,7 @@ class DownloadStatus(Enum):
 class MirrorWatcher:
     def __init__(
         self,
-        authority_pubkey_hex: str,
+        producer_signing_pubkey_hex: str,
         data_dir: str = DEFAULT_DATA_DIR,
         poll_interval: int = DEFAULT_POLL_INTERVAL,
         salt: str = DEFAULT_SALT,
@@ -57,7 +65,7 @@ class MirrorWatcher:
         extract: bool = False,
         seed_peers: Optional[list[tuple[str, int]]] = None,
     ):
-        self.authority_pubkey_hex = authority_pubkey_hex
+        self.producer_signing_pubkey_hex = producer_signing_pubkey_hex
         self.data_dir = data_dir
         self.poll_interval = poll_interval
         self.salt = salt
@@ -66,7 +74,7 @@ class MirrorWatcher:
         self.extract = extract
         self.seed_peers = seed_peers or []
 
-        self.pub_key_bytes = bytes.fromhex(self.authority_pubkey_hex)
+        self.pub_key_bytes = bytes.fromhex(self.producer_signing_pubkey_hex)
 
         self.state = MirrorState(os.path.join(data_dir, STATE_FILENAME))
         self.snapshot_meta = SnapshotMetadata(os.path.join(data_dir, SNAPSHOT_META_FILENAME))
@@ -88,7 +96,7 @@ class MirrorWatcher:
     def start(self, *, once: bool = False) -> None:
         logger.info("=" * 60)
         logger.info("Nano P2P Mirror Service Starting")
-        logger.info(f"Authority public key: {self.authority_pubkey_hex[:16]}...")
+        logger.info(f"Producer signing public key: {self.producer_signing_pubkey_hex[:16]}...")
         logger.info(f"Data directory: {self.data_dir}")
         logger.info(f"DHT salt: '{self.salt}'")
         if once:
@@ -168,7 +176,7 @@ class MirrorWatcher:
             self.state.set_phase("discovering")
             result = discover_latest_snapshot(
                 session=self.session,
-                authority_pubkey_hex=self.authority_pubkey_hex,
+                producer_signing_pubkey_hex=self.producer_signing_pubkey_hex,
                 salt=self.salt,
             )
         except Exception:
@@ -272,7 +280,7 @@ class MirrorWatcher:
                 self.state.set_phase("discovering")
                 result = discover_latest_snapshot(
                     session=self.session,
-                    authority_pubkey_hex=self.authority_pubkey_hex,
+                    producer_signing_pubkey_hex=self.producer_signing_pubkey_hex,
                     salt=self.salt,
                 )
 
@@ -330,8 +338,8 @@ class MirrorWatcher:
             self._last_discovery = result
             self.state.update(result.sequence, result.info_hash_hex)
             self.snapshot_meta.update(
-                authority_pubkey=self.authority_pubkey_hex,
-                dht_pubkey=result.dht_pubkey_hex or self.authority_pubkey_hex,
+                producer_signing_pubkey=self.producer_signing_pubkey_hex,
+                dht_pubkey=result.dht_pubkey_hex or self.producer_signing_pubkey_hex,
                 dht_signature=result.signature_hex,
                 dht_seq=result.sequence,
                 dht_salt=self.salt,
@@ -608,9 +616,12 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="Nano P2P Mirror Service")
     parser.add_argument(
-        "--authority-pubkey",
-        default=os.environ.get("AUTHORITY_PUBKEY") or load_default_authority_pubkey(),
-        help="Authority Ed25519 public key (hex). Defaults to env or repo root AUTHORITY_PUBKEY.",
+        "--producer-signing-pubkey",
+        default=None,
+        help=(
+            "Producer Ed25519 public key (hex). Defaults to PRODUCER_SIGNING_PUBKEY "
+            "or repo root PRODUCER_SIGNING_PUBKEY."
+        ),
     )
     parser.add_argument(
         "--data-dir",
@@ -670,11 +681,13 @@ def main() -> None:
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
 
-    pubkey = args.authority_pubkey.replace(":", "").strip()
+    pubkey = (
+        args.producer_signing_pubkey or resolve_producer_signing_pubkey()
+    ).replace(":", "").strip()
     if not pubkey:
         print(
-            "ERROR: AUTHORITY_PUBKEY is required via --authority-pubkey, env, "
-            "or AUTHORITY_PUBKEY file",
+            "ERROR: PRODUCER_SIGNING_PUBKEY is required via --producer-signing-pubkey, env, "
+            "or PRODUCER_SIGNING_PUBKEY file",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -685,7 +698,7 @@ def main() -> None:
             raise ValueError
     except ValueError:
         print(
-            "ERROR: AUTHORITY_PUBKEY must be a 32-byte hex string (64 hex characters)",
+            "ERROR: PRODUCER_SIGNING_PUBKEY must be a 32-byte hex string (64 hex characters)",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -711,7 +724,7 @@ def main() -> None:
             )
 
     watcher = MirrorWatcher(
-        authority_pubkey_hex=pubkey,
+        producer_signing_pubkey_hex=pubkey,
         data_dir=args.data_dir,
         poll_interval=args.poll_interval,
         salt=args.salt,

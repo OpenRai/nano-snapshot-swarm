@@ -22,8 +22,11 @@ class SnapshotMetadata:
             if isinstance(loaded, dict):
                 self.data = loaded
                 removed_source_url = self.data.pop("source_url", None) is not None
+                removed_authority_pubkey = self.data.pop("authority_pubkey", None) is not None
                 removed_nano_pubkey = self.data.pop("authority_pubkey_nano", None) is not None
-                removed_legacy_fields = removed_source_url or removed_nano_pubkey
+                removed_legacy_fields = (
+                    removed_source_url or removed_authority_pubkey or removed_nano_pubkey
+                )
                 if removed_legacy_fields:
                     self._save()
         except json.JSONDecodeError as e:

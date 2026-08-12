@@ -6,11 +6,11 @@ All environment variables, CLI flags, and Docker Compose options.
 
 ## Mirror: Environment Variables
 
-The default OpenRAI mirror stream is baked into the published Docker image and stored in the repo root `AUTHORITY_PUBKEY` file for local builds and `uvx --from .` usage. Most mirror and leech users do not need to set `AUTHORITY_PUBKEY` unless they are following a different producer.
+The default OpenRAI mirror stream is baked into the published Docker image and stored in the repo root `PRODUCER_SIGNING_PUBKEY` file for local builds and `uvx --from .` usage. Most mirror and leech users do not need to set `PRODUCER_SIGNING_PUBKEY` unless they are following a different producer.
 
 | Variable | Default | Required | Description |
 |---|---|---|---|
-| `AUTHORITY_PUBKEY` | baked into image / repo | No | 32-byte Ed25519 public key (hex, 64 chars); override only to follow a different producer |
+| `PRODUCER_SIGNING_PUBKEY` | baked into image / repo | No | 32-byte Ed25519 public key (hex, 64 chars); override only to follow a different producer |
 | `DATA_DIR` | `/data` | No | Directory for ledger data and state |
 | `DHT_SALT` | `daily` | No | DHT mutable item salt namespace |
 | `POLL_INTERVAL` | `600` | No | DHT poll interval in seconds (swarm mode only) |
@@ -27,7 +27,7 @@ python -m mirror.watcher [flags]
 
 | Flag | Env | Default | Description |
 |---|---|---|---|
-| `--authority-pubkey` | `AUTHORITY_PUBKEY` | baked into image / repo | Ed25519 public key hex |
+| `--producer-signing-pubkey` | `PRODUCER_SIGNING_PUBKEY` | baked into image / repo | Ed25519 public key hex |
 | `--data-dir` | `DATA_DIR` | `/data` | Data directory |
 | `--salt` | `DHT_SALT` | `daily` | DHT salt |
 | `--poll-interval` | `POLL_INTERVAL` | `600` | Poll interval in seconds |
@@ -76,11 +76,11 @@ docker compose run -e POLL_INTERVAL=60 nano-mirror
 
 ### Follow a Different Producer
 
-Only set `AUTHORITY_PUBKEY` if you want to follow a non-default snapshot stream:
+Only set `PRODUCER_SIGNING_PUBKEY` if you want to follow a non-default snapshot stream:
 
 ```bash
 docker run --rm \
-  -e AUTHORITY_PUBKEY=<other_producer_pubkey> \
+  -e PRODUCER_SIGNING_PUBKEY=<other_producer_pubkey> \
   -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
   --once

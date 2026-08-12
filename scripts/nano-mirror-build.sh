@@ -14,7 +14,7 @@ GITHUB_SHA and identifies the temporary platform image used by publication.
 
 Environment:
   IMAGE_NAME           Image without tag (default: $DEFAULT_IMAGE_NAME).
-  AUTHORITY_PUBKEY     Override the key read from AUTHORITY_PUBKEY.
+  PRODUCER_SIGNING_PUBKEY     Override the key read from PRODUCER_SIGNING_PUBKEY.
   SEED_PEERS           Build-time HOST:PORT peers; defaults to the public seeder.
   BUILD_ID             Temporary image tag suffix; defaults to GITHUB_SHA.
   REGISTRY_USERNAME    Username for an authenticated push.
@@ -74,20 +74,24 @@ else
     IMAGE_TAG="$IMAGE_NAME:latest"
 fi
 
-AUTHORITY_PUBKEY_FILE="$REPO_DIR/AUTHORITY_PUBKEY"
-if [[ -n "${AUTHORITY_PUBKEY:-}" ]]; then
-    PUBKEY="$AUTHORITY_PUBKEY"
-elif [[ -f "$AUTHORITY_PUBKEY_FILE" ]]; then
-    IFS= read -r PUBKEY < "$AUTHORITY_PUBKEY_FILE"
+if [[ -v AUTHORITY_PUBKEY ]]; then
+    echo "WARNING: AUTHORITY_PUBKEY is ignored; use PRODUCER_SIGNING_PUBKEY." >&2
+fi
+
+PRODUCER_SIGNING_PUBKEY_FILE="$REPO_DIR/PRODUCER_SIGNING_PUBKEY"
+if [[ -n "${PRODUCER_SIGNING_PUBKEY:-}" ]]; then
+    PUBKEY="$PRODUCER_SIGNING_PUBKEY"
+elif [[ -f "$PRODUCER_SIGNING_PUBKEY_FILE" ]]; then
+    IFS= read -r PUBKEY < "$PRODUCER_SIGNING_PUBKEY_FILE"
 else
-    echo "ERROR: missing $AUTHORITY_PUBKEY_FILE" >&2
+    echo "ERROR: missing $PRODUCER_SIGNING_PUBKEY_FILE" >&2
     exit 1
 fi
 
 PUBKEY="${PUBKEY#"${PUBKEY%%[![:space:]]*}"}"
 PUBKEY="${PUBKEY%"${PUBKEY##*[![:space:]]}"}"
 if [[ ! "$PUBKEY" =~ ^[a-f0-9]{64}$ ]]; then
-    echo "ERROR: AUTHORITY_PUBKEY must contain a 64-character lowercase hex key" >&2
+    echo "ERROR: PRODUCER_SIGNING_PUBKEY must contain a 64-character lowercase hex key" >&2
     exit 1
 fi
 
@@ -106,7 +110,7 @@ fi
 BUILD_ARGS=(
     docker buildx build
     --platform "$PLATFORM"
-    --build-arg "AUTHORITY_PUBKEY=$PUBKEY"
+    --build-arg "PRODUCER_SIGNING_PUBKEY=$PUBKEY"
     --build-arg "SEED_PEERS=$SEED_PEERS"
     --file mirror/Dockerfile
     --tag "$IMAGE_TAG"

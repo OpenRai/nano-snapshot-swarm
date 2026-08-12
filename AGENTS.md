@@ -24,7 +24,7 @@ uv run ruff check shared/ producer/ mirror/ tests/ status-api/
 - `status-api/app/static/` is served at `/static` via `StaticFiles` mount.
 - `producer/push_status.py` uses `urllib.request` (stdlib) — no new deps for the main project.
 - Push failures are non-fatal. DHT publish is the source of truth; status API is best-effort.
-- `AUTHORITY_PUBKEY` is baked into `fly.toml` as an env var.
+- `PRODUCER_SIGNING_PUBKEY` is baked into `fly.toml` as an env var.
 
 ### Key non-obvious facts
 
@@ -34,7 +34,7 @@ uv run ruff check shared/ producer/ mirror/ tests/ status-api/
 - `mirror_state.json` is saved in both swarm and `--once` (leech) mode.
 - Leech mode has no download timeout — runs until complete or user cancels. Stall warning at 300s of zero rate, but never exits. Do not add a wall-clock timeout.
 - Swarm mode exits after `--download-timeout` (default 1800s) of continuous DHT inactivity so the container can restart.
-- `AUTHORITY_PUBKEY` and `DHT_SALT` are baked into the mirror Docker image as `ARG` defaults. Image runs with zero env vars.
+- `PRODUCER_SIGNING_PUBKEY` and `DHT_SALT` are baked into the mirror Docker image as `ARG` defaults. Image runs with zero env vars.
 
 ### Deployment — remote host `bandwidth-martyr`
 
@@ -45,7 +45,7 @@ uv run ruff check shared/ producer/ mirror/ tests/ status-api/
   ```bash
   ssh bandwidth-martyr 'cd /opt/nano-snapshot-swarm && git pull --rebase && set -a && source ~/.env && set +a && .venv/bin/python -m producer.push_status --status-api-url https://nano-snapshot-hub.fly.dev --state-file publisher_state.json --torrent-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z.torrent --snapshot-file /home/openrai/nano-snapshots/nano-ledger-snapshot.7z'
   ```
-- From the repo root, refresh the checked-in authority key file with `./derive-authority-pubkey | tee AUTHORITY_PUBKEY`.
+- From the repo root, refresh the checked-in producer signing key file with `./derive-producer-signing-pubkey | tee PRODUCER_SIGNING_PUBKEY`.
 
 ### E2E validation procedure
 

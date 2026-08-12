@@ -60,14 +60,14 @@ def test_snapshot_metadata_persists_latest_fields(tmp_path) -> None:
     meta = SnapshotMetadata(str(meta_path))
 
     meta.update(
-        authority_pubkey="ab" * 32,
+        producer_signing_pubkey="ab" * 32,
         dht_signature="cd" * 32,
         original_filename="snapshot-2026-04-22.7z",
     )
     meta.update(torrent_info_hash="ef" * 32, current_torrent_name="nano-ledger-snapshot.7z")
 
     loaded = json.loads(meta_path.read_text())
-    assert loaded["authority_pubkey"] == "ab" * 32
+    assert loaded["producer_signing_pubkey"] == "ab" * 32
     assert loaded["dht_signature"] == "cd" * 32
     assert loaded["original_filename"] == "snapshot-2026-04-22.7z"
     assert loaded["torrent_info_hash"] == "ef" * 32
@@ -79,7 +79,7 @@ def test_snapshot_metadata_loads_existing_file(tmp_path) -> None:
     meta_path.write_text(
         json.dumps(
             {
-                "authority_pubkey": "12" * 32,
+                "producer_signing_pubkey": "12" * 32,
                 "dht_signature": "34" * 32,
                 "original_filename": "nano-ledger-snapshot-123.7z",
             }
@@ -87,7 +87,7 @@ def test_snapshot_metadata_loads_existing_file(tmp_path) -> None:
     )
 
     meta = SnapshotMetadata(str(meta_path))
-    assert meta.data["authority_pubkey"] == "12" * 32
+    assert meta.data["producer_signing_pubkey"] == "12" * 32
     assert meta.data["dht_signature"] == "34" * 32
     assert meta.data["original_filename"] == "nano-ledger-snapshot-123.7z"
 
@@ -96,6 +96,7 @@ def test_snapshot_metadata_removes_legacy_fields(tmp_path) -> None:
     meta_path = tmp_path / "snapshot-meta.json"
     meta_path.write_text(
         '{"source_url": "https://example.test/snapshot", '
+        '"authority_pubkey": "obsolete", '
         '"authority_pubkey_nano": "obsolete", '
         '"dht_seq": 1}\n'
     )
@@ -104,4 +105,5 @@ def test_snapshot_metadata_removes_legacy_fields(tmp_path) -> None:
 
     metadata = json.loads(meta_path.read_text())
     assert "source_url" not in metadata
+    assert "authority_pubkey" not in metadata
     assert "authority_pubkey_nano" not in metadata

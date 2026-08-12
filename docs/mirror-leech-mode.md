@@ -6,7 +6,7 @@ Leech mode downloads the latest snapshot once, verifies it, and exits. No daemon
 - **One-off sync** — get the ledger file without running a long-lived service
 - **Testing** — quickly verify DHT discovery works
 
-The published Docker image already has the current OpenRAI producer public key baked in. You only need to set `AUTHORITY_PUBKEY` if you want to follow a different producer.
+The published Docker image already has the current OpenRAI producer public key baked in. You only need to set `PRODUCER_SIGNING_PUBKEY` if you want to follow a different producer.
 
 ---
 
@@ -24,12 +24,12 @@ docker run --rm \
 ### uvx
 
 ```bash
-read -r AUTHORITY_PUBKEY < AUTHORITY_PUBKEY
-export AUTHORITY_PUBKEY
+read -r PRODUCER_SIGNING_PUBKEY < PRODUCER_SIGNING_PUBKEY
+export PRODUCER_SIGNING_PUBKEY
 uvx --from . nano-mirror --once --data-dir ./nano-data
 ```
 
-That `uvx` snippet is only needed when running from a local git clone, because the source tree keeps the default producer key in the repo root `AUTHORITY_PUBKEY` file rather than hardcoding it into shell examples.
+That `uvx` snippet is only needed when running from a local git clone, because the source tree keeps the default producer key in the repo root `PRODUCER_SIGNING_PUBKEY` file rather than hardcoding it into shell examples.
 
 ### With Custom Timeout
 

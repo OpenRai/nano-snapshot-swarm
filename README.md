@@ -31,13 +31,13 @@ For the exact hybrid torrent, raw-v2 DHT pointer, magnet, and download-route con
 
 ### 1. Get the Latest Snapshot Once
 
-Use leech mode when you just want the newest snapshot archive or extracted ledger and do not want to run a mirror daemon. The published mirror image already has the current OpenRAI producer public key baked in, so downloaders do not need to go hunting for `AUTHORITY_PUBKEY`.
+Use leech mode when you just want the newest snapshot archive or extracted ledger and do not want to run a mirror daemon. The published mirror image already has the current OpenRAI producer public key baked in, so downloaders do not need to go hunting for `PRODUCER_SIGNING_PUBKEY`.
 
 ```bash
 # uvx from a local git clone: read the baked-in default key from the repo root
-AUTHORITY_PUBKEY="$(<AUTHORITY_PUBKEY)" uvx --from . nano-mirror --once --extract --data-dir ./nano-data
+PRODUCER_SIGNING_PUBKEY="$(<PRODUCER_SIGNING_PUBKEY)" uvx --from . nano-mirror --once --extract --data-dir ./nano-data
 
-# or, with Docker: no AUTHORITY_PUBKEY needed for the default stream
+# or, with Docker: no PRODUCER_SIGNING_PUBKEY needed for the default stream
 docker run --rm \
   -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \

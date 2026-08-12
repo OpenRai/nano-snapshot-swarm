@@ -2,7 +2,7 @@
 
 Swarm mode is the default operational mode. The mirror runs as a daemon, polling the DHT every `POLL_INTERVAL` seconds, downloading new snapshots as they appear, and seeding them back to the P2P network.
 
-The published Docker image already targets the default OpenRAI producer stream. You only need to set `AUTHORITY_PUBKEY` when you intentionally want to follow a different producer.
+The published Docker image already targets the default OpenRAI producer stream. You only need to set `PRODUCER_SIGNING_PUBKEY` when you intentionally want to follow a different producer.
 
 ---
 
@@ -73,7 +73,7 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 
 | Log | Meaning |
 |---|---|
-| `Authority public key: <hex>...` | The configured DHT authority public key |
+| `Producer signing public key: <hex>...` | The configured key that verifies the producer's signed DHT records |
 | `Mode: SWARM (continuous polling every Ns)` | Running as long-lived daemon |
 | `libtorrent session started, listening on port 6881` | BitTorrent engine ready |
 
@@ -164,7 +164,7 @@ docker exec nano-mirror cat /data/snapshot-meta.json
 
 ```json
 {
-  "authority_pubkey": "2b845d...",
+  "producer_signing_pubkey": "2b845d...",
   "dht_pubkey": "2b845d...",
   "dht_signature": "ed05ae...",
   "dht_seq": 70,

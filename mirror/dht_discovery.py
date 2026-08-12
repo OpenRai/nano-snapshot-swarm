@@ -28,11 +28,11 @@ class DHTDiscoveryResult:
 
 def discover_latest_snapshot(
     session,
-    authority_pubkey_hex: str,
+    producer_signing_pubkey_hex: str,
     salt: str = DEFAULT_SALT,
     timeout: float = DHT_TIMEOUT,
 ) -> Optional[DHTDiscoveryResult]:
-    pub_key_bytes = bytes.fromhex(authority_pubkey_hex)
+    pub_key_bytes = bytes.fromhex(producer_signing_pubkey_hex)
     target_id = compute_bep46_target_id(pub_key_bytes, salt)
 
     logger.info(

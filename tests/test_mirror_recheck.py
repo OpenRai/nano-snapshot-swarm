@@ -35,7 +35,7 @@ def test_replacement_waits_for_metadata_recheck_before_resuming(tmp_path) -> Non
     from mirror.reconcile import DesiredSnapshot, ReconcileDecision
     from mirror.watcher import MirrorWatcher
 
-    watcher = MirrorWatcher(authority_pubkey_hex="ab" * 32, data_dir=str(tmp_path))
+    watcher = MirrorWatcher(producer_signing_pubkey_hex="ab" * 32, data_dir=str(tmp_path))
     session = FakeSession()
     watcher.session = session
     watcher._active_info_hash = "cd" * 32
@@ -55,3 +55,16 @@ def test_replacement_waits_for_metadata_recheck_before_resuming(tmp_path) -> Non
     watcher._resume_after_recheck(target.info_hash, "downloading")
 
     assert session.calls[-2:] == [("recheck", "ef" * 32), ("resume", "ef" * 32)]
+
+
+def test_old_authority_pubkey_environment_is_ignored(monkeypatch, caplog) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    from mirror.watcher import resolve_producer_signing_pubkey
+
+    monkeypatch.setenv("AUTHORITY_PUBKEY", "00" * 32)
+    monkeypatch.setenv("PRODUCER_SIGNING_PUBKEY", "ab" * 32)
+
+    with caplog.at_level("WARNING"):
+        assert resolve_producer_signing_pubkey() == "ab" * 32
+
+    assert "AUTHORITY_PUBKEY is ignored; use PRODUCER_SIGNING_PUBKEY." in caplog.text

@@ -29,7 +29,7 @@ uv pip install pynacl bencodepy nano_lib_py
 
 ## Generating an Ed25519 Key Pair
 
-The producer needs an Ed25519 key pair. The **private key** (hex) is used to sign DHT mutable items. The **public key** (hex) is what mirrors use as `AUTHORITY_PUBKEY`.
+The producer needs an Ed25519 key pair. The **private key** (hex) is used to sign DHT mutable items. The **public key** (hex) is what mirrors use as `PRODUCER_SIGNING_PUBKEY`.
 
 Important: the BEP 46 / libtorrent keypair uses standard Ed25519 derivation. A Nano account address uses Nano's Ed25519-Blake2b derivation. Reusing the same 32-byte secret across both systems does not make the DHT public key numerically equal to the Nano account public key.
 
@@ -47,7 +47,7 @@ from nacl.signing import SigningKey
 secret = getpass.getpass('Enter 32-byte secret key hex: ').strip()
 sk = SigningKey(bytes.fromhex(secret))
 print(f'DHT_PRIVATE_KEY: {secret}')
-print(f'AUTHORITY_PUBKEY: {sk.verify_key.encode().hex()}')
+print(f'PRODUCER_SIGNING_PUBKEY: {sk.verify_key.encode().hex()}')
 "
 ```
 
@@ -61,14 +61,14 @@ cd /opt/nano-snapshot-swarm
 from nacl.signing import SigningKey
 sk = SigningKey.generate()
 print(f'Private key (DHT_PRIVATE_KEY): {sk.encode().hex()}')
-print(f'Public key  (AUTHORITY_PUBKEY):  {sk.verify_key.encode().hex()}')
+print(f'Public key  (PRODUCER_SIGNING_PUBKEY):  {sk.verify_key.encode().hex()}')
 "
 ```
 
 Sample output:
 ```
 Private key (DHT_PRIVATE_KEY): a06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d...
-Public key  (AUTHORITY_PUBKEY):  77ff84905a91936367c01360803104f92432fcd904a43511876df5cdf3e7e548...
+Public key  (PRODUCER_SIGNING_PUBKEY):  77ff84905a91936367c01360803104f92432fcd904a43511876df5cdf3e7e548...
 ```
 
 **Store the private key securely.** Never commit it, never log it, never share it. The public key is safe to share.
@@ -83,7 +83,7 @@ On the server, credentials are stored in `/home/openrai/.env` (mode 600, owned b
 
 ```
 DHT_PRIVATE_KEY=<your_64_char_hex_private_key>
-AUTHORITY_PUBKEY=<your_32_char_hex_public_key>
+# The seeder logs the derived PRODUCER_SIGNING_PUBKEY at startup. Copy that 64-character value into mirrors or a Status API for this producer; do not set it here.
 NANO_LEDGER_PATH=/var/nano/data/data.ldb
 OUTPUT_DIR=/opt/nano-snapshots
 ```
@@ -154,10 +154,10 @@ python -m producer.cli publish \
 
 And on a mirror following that separate stream:
 ```bash
-docker run --rm -e AUTHORITY_PUBKEY=<pubkey> -e DHT_SALT=weekly ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest --once
+docker run --rm -e PRODUCER_SIGNING_PUBKEY=<pubkey> -e DHT_SALT=weekly ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest --once
 ```
 
-For the default OpenRAI stream, the published mirror image already has the current producer public key baked in, so mirror and leech users do not need to set `AUTHORITY_PUBKEY`.
+For the default OpenRAI stream, the published mirror image already has the current producer public key baked in, so mirror and leech users do not need to set `PRODUCER_SIGNING_PUBKEY`.
 
 ---
 
@@ -227,7 +227,7 @@ fly volumes create status_data --size 1 --region sjc --app nano-snapshot-hub
 fly deploy
 ```
 
-The `fly.toml` and `Dockerfile` live directly in `status-api/` (the service root). The checked-in config already embeds the OpenRAI `AUTHORITY_PUBKEY`, so no env vars are needed at runtime.
+The `fly.toml` and `Dockerfile` live directly in `status-api/` (the service root). The checked-in config already embeds the OpenRAI `PRODUCER_SIGNING_PUBKEY`, so no env vars are needed at runtime.
 
 ### Producer Configuration
 
@@ -261,7 +261,7 @@ Expected Fly.io cost: **under $5/month** (mostly idle 256 MB VM + 1 GB volume).
 ## Security
 
 - **Never commit `DHT_PRIVATE_KEY`** to git. Use environment variables or a secrets manager.
-- The private key controls your snapshot stream. If compromised, rotate to a new key and update your `AUTHORITY_PUBKEY` in all mirrors.
+- The private key controls your snapshot stream. If compromised, rotate to a new key and update your `PRODUCER_SIGNING_PUBKEY` in all mirrors.
 - Logs contain your DHT public key and DHT target ID but **never** the private key.
 
 ---
