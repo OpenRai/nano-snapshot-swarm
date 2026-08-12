@@ -96,6 +96,7 @@ docker run --rm \
 | `DHT_PRIVATE_KEY` | — | **Yes** | Ed25519 private key (hex, 64 chars) |
 | `DHT_SALT` | `daily` | No | DHT salt namespace |
 | `SNAPSHOT_RETENTION` | `0` | No | Number of prior archive-plus-torrent pairs to retain and seed; `0` retains only the current snapshot |
+| `USE_PLACEHOLDER_SNAPSHOT` | `0` | No | Set to `1` to replace the upstream download with a fresh timestamped 128 MiB test payload while retaining the normal publication path |
 | `STATUS_API_URL` | _(empty)_ | No | URL used by the producer to push snapshot metadata (use `https://nano-snapshot-hub.fly.dev` unless Cloudflare permits `/api/push`; public dashboard: `https://nano-snapshots.openrai.org`) |
 
 ---

@@ -110,6 +110,42 @@ fi
 ./scripts/daily-snapshot.sh
 ```
 
+### Placeholder producer test mode
+
+Before launch, the complete producer-to-mirror update path can be tested without
+downloading the full upstream archive. Add this temporary setting to
+`/home/openrai/.env`:
+
+```
+USE_PLACEHOLDER_SNAPSHOT=1
+```
+
+Then trigger one normal user service run:
+
+```bash
+systemctl --user start nano-snapshot.service
+journalctl --user -u nano-snapshot -f
+```
+
+The pipeline creates a fresh timestamped `nano-ledger-snapshot-*.7z` payload of
+exactly 128 MiB, links it to the canonical `nano-ledger-snapshot.7z` name, and
+continues through torrent creation, signed DHT publication, seeder restart, and
+status push. The payload is intentionally not a valid 7z archive; this mode
+tests transfer, mutation, recheck, and seeding behavior.
+
+Remove the setting, or change it to `USE_PLACEHOLDER_SNAPSHOT=0`, immediately
+after testing so the hourly timer returns to downloading real snapshots.
+
+For the mirror acceptance test, run one mirror container in swarm mode with a
+short `POLL_INTERVAL`. Confirm that it finishes the first placeholder download
+and remains seeding. Trigger another producer service run, then verify without
+restarting the mirror that its logs show the higher DHT sequence, changed info
+hash, replacement, metadata recheck, resumed piece requests, and return to
+seeding. Also verify that the mirror process uptime is continuous and that
+`mirror_state.json` and `snapshot-meta.json` contain the new hash. A completed
+download alone does not prove peer-sourced bytes; inspect peer/source counters
+when recording P2P evidence.
+
 ### Individual steps (advanced)
 
 ```bash

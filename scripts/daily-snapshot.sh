@@ -6,6 +6,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
 UPSTREAM_SNAPSHOT_INDEX_URL="${UPSTREAM_SNAPSHOT_INDEX_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
 TORRENT_FORMAT_VERSION=3
 SNAPSHOT_RETENTION="${SNAPSHOT_RETENTION:-0}"
+USE_PLACEHOLDER_SNAPSHOT="${USE_PLACEHOLDER_SNAPSHOT:-0}"
 AGENT="nano-snapshot-swarm/1.0"
 
 log() {
@@ -20,6 +21,14 @@ if ! [[ "$SNAPSHOT_RETENTION" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
+case "$USE_PLACEHOLDER_SNAPSHOT" in
+    0|1) ;;
+    *)
+        log "ERROR: USE_PLACEHOLDER_SNAPSHOT must be 0 or 1"
+        exit 1
+        ;;
+esac
+
 # --- Lockfile: prevent concurrent script instances (Bug 7 fix) ---
 LOCKFILE="${OUTPUT_DIR}/.snapshot.lock"
 exec 9>"$LOCKFILE"
@@ -28,31 +37,39 @@ if ! flock -n 9; then
     exit 0
 fi
 
-# --- Step 1: Resolve latest snapshot URL from S3 listing ---
-log "Resolving latest snapshot URL"
+# --- Step 1: Resolve or create the latest snapshot ---
+if [[ "$USE_PLACEHOLDER_SNAPSHOT" == 1 ]]; then
+    log "USE_PLACEHOLDER_SNAPSHOT=1 — creating a local 128 MiB placeholder"
+    PLACEHOLDER_FILE=$(bash "$REPO_DIR/scripts/create-placeholder-snapshot.sh" "$WORK_DIR")
+    FILENAME=$(basename "$PLACEHOLDER_FILE")
+    TARGET_FILE="$PLACEHOLDER_FILE"
+    log "Created placeholder: ${FILENAME}"
+else
+    log "Resolving latest snapshot URL"
 
-# Bug 2+3 fix: use -f to fail on HTTP errors, capture exit code explicitly
-RAW_URL=""
-if ! RAW_URL=$(curl -sSfL -A "$AGENT" "$UPSTREAM_SNAPSHOT_INDEX_URL" | tr -d '"\r\n '); then
-    log "ERROR: Could not fetch latest snapshot URL from $UPSTREAM_SNAPSHOT_INDEX_URL (curl exit $?)"
-    exit 1
+    # Bug 2+3 fix: use -f to fail on HTTP errors, capture exit code explicitly
+    RAW_URL=""
+    if ! RAW_URL=$(curl -sSfL -A "$AGENT" "$UPSTREAM_SNAPSHOT_INDEX_URL" | tr -d '"\r\n '); then
+        log "ERROR: Could not fetch latest snapshot URL from $UPSTREAM_SNAPSHOT_INDEX_URL (curl exit $?)"
+        exit 1
+    fi
+    if [ -z "$RAW_URL" ]; then
+        log "ERROR: Empty response from $UPSTREAM_SNAPSHOT_INDEX_URL"
+        exit 1
+    fi
+
+    # S3 listing returns a full URL — extract just the filename
+    FILENAME=$(basename "$RAW_URL")
+    LATEST_URL="$RAW_URL"
+
+    # If the listing returned a relative path, construct full URL
+    if [[ "$LATEST_URL" != http* ]]; then
+        LATEST_URL="https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/${FILENAME}"
+    fi
+
+    log "Resolved: ${FILENAME}"
+    TARGET_FILE="${WORK_DIR}/${FILENAME}"
 fi
-if [ -z "$RAW_URL" ]; then
-    log "ERROR: Empty response from $UPSTREAM_SNAPSHOT_INDEX_URL"
-    exit 1
-fi
-
-# S3 listing returns a full URL — extract just the filename
-FILENAME=$(basename "$RAW_URL")
-LATEST_URL="$RAW_URL"
-
-# If the listing returned a relative path, construct full URL
-if [[ "$LATEST_URL" != http* ]]; then
-    LATEST_URL="https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/${FILENAME}"
-fi
-
-log "Resolved: ${FILENAME}"
-TARGET_FILE="${WORK_DIR}/${FILENAME}"
 
 # Stable name for torrenting (changing filenames = new info hash = no delta reuse)
 STABLE_NAME="nano-ledger-snapshot.7z"
