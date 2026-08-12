@@ -73,6 +73,7 @@ three intentionally different meanings:
 | `/api/torrents/{v2-infohash}/{torrent_name}.torrent` | The immutable torrent for one v2 hash | A client can cache it safely because the path names its content identity. |
 | `/api/torrent` | The current/latest compatibility entry point | Older clients can keep using one URL; the response redirects with `307` and `Cache-Control: no-store`. |
 | `/api/latest.magnet` | The current magnet as plain text | Scripts and operators can fetch the latest discovery information without parsing dashboard HTML. |
+| `/nano-snapshot-swarm.pubkey.txt` | The current authority Ed25519 public key as plain text | Mirrors and operators can fetch the verification key without copying it from the dashboard or repository. |
 
 The named route returns the canonical `Content-Disposition` filename
 `nano-ledger-snapshot.7z.torrent`. The latest route is deliberately not

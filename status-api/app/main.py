@@ -244,6 +244,16 @@ def get_latest_magnet() -> Response:
     )
 
 
+@app.get("/nano-snapshot-swarm.pubkey.txt")
+def get_public_key() -> Response:
+    """Serve the current snapshot authority public key as plain text."""
+    return Response(
+        content=f"{AUTHORITY_PUBKEY}\n",
+        media_type="text/plain",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @app.get("/")
 def index() -> Response:
     template_path = Path(__file__).parent / "templates" / "index.html"

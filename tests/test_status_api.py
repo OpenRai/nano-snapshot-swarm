@@ -241,6 +241,20 @@ class TestGetEndpoints:
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
+    def test_public_key_endpoint_returns_plain_text_key(self, client):
+        import app.main as main_module
+
+        original_pubkey = main_module.AUTHORITY_PUBKEY
+        main_module.AUTHORITY_PUBKEY = "ab" * 32
+        try:
+            resp = client.get("/nano-snapshot-swarm.pubkey.txt")
+            assert resp.status_code == 200
+            assert resp.headers["content-type"].startswith("text/plain")
+            assert resp.headers["cache-control"] == "public, max-age=3600"
+            assert resp.text == ("ab" * 32) + "\n"
+        finally:
+            main_module.AUTHORITY_PUBKEY = original_pubkey
+
     def test_health_ok_before_push(self, client):
         import app.main as main_module
 
@@ -308,3 +322,5 @@ class TestGetEndpoints:
         assert 'data-tab="compose"' in seed
         assert "./nano-data:/data" in seed
         assert "nano-data:/data" not in seed.replace("./nano-data:/data", "")
+        assert 'href="/nano-snapshot-swarm.pubkey.txt">an Ed25519 key</a>' in response.text
+        assert 'href="https://openrai.org/">The OpenRai Initiative</a>' in response.text
