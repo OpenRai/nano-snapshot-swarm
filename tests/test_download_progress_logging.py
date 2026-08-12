@@ -16,6 +16,13 @@ def test_initial_download_log_waits_thirty_seconds() -> None:
     assert state.observe("downloading", 0.01, 130.0)
 
 
+def test_recheck_to_download_starts_progress_logging() -> None:
+    state = DownloadProgressLogState()
+    assert not state.observe("checking_files", 0.5, 100.0)
+    assert not state.observe("downloading", 0.5, 100.0)
+    assert state.observe("downloading", 0.5, 130.0)
+
+
 def test_progress_increase_triggers_and_resets_baseline_and_timer() -> None:
     state = DownloadProgressLogState()
     begin_download(state)

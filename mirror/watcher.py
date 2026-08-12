@@ -539,6 +539,12 @@ class MirrorWatcher:
                             f"No peers, {status.progress * 100:.1f}% progress for 60s "
                             f"— download may be stalled"
                         )
+                        if self.seed_peers:
+                            logger.info(
+                                "Retrying configured seed-peer connection attempts; "
+                                "the previous requests did not produce a connected torrent peer"
+                            )
+                            self._connect_seed_peers(info_hash)
                         no_peer_seconds = 0
                 else:
                     no_peer_seconds = 0

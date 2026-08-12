@@ -14,7 +14,7 @@ class DownloadProgressLogState:
 
     def observe(self, state: str, progress: float, now: float) -> bool:
         if state != self.previous_state:
-            if self.previous_state == "downloading_metadata" and state == "downloading":
+            if state == "downloading":
                 self.phase_started_at = now
                 self.last_logged_at = None
                 self.last_logged_progress = progress

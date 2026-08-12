@@ -128,7 +128,7 @@ docker run --rm \
 1. Waits 30 seconds for DHT to bootstrap
 2. Queries DHT for the latest mutable item under the configured authority key and salt
 3. On success: adds the torrent, begins P2P download
-4. Tracks progress every 5 seconds
+4. Polls torrent status every 5 seconds and emits bounded progress logs while downloading
 5. On download complete: logs the `.7z` file path, exits `0` (or extracts it with `--extract`)
 6. On error: logs error, exits `1`
 

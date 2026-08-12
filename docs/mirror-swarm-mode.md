@@ -276,6 +276,14 @@ The mirror rejects such items and retries on the next poll cycle.
 
 DHT bootstrap can take 5–15 minutes on a cold start, especially behind NAT. The 30-second bootstrap wait is intentionally conservative. Mirror downloads are P2P-only.
 
+### "No peers"
+
+`Attempting connection to seed peer ...` means libtorrent queued an asynchronous
+connection request. It does not confirm a TCP connection or BitTorrent handshake.
+`No peers` is based on torrent status and means that no usable torrent peer has
+connected yet. The mirror retries configured seed-peer requests after each
+60-second no-peer warning. The seed peer must be reachable on TCP port 6881.
+
 ### Download appears stuck at 0%
 
 Check `num_peers: 0`. If the torrent has no reachable peers, the download cannot proceed. This can happen if:

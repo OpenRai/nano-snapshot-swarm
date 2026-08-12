@@ -25,6 +25,9 @@ class FakeSession:
     def resume_torrent(self, info_hash: str) -> None:
         self.calls.append(("resume", info_hash))
 
+    def connect_peer(self, info_hash: str, host: str, port: int) -> None:
+        self.calls.append(("connect", info_hash, host, port))
+
     def torrent_metadata(self, info_hash: str):
         return None
 
@@ -55,6 +58,23 @@ def test_replacement_waits_for_metadata_recheck_before_resuming(tmp_path) -> Non
     watcher._resume_after_recheck(target.info_hash, "downloading")
 
     assert session.calls[-2:] == [("recheck", "ef" * 32), ("resume", "ef" * 32)]
+
+
+def test_configured_seed_peer_attempt_is_forwarded(tmp_path) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    from mirror.watcher import MirrorWatcher
+
+    watcher = MirrorWatcher(
+        producer_signing_pubkey_hex="ab" * 32,
+        data_dir=str(tmp_path),
+        seed_peers=[("seed.example", 6881)],
+    )
+    session = FakeSession()
+    watcher.session = session
+
+    watcher._connect_seed_peers("cd" * 32)
+
+    assert session.calls == [("connect", "cd" * 32, "seed.example", 6881)]
 
 
 def test_old_authority_pubkey_environment_is_ignored(monkeypatch, caplog) -> None:
