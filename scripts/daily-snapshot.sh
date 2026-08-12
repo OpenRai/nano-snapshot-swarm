@@ -4,7 +4,8 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
 UPSTREAM_SNAPSHOT_INDEX_URL="${UPSTREAM_SNAPSHOT_INDEX_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
-TORRENT_FORMAT_VERSION=2
+TORRENT_FORMAT_VERSION=3
+SNAPSHOT_RETENTION="${SNAPSHOT_RETENTION:-0}"
 AGENT="nano-snapshot-swarm/1.0"
 
 log() {
@@ -13,6 +14,11 @@ log() {
 
 WORK_DIR="${OUTPUT_DIR}/tmp"
 mkdir -p "$WORK_DIR"
+
+if ! [[ "$SNAPSHOT_RETENTION" =~ ^[0-9]+$ ]]; then
+    log "ERROR: SNAPSHOT_RETENTION must be a non-negative integer"
+    exit 1
+fi
 
 # --- Lockfile: prevent concurrent script instances (Bug 7 fix) ---
 LOCKFILE="${OUTPUT_DIR}/.snapshot.lock"
@@ -48,24 +54,26 @@ fi
 log "Resolved: ${FILENAME}"
 TARGET_FILE="${WORK_DIR}/${FILENAME}"
 
+# Stable name for torrenting (changing filenames = new info hash = no delta reuse)
+STABLE_NAME="nano-ledger-snapshot.7z"
+STABLE_FILE="${OUTPUT_DIR}/${STABLE_NAME}"
+META_FILE="${OUTPUT_DIR}/snapshot-meta.json"
+CURRENT_STABLE_TARGET=$(readlink -f "$STABLE_FILE" 2>/dev/null || true)
+
 # --- Step 2: Clean up stale files ---
 # Bug 4 fix: also clean stale .partial and .aria2 files from old snapshots
 for STALE_FILE in "$WORK_DIR"/*.7z "$WORK_DIR"/*.7z.partial "$WORK_DIR"/*.7z.aria2; do
     [ -f "$STALE_FILE" ] || continue
     STALE_BASE=$(basename "$STALE_FILE")
     # Keep files matching the current snapshot
-    if [ "$STALE_BASE" != "$FILENAME" ] && \
+    if [ "$STALE_FILE" != "$CURRENT_STABLE_TARGET" ] && \
+       [ "$STALE_BASE" != "$FILENAME" ] && \
        [ "$STALE_BASE" != "${FILENAME}.partial" ] && \
        [ "$STALE_BASE" != "${FILENAME}.aria2" ]; then
         log "Removing stale file from different snapshot: $STALE_FILE"
         rm -f "$STALE_FILE"
     fi
 done
-
-# Stable name for torrenting (changing filenames = new info hash = no delta reuse)
-STABLE_NAME="nano-ledger-snapshot.7z"
-STABLE_FILE="${OUTPUT_DIR}/${STABLE_NAME}"
-META_FILE="${OUTPUT_DIR}/snapshot-meta.json"
 
 # Use .partial file for download, then atomically rename on success
 PARTIAL_FILE="${TARGET_FILE}.partial"
@@ -234,6 +242,16 @@ fi
 
 # --- Step 4: Symlink to stable name, compute provenance ---
 
+# Preserve the current canonical pair before repointing it to the new archive.
+if [ -f "$META_FILE" ] && [ -f "$STABLE_FILE" ] && [ -f "${STABLE_FILE}.torrent" ]; then
+    PREVIOUS_TORRENT=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('torrent_info_hash',''))" 2>/dev/null || true)
+    if [ -n "$PREVIOUS_TORRENT" ]; then
+        cd "$REPO_DIR"
+        source .venv/bin/activate
+        python -c "from producer.retention import retain_current_snapshot; retain_current_snapshot('$OUTPUT_DIR', '$PREVIOUS_TORRENT', $SNAPSHOT_RETENTION)"
+    fi
+fi
+
 # New snapshot — compute SHA-256 for provenance record
 log "Computing SHA-256 of ${FILENAME}"
 SHA256=$(sha256sum "$TARGET_FILE" | cut -d' ' -f1)
@@ -277,11 +295,13 @@ echo "$PUBLISH_OUTPUT"
 
 # Extract info hash and update metadata so future runs skip
 TORRENT_HASH=$(echo "$PUBLISH_OUTPUT" | grep -oP '(?<=Info-hash \(v2\): ).*' || true)
+TORRENT_HASH_V1=$(echo "$PUBLISH_OUTPUT" | grep -oP '(?<=Info-hash \(v1\): ).*' || true)
 if [ -n "$TORRENT_HASH" ]; then
     python3 -c "
 import json
 m = json.load(open('$META_FILE'))
 m['torrent_info_hash'] = '$TORRENT_HASH'
+m['torrent_info_hash_v1'] = '$TORRENT_HASH_V1'
 json.dump(m, open('$META_FILE', 'w'), indent=2)
 "
     log "Updated metadata with torrent hash: $TORRENT_HASH"

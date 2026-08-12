@@ -11,6 +11,8 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(PROJECT_ROOT))  # noqa: E402
 
+CANONICAL_SNAPSHOT_NAME = "nano-ledger-snapshot.7z"
+
 from producer.publish import DEFAULT_SALT, publish_to_dht  # noqa: E402
 from producer.torrent_create import create_torrent  # noqa: E402
 from producer.validation_fixture import (  # noqa: E402
@@ -44,6 +46,11 @@ def cmd_publish(args: argparse.Namespace) -> None:
     if not os.path.exists(snapshot_file):
         print(f"ERROR: Snapshot file not found: {snapshot_file}", file=sys.stderr)
         sys.exit(1)
+    if getattr(args, "require_canonical_name", True) and (
+        Path(snapshot_file).name != CANONICAL_SNAPSHOT_NAME
+    ):
+        print(f"ERROR: Snapshot file must be named {CANONICAL_SNAPSHOT_NAME}", file=sys.stderr)
+        sys.exit(1)
 
     print(f"Creating torrent for: {snapshot_file}")
 
@@ -60,7 +67,7 @@ def cmd_publish(args: argparse.Namespace) -> None:
         separators=(",", ":"),
     )
 
-    torrent_path, info_hash = create_torrent(
+    torrent_path, hashes = create_torrent(
         filepath=snapshot_file,
         piece_size=args.piece_size,
         output_path=snapshot_file + ".torrent",
@@ -68,11 +75,12 @@ def cmd_publish(args: argparse.Namespace) -> None:
         snapshot_meta=snapshot_meta_json,
     )
     print(f"Torrent created: {torrent_path}")
-    print(f"Info-hash (v2): {info_hash}")
+    print(f"Info-hash (v1): {hashes.v1}")
+    print(f"Info-hash (v2): {hashes.v2}")
 
     result = publish_to_dht(
         private_key_hex=private_key,
-        info_hash_hex=info_hash,
+        info_hash_hex=hashes.v2,
         piece_size=args.piece_size,
         state_path=args.state_file,
         dry_run=args.dry_run,

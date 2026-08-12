@@ -145,6 +145,12 @@ docker exec nano-mirror cat /data/mirror_state.json
 
 If `last_seq` is `0`, the mirror has never successfully discovered a snapshot.
 
+When a later v2 info-hash is discovered, the mirror keeps the canonical archive
+in place, adds the replacement paused, resolves its metadata, and force-rechecks
+the archive before it resumes piece requests. This lets normal BitTorrent piece
+checking reuse matching data across snapshots; it does not promise a measured
+daily compression-reuse rate.
+
 ### snapshot-meta.json
 
 This file is updated locally after DHT discovery and torrent metadata resolution, so mirrors and leechers can inspect the latest resolved snapshot details without scraping logs:

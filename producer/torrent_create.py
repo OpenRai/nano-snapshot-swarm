@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+from dataclasses import dataclass
 
 PUBLIC_TRACKERS = (
     "udp://tracker.opentrackr.org:1337/announce",
@@ -9,15 +10,10 @@ PUBLIC_TRACKERS = (
 )
 
 
-def _v2_flags(lt):
-    """Build v2-only + merkle flags, compatible with libtorrent 2.0.x and 2.1+."""
-    flags = lt.create_torrent_flags_t.v2_only
-    # 2.1+ renamed merkle → merkle_tree
-    if hasattr(lt.create_torrent_flags_t, "merkle_tree"):
-        flags |= lt.create_torrent_flags_t.merkle_tree
-    elif hasattr(lt.create_torrent_flags_t, "merkle"):
-        flags |= lt.create_torrent_flags_t.merkle
-    return flags
+@dataclass(frozen=True)
+class TorrentHashes:
+    v1: str
+    v2: str
 
 
 def create_torrent(
@@ -26,8 +22,8 @@ def create_torrent(
     output_path: str | None = None,
     comment: str | None = None,
     snapshot_meta: str | None = None,
-) -> tuple[str, str]:
-    """Create a v2 torrent for a single file.
+) -> tuple[str, TorrentHashes]:
+    """Create a hybrid v1+v2 torrent for a single file.
 
     Args:
         snapshot_meta: JSON string embedded as 'x-snapshot' in the info dict.
@@ -45,7 +41,7 @@ def create_torrent(
     fs = lt.file_storage()
     lt.add_files(fs, filepath)
 
-    ct = lt.create_torrent(fs, piece_size=piece_size, flags=_v2_flags(lt))
+    ct = lt.create_torrent(fs, piece_size=piece_size)
 
     for tracker in PUBLIC_TRACKERS:
         ct.add_tracker(tracker)
@@ -68,11 +64,10 @@ def create_torrent(
         f.write(torrent_data)
 
     info = lt.torrent_info(torrent_data)
-    info_hash_v2 = (
-        str(info.info_hashes().v2) if hasattr(info, "info_hashes") else str(info.info_hash())
-    )
+    hashes = info.info_hashes()
+    info_hashes = TorrentHashes(v1=str(hashes.v1), v2=str(hashes.v2))
 
-    return output_path, info_hash_v2
+    return output_path, info_hashes
 
 
 def create_torrent_from_directory(
@@ -80,7 +75,7 @@ def create_torrent_from_directory(
     filenames: list[str],
     piece_size: int = 32 * 1024 * 1024,
     output_path: str | None = None,
-) -> tuple[str, str]:
+) -> tuple[str, TorrentHashes]:
     import libtorrent as lt
 
     if output_path is None:
@@ -92,7 +87,7 @@ def create_torrent_from_directory(
         file_size = os.path.getsize(full_path)
         fs.add_file(fname, file_size)
 
-    ct = lt.create_torrent(fs, piece_size=piece_size, flags=_v2_flags(lt))
+    ct = lt.create_torrent(fs, piece_size=piece_size)
 
     for tracker in PUBLIC_TRACKERS:
         ct.add_tracker(tracker)
@@ -104,11 +99,10 @@ def create_torrent_from_directory(
         f.write(torrent_data)
 
     info = lt.torrent_info(torrent_data)
-    info_hash_v2 = (
-        str(info.info_hashes().v2) if hasattr(info, "info_hashes") else str(info.info_hash())
-    )
+    hashes = info.info_hashes()
+    info_hashes = TorrentHashes(v1=str(hashes.v1), v2=str(hashes.v2))
 
-    return output_path, info_hash_v2
+    return output_path, info_hashes
 
 
 def main() -> None:
@@ -119,9 +113,10 @@ def main() -> None:
     filepath = sys.argv[1]
     output_path = sys.argv[2] if len(sys.argv) > 2 else None
 
-    torrent_path, info_hash = create_torrent(filepath, output_path=output_path)
+    torrent_path, hashes = create_torrent(filepath, output_path=output_path)
     print(f"torrent={torrent_path}")
-    print(f"info_hash_v2={info_hash}")
+    print(f"info_hash_v1={hashes.v1}")
+    print(f"info_hash_v2={hashes.v2}")
 
 
 if __name__ == "__main__":

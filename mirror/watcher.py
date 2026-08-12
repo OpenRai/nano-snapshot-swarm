@@ -81,6 +81,9 @@ class MirrorWatcher:
         self._state_lock = threading.Lock()
         self._reconcile_event = threading.Event()
         self._last_discovery: Optional[DHTDiscoveryResult] = None
+        self._recheck_after_metadata: Optional[str] = None
+        self._recheck_started = False
+        self._recheck_checking_observed = False
 
     def start(self, *, once: bool = False) -> None:
         logger.info("=" * 60)
@@ -377,10 +380,19 @@ class MirrorWatcher:
                 self.session.ensure_torrent(
                     info_hash=target.info_hash,
                     save_path=self.data_dir,
+                    paused=decision.action == "replace",
                 )
-                self._connect_seed_peers(target.info_hash)
+                if decision.action != "replace":
+                    self._connect_seed_peers(target.info_hash)
                 self._active_info_hash = target.info_hash
                 self._active_started_at = time.time()
+
+                if decision.action == "replace":
+                    self._recheck_after_metadata = target.info_hash
+                    self._recheck_started = False
+                    self._recheck_checking_observed = False
+                    self.state.set_phase("metadata")
+                    logger.info("Replacement torrent paused until metadata recheck completes")
 
                 if decision.should_recheck:
                     logger.info("Force rechecking existing data...")
@@ -430,6 +442,29 @@ class MirrorWatcher:
         if parts:
             logger.info(f"Snapshot metadata: {', '.join(parts)}")
 
+    def _begin_recheck_after_metadata(self, info_hash: str) -> None:
+        if self._recheck_after_metadata != info_hash:
+            return
+        self.state.set_phase("checking")
+        logger.info("Replacement metadata resolved; force rechecking canonical archive...")
+        self.session.force_recheck(info_hash)
+        self._recheck_started = True
+
+    def _resume_after_recheck(self, info_hash: str, state: str) -> None:
+        if self._recheck_after_metadata != info_hash or not self._recheck_started:
+            return
+        if state == "checking_files":
+            self._recheck_checking_observed = True
+            return
+        if not self._recheck_checking_observed:
+            return
+        logger.info("Replacement recheck complete; resuming piece requests")
+        self.session.resume_torrent(info_hash)
+        self._connect_seed_peers(info_hash)
+        self._recheck_after_metadata = None
+        self._recheck_started = False
+        self._recheck_checking_observed = False
+
     def _monitor_active_torrent_loop(self) -> None:
         tracked_hash: Optional[str] = None
         progress_log = DownloadProgressLogState()
@@ -464,11 +499,14 @@ class MirrorWatcher:
                     if metadata:
                         metadata_logged = True
                         self._apply_metadata(metadata)
+                        self._begin_recheck_after_metadata(info_hash)
 
                 status = self.session.torrent_status(info_hash)
                 if status is None:
                     time.sleep(1)
                     continue
+
+                self._resume_after_recheck(info_hash, status.state)
 
                 should_log_progress = progress_log.observe(
                     status.state,

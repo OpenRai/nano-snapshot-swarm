@@ -26,6 +26,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 import libtorrent as lt  # noqa: E402
 
 from mirror.libtorrent_session import LibtorrentSession  # noqa: E402
+from producer.retention import retained_torrent_pairs  # noqa: E402
 from shared.bep46 import build_dht_value  # noqa: E402
 from shared.nano_identity import compute_bep46_target_id  # noqa: E402
 
@@ -146,6 +147,13 @@ def main() -> None:
         torrent_file=str(torrent_path),
     )
     logger.info("Torrent added, seeding...")
+    for archive_path, retained_torrent in retained_torrent_pairs(data_dir):
+        session.add_torrent(
+            info_hash="",
+            save_path=str(archive_path.parent),
+            torrent_file=str(retained_torrent),
+        )
+        logger.info("Retained torrent added for seeding: %s", retained_torrent)
 
     # Graceful shutdown on SIGTERM/SIGINT
     running = True

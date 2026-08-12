@@ -61,6 +61,7 @@ def push_status(
     piece_size: int,
     snapshot_file: str,
     torrent_file: str,
+    info_hash_v1: str | None = None,
 ) -> dict:
     torrent_bytes = Path(torrent_file).read_bytes()
     torrent_b64 = base64.b64encode(torrent_bytes).decode("ascii")
@@ -78,6 +79,8 @@ def push_status(
         "torrent_file_b64": torrent_b64,
         "signature": signature,
     }
+    if info_hash_v1:
+        payload["info_hash_v1"] = info_hash_v1
 
     listing = get_archive_listing(snapshot_file)
     if listing:
@@ -110,7 +113,7 @@ def main() -> int:
         print("ERROR: DHT_PRIVATE_KEY not set (env or --private-key)", file=sys.stderr)
         return 1
 
-    # Read publisher state for sequence and info_hash
+    # Read publisher state for sequence and v2 info_hash.
     state_path = Path(args.state_file)
     if state_path.exists():
         state = json.loads(state_path.read_text())
@@ -124,6 +127,11 @@ def main() -> int:
         print("ERROR: No info hash in state file", file=sys.stderr)
         return 1
 
+    info_hash_v1 = None
+    meta_path = Path(args.meta_file)
+    if meta_path.exists():
+        info_hash_v1 = json.loads(meta_path.read_text()).get("torrent_info_hash_v1") or None
+
     try:
         result = push_status(
             status_api_url=args.status_api_url,
@@ -134,6 +142,7 @@ def main() -> int:
             piece_size=args.piece_size,
             snapshot_file=args.snapshot_file,
             torrent_file=args.torrent_file,
+            info_hash_v1=info_hash_v1,
         )
         print(json.dumps(result, indent=2))
         return 0

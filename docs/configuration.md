@@ -95,6 +95,7 @@ docker run --rm \
 | `OUTPUT_DIR` | `.` | No | Output directory for `.7z`, `.torrent`, and metadata files |
 | `DHT_PRIVATE_KEY` | — | **Yes** | Ed25519 private key (hex, 64 chars) |
 | `DHT_SALT` | `daily` | No | DHT salt namespace |
+| `SNAPSHOT_RETENTION` | `0` | No | Number of prior archive-plus-torrent pairs to retain and seed; `0` retains only the current snapshot |
 | `STATUS_API_URL` | _(empty)_ | No | URL of the status API to push snapshot metadata (e.g. `https://nano-snapshots.openrai.org`) |
 
 ---
@@ -111,7 +112,7 @@ python -m producer.cli validation-fixture publish [flags]
 
 | Flag | Description |
 |---|---|
-| `--snapshot-file` | Path to the `.7z` archive to torrent (defaults to `OUTPUT_DIR/nano-ledger-snapshot.7z`) |
+| `--snapshot-file` | Path to the canonical `nano-ledger-snapshot.7z` archive (defaults to `OUTPUT_DIR/nano-ledger-snapshot.7z`) |
 | `--output-dir` | Output directory for auto-detecting the snapshot file |
 | `--private-key` | Ed25519 private key hex (overrides `DHT_PRIVATE_KEY`) |
 | `--piece-size` | Torrent piece size in bytes (default: 32 MiB) |
@@ -225,3 +226,6 @@ The status API optionally adds a direct peer hint to generated magnets when
 `bandwidth-martyr.openrai.org` with port `6881`; leave the host empty to omit
 the `x.pe` parameter. DHT bootstrap nodes listed above are client/DHT settings,
 not `tr=` tracker entries in the generated magnet.
+
+Published torrents are hybrid v1+v2. The signed DHT value remains the raw v2
+info-hash; the Status API uses the companion v1 hash only for hybrid magnets.

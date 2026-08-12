@@ -178,19 +178,24 @@ class LibtorrentSession:
         info_hash: str,
         save_path: Optional[str] = None,
         torrent_file: Optional[str] = None,
+        paused: bool = False,
     ) -> lt.torrent_handle:
         if self._session is None:
             raise RuntimeError("Session not started")
 
         save_path = save_path or self.data_dir
+        handle_key = info_hash
 
         if torrent_file:
             info = lt.torrent_info(torrent_file)
+            handle_key = str(info.info_hashes().v2)
             params = {
                 "ti": info,
                 "save_path": save_path,
             }
             flags = lt.torrent_flags.auto_managed
+            if paused:
+                flags |= lt.torrent_flags.paused
             if hasattr(lt.torrent_flags, "update_subscribe"):
                 flags |= lt.torrent_flags.update_subscribe
             params["flags"] = flags
@@ -206,12 +211,14 @@ class LibtorrentSession:
             params = lt.parse_magnet_uri(magnet_uri)
             params.save_path = save_path
             params.flags = lt.torrent_flags.auto_managed
+            if paused:
+                params.flags |= lt.torrent_flags.paused
             if hasattr(lt.torrent_flags, "update_subscribe"):
                 params.flags |= lt.torrent_flags.update_subscribe
             handle = self._session.add_torrent(params)
 
-        self._handles[info_hash] = handle
-        logger.info(f"Added torrent: {info_hash[:16]}...")
+        self._handles[handle_key] = handle
+        logger.info(f"Added torrent: {handle_key[:16]}...")
         return handle
 
     def remove_torrent(self, info_hash: str) -> None:
@@ -227,12 +234,14 @@ class LibtorrentSession:
         self,
         info_hash: str,
         save_path: Optional[str] = None,
+        paused: bool = False,
     ) -> None:
         if self.has_torrent(info_hash):
             return
         self.add_torrent(
             info_hash=info_hash,
             save_path=save_path,
+            paused=paused,
         )
 
     def pause_torrent(self, info_hash: str) -> None:

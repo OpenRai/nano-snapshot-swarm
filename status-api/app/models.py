@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class PushRequest(BaseModel):
     sequence: int
     info_hash: str
+    info_hash_v1: str | None = None
     torrent_name: str
     piece_size: int
     snapshot_size_bytes: int
@@ -18,6 +19,7 @@ class PushRequest(BaseModel):
 class StatusResponse(BaseModel):
     sequence: int
     info_hash: str
+    info_hash_v1: str | None = None
     torrent_name: str
     magnet: str
     torrent_download_url: str

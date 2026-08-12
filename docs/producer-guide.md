@@ -121,8 +121,8 @@ python -m producer.cli publish \
   --output-dir /opt/nano-snapshots
 ```
 
-Published torrents contain only BitTorrent metadata and the signed DHT reference;
-they do not contain an HTTP download URL.
+Published torrents are hybrid v1+v2 and contain only BitTorrent metadata and the
+signed raw-v2 DHT reference; they do not contain an HTTP download URL or webseed.
 
 Expected publish output:
 ```
@@ -170,7 +170,7 @@ Snapshots run automatically via a **user-level** systemd timer on the producer s
 
 **Credentials:** The service reads `/home/openrai/.env` (EnvironmentFile), so keys are never in the unit file itself.
 
-**Pipeline steps:** The timer invokes `/opt/nano-snapshot-swarm/scripts/daily-snapshot.sh`, which retrieves the latest upstream `.7z` archive, validates it, writes local publisher metadata, and publishes the torrent info-hash to DHT. The upstream URL is not distributed to mirrors or embedded in the torrent.
+**Pipeline steps:** The timer invokes `/opt/nano-snapshot-swarm/scripts/daily-snapshot.sh`, which retrieves the latest upstream `.7z` archive, validates it, writes local publisher metadata, and publishes the torrent v2 info-hash to DHT. The upstream URL is not distributed to mirrors or embedded in the torrent. Set `SNAPSHOT_RETENTION=N` to retain and seed the last `N` prior canonical archive-plus-torrent pairs; the default `0` keeps only the current snapshot.
 
 ```bash
 # Check timer status
@@ -200,7 +200,9 @@ The **Status API** is a lightweight Fly.io service that makes your snapshot stre
 ```
 Producer ──HTTPS signed push──► Fly.io: nano-snapshot-hub
                                      ├── GET /api/status   (JSON)
-                                     ├── GET /api/torrent  (.torrent file)
+                                     ├── GET /api/torrent  (latest redirect)
+                                     ├── GET /api/torrents/{v2}/{name}.torrent
+                                     ├── GET /api/latest.magnet
                                      ├── GET /             (SSR dashboard)
                                      └── /data volume      (persistent)
                                           ▼

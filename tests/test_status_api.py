@@ -27,6 +27,7 @@ def isolated_status_api_state(tmp_path, monkeypatch):
     monkeypatch.setattr(main_module, "DATA_DIR", data_dir)
     monkeypatch.setattr(main_module, "STATUS_FILE", data_dir / "status.json")
     monkeypatch.setattr(main_module, "TORRENT_FILE", data_dir / "torrent.bin")
+    monkeypatch.setattr(main_module, "TORRENTS_DIR", data_dir / "torrents")
     main_module._current_status = None
     main_module._torrent_bytes = b""
     yield
@@ -55,6 +56,7 @@ def sample_push_payload():
     return {
         "sequence": sequence,
         "info_hash": info_hash,
+        "info_hash_v1": "cd" * 20,
         "torrent_name": "nano-ledger-snapshot.7z",
         "piece_size": 33554432,
         "snapshot_size_bytes": 64320000000,
@@ -87,6 +89,19 @@ class TestPush:
         payload["signature"] = "00" * 64
         resp = client.post("/api/push", json=payload)
         assert resp.status_code == 401
+
+    def test_push_rejects_noncanonical_torrent_name(self, client, sample_push_payload):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        original_pubkey = main_module.AUTHORITY_PUBKEY
+        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        try:
+            payload["torrent_name"] = "upstream-snapshot.7z"
+            resp = client.post("/api/push", json=payload)
+            assert resp.status_code == 422
+        finally:
+            main_module.AUTHORITY_PUBKEY = original_pubkey
 
     def test_push_replay_rejected(self, client, sample_push_payload):
         payload, pubkey_hex = sample_push_payload
@@ -145,6 +160,7 @@ class TestGetEndpoints:
             data = resp.json()
             assert data["sequence"] == 42
             assert data["info_hash"] == payload["info_hash"]
+            assert data["info_hash_v1"] == payload["info_hash_v1"]
             assert data["verified"] is True
             assert "magnet" in data
         finally:
@@ -165,6 +181,8 @@ class TestGetEndpoints:
         try:
             client.post("/api/push", json=payload)
             magnet = client.get("/api/status").json()["magnet"]
+            assert f"xt=urn:btih:{payload['info_hash_v1']}" in magnet
+            assert f"xt=urn:btmh:1220{payload['info_hash']}" in magnet
             assert "x.pe=bandwidth-martyr.openrai.org%3A6881" in magnet
             assert "tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce" in magnet
             assert "tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce" in magnet
@@ -175,7 +193,7 @@ class TestGetEndpoints:
             main_module._current_status = None
             main_module._torrent_bytes = b""
 
-    def test_torrent_content_type(self, client, sample_push_payload):
+    def test_torrent_redirects_to_named_immutable_content(self, client, sample_push_payload):
         payload, pubkey_hex = sample_push_payload
         import app.main as main_module
 
@@ -183,10 +201,41 @@ class TestGetEndpoints:
         main_module.AUTHORITY_PUBKEY = pubkey_hex
         try:
             client.post("/api/push", json=payload)
-            resp = client.get("/api/torrent")
+            redirect = client.get("/api/torrent", follow_redirects=False)
+            expected_path = (
+                f"/api/torrents/{payload['info_hash']}/{payload['torrent_name']}.torrent"
+            )
+            assert redirect.status_code == 307
+            assert redirect.headers["cache-control"] == "no-store"
+            assert redirect.headers["location"].startswith(expected_path)
+
+            resp = client.get(redirect.headers["location"])
             assert resp.status_code == 200
             assert resp.headers["content-type"] == "application/x-bittorrent"
+            assert resp.headers["content-disposition"] == (
+                'attachment; filename="nano-ledger-snapshot.7z.torrent"'
+            )
+            assert resp.headers["cache-control"] == "public, max-age=31536000, immutable"
             assert resp.content == b"fake-torrent-data"
+        finally:
+            main_module.AUTHORITY_PUBKEY = original_pubkey
+            main_module._current_status = None
+            main_module._torrent_bytes = b""
+
+    def test_latest_magnet_is_raw_non_cacheable_text(self, client, sample_push_payload):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        original_pubkey = main_module.AUTHORITY_PUBKEY
+        main_module.AUTHORITY_PUBKEY = pubkey_hex
+        try:
+            client.post("/api/push", json=payload)
+            resp = client.get("/api/latest.magnet")
+            assert resp.status_code == 200
+            assert resp.headers["content-type"].startswith("text/plain")
+            assert resp.headers["cache-control"] == "no-store"
+            assert resp.text.startswith("magnet:?")
+            assert "ws=" not in resp.text
         finally:
             main_module.AUTHORITY_PUBKEY = original_pubkey
             main_module._current_status = None

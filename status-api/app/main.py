@@ -3,11 +3,13 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
@@ -17,6 +19,7 @@ from app.models import PushRequest
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 STATUS_FILE = DATA_DIR / "status.json"
 TORRENT_FILE = DATA_DIR / "torrent.bin"
+TORRENTS_DIR = DATA_DIR / "torrents"
 AUTHORITY_PUBKEY = os.environ.get(
     "AUTHORITY_PUBKEY",
     "cdbc9284015e84c225f0e67b891606505a60cf1218b127ac1c1edb6444567e6b",
@@ -28,6 +31,7 @@ MAGNET_TRACKERS = (
     "udp://tracker.opentrackr.org:1337/announce",
     "udp://tracker.torrent.eu.org:451/announce",
 )
+CANONICAL_TORRENT_NAME = "nano-ledger-snapshot.7z"
 
 app = FastAPI(title="Nano Snapshot Status API")
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -35,6 +39,15 @@ app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), na
 # Store current state in memory (reloaded from disk on startup)
 _current_status: dict | None = None
 _torrent_bytes: bytes = b""
+
+
+def _named_torrent_path(info_hash: str, torrent_name: str) -> Path:
+    if not re.fullmatch(r"[0-9a-f]{64}", info_hash):
+        raise HTTPException(status_code=404, detail="Torrent not found")
+    if torrent_name != Path(torrent_name).name:
+        raise HTTPException(status_code=404, detail="Torrent not found")
+    return TORRENTS_DIR / info_hash / f"{torrent_name}.torrent"
+
 
 def _load_state() -> None:
     global _current_status, _torrent_bytes
@@ -52,6 +65,12 @@ def _load_state() -> None:
             _torrent_bytes = b""
     else:
         _torrent_bytes = b""
+    if _current_status and _torrent_bytes:
+        named_path = _named_torrent_path(
+            _current_status["info_hash"], _current_status["torrent_name"]
+        )
+        if not named_path.exists():
+            _save_state(_current_status, _torrent_bytes)
 
 
 def _save_state(status: dict, torrent_bytes: bytes) -> None:
@@ -68,15 +87,24 @@ def _save_state(status: dict, torrent_bytes: bytes) -> None:
         f.flush()
         os.fsync(f.fileno())
     os.rename(f.name, TORRENT_FILE)
+    named_path = _named_torrent_path(status["info_hash"], status["torrent_name"])
+    named_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        mode="wb", dir=named_path.parent, suffix=".tmp", delete=False
+    ) as f:
+        f.write(torrent_bytes)
+        f.flush()
+        os.fsync(f.fileno())
+    os.rename(f.name, named_path)
 
 
-def _build_magnet(info_hash: str, torrent_name: str) -> str:
-    from urllib.parse import quote
-
+def _build_magnet(info_hash: str, torrent_name: str, info_hash_v1: str | None = None) -> str:
     params = [
-        f"xt=urn:btmh:1220{info_hash}",
         f"dn={quote(torrent_name)}",
     ]
+    if info_hash_v1:
+        params.insert(0, f"xt=urn:btih:{info_hash_v1}")
+    params.insert(1 if info_hash_v1 else 0, f"xt=urn:btmh:1220{info_hash}")
     for tracker in MAGNET_TRACKERS:
         params.append(f"tr={quote(tracker, safe='')}")
     if MAGNET_PEER_HOST:
@@ -106,6 +134,8 @@ def push(payload: PushRequest) -> JSONResponse:
 
     if not verify_push(payload, AUTHORITY_PUBKEY):
         raise HTTPException(status_code=401, detail="Invalid signature")
+    if payload.torrent_name != CANONICAL_TORRENT_NAME:
+        raise HTTPException(status_code=422, detail="Unexpected torrent name")
 
     current_seq = _current_status.get("sequence", 0) if _current_status else 0
     if payload.sequence < current_seq:
@@ -114,14 +144,18 @@ def push(payload: PushRequest) -> JSONResponse:
         )
 
     torrent_bytes = base64.b64decode(payload.torrent_file_b64)
-    magnet = _build_magnet(payload.info_hash, payload.torrent_name)
+    magnet = _build_magnet(payload.info_hash, payload.torrent_name, payload.info_hash_v1)
 
     status = {
         "sequence": payload.sequence,
         "info_hash": payload.info_hash,
+        "info_hash_v1": payload.info_hash_v1,
         "torrent_name": payload.torrent_name,
         "magnet": magnet,
         "torrent_download_url": "/api/torrent",
+        "named_torrent_download_url": (
+            f"/api/torrents/{payload.info_hash}/{quote(payload.torrent_name)}.torrent"
+        ),
         "snapshot_size_bytes": payload.snapshot_size_bytes,
         "piece_size": payload.piece_size,
         "authority_pubkey": AUTHORITY_PUBKEY,
@@ -179,14 +213,34 @@ def get_status_fragment() -> Response:
 
 @app.get("/api/torrent")
 def get_torrent() -> Response:
-    if not _torrent_bytes:
+    if _current_status is None or not _torrent_bytes:
         raise HTTPException(status_code=404, detail="No torrent available yet")
+    url = _current_status["named_torrent_download_url"] + f"?v={_current_status['info_hash']}"
+    return RedirectResponse(url=url, status_code=307, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/torrents/{info_hash}/{torrent_name}.torrent")
+def get_named_torrent(info_hash: str, torrent_name: str) -> Response:
+    torrent_path = _named_torrent_path(info_hash, torrent_name)
+    if not torrent_path.exists():
+        raise HTTPException(status_code=404, detail="Torrent not found")
     headers = {
         "Content-Type": "application/x-bittorrent",
-        "Content-Disposition": 'attachment; filename="nano-ledger-snapshot.7z.torrent"',
-        "Cache-Control": "public, max-age=3600, immutable",
+        "Content-Disposition": f'attachment; filename="{torrent_name}.torrent"',
+        "Cache-Control": "public, max-age=31536000, immutable",
     }
-    return Response(content=_torrent_bytes, headers=headers)
+    return Response(content=torrent_path.read_bytes(), headers=headers)
+
+
+@app.get("/api/latest.magnet")
+def get_latest_magnet() -> Response:
+    if _current_status is None:
+        raise HTTPException(status_code=404, detail="No status available yet")
+    return Response(
+        content=_current_status["magnet"],
+        media_type="text/plain",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/")

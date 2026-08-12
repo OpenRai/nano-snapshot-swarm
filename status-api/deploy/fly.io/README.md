@@ -50,7 +50,7 @@ fly apps create nano-snapshot-hub
 
 ### 3.2 Create the Persistent Volume
 
-The API stores `status.json` and `torrent.bin` on a Fly volume so state survives redeploys.
+The API stores `status.json`, `torrent.bin`, and immutable named torrent files on a Fly volume so state survives redeploys.
 
 ```bash
 fly volumes create status_data --size 1 --region sjc --app nano-snapshot-hub
@@ -86,7 +86,7 @@ fly logs --app nano-snapshot-hub
 curl https://nano-snapshot.ninzin.net/health
 ```
 
-Initially, `GET /api/status` and `GET /api/torrent` will return `404` until the Producer pushes the first snapshot.
+Initially, `GET /api/status`, `GET /api/torrent`, and `GET /api/latest.magnet` return `404` until the Producer pushes the first snapshot.
 
 ---
 
@@ -102,7 +102,8 @@ The canonical public URL is `https://nano-snapshot.ninzin.net`, fronted by Cloud
    - **TXT** `_fly-ownership.nano-snapshot` → `app-0pd61ql` (DNS only)
 3. In Cloudflare SSL/TLS: set mode to **Full (strict)**
 4. Optionally add Cloudflare Cache Rules:
-   - `nano-snapshot.ninzin.net/api/torrent` → **Cache Level: Cache Everything**, **Edge TTL: 1 hour**
+   - `nano-snapshot.ninzin.net/api/torrent` and `/api/latest.magnet` → **Cache Level: Bypass**
+   - `nano-snapshot.ninzin.net/api/torrents/*` → **Cache Level: Cache Everything**, **Edge TTL: 1 year**
    - `nano-snapshot.ninzin.net/api/status*` → **Cache Level: Cache Everything**, **Edge TTL: 5–10 minutes**
    - `nano-snapshot.ninzin.net/api/push` → **Cache Level: Bypass**
 
