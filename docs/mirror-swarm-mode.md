@@ -73,7 +73,7 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 
 | Log | Meaning |
 |---|---|
-| `Producer signing public key: <hex>...` | The configured key that verifies the producer's signed DHT records |
+| `Producer signing public key (PRODUCER_SIGNING_PUBKEY): <full hex>` | The complete, copyable key that verifies the producer's signed DHT records |
 | `Mode: SWARM (continuous polling every Ns)` | Running as long-lived daemon |
 | `libtorrent session started, listening on port 6881` | BitTorrent engine ready |
 
@@ -82,9 +82,9 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 | Log | Meaning |
 |---|---|
 | `DHT get_mutable_item requested` | Querying DHT for latest snapshot |
-| `Discovered DHT item: seq=N` | Found a published snapshot |
-| `Discovery seq N <= stored seq N; no update needed` | Already have the latest, nothing to do |
-| `New snapshot detected! seq=N` | Newer snapshot found, will download |
+| `Discovered DHT mutable item: sequence=N, torrent v2 info hash=<short hash>` | Found a published snapshot |
+| `DHT mutable-item sequence N <= stored sequence N; no update needed` | Already have the latest, nothing to do |
+| `New snapshot detected: DHT mutable-item sequence=N` | Newer snapshot found, will download |
 | `No snapshot discovered from DHT` | DHT query returned nothing (item expired or not yet published) |
 
 **Download (only when new snapshot found):**
@@ -94,12 +94,16 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 | `Force recheck on existing data...` | Hashing local file to find reusable pieces |
 | `State transition: downloading → checking_files` | Mirror phase changed |
 | `Download: 45.2% \| State: downloading \| DL: 1234.5 KB/s \| Peers: 3` | Active transfer with progress |
-| `Snapshot seeding complete` | Download finished, now seeding to others |
+| `Snapshot download complete; now seeding torrent v2 info hash=<short hash>` | Download finished, now seeding to others |
 | `Download: 0.0% ... Peers: 0` | No reachable peers — check connectivity |
 
 **Seeding (steady state):**
 
-Once download completes, the mirror quietly seeds. There are no periodic seeding logs by default. Use `LOG_LEVEL=DEBUG` for verbose output.
+Once download completes, the mirror reports compact seeding statistics every five minutes.
+
+Signing public keys are printed in full because operators may need to copy and compare
+them. Internal torrent info hashes and DHT target IDs are identified by type and shortened
+to their first 16 hexadecimal characters in routine logs.
 
 **Shutdown:**
 
@@ -142,6 +146,11 @@ docker exec nano-mirror cat /data/mirror_state.json
 | `current_torrent_name` | Filename of the snapshot on disk |
 | `phase` | Current mirror lifecycle phase |
 | `last_error` | Last persisted error, if any |
+
+`last_seq` is the DHT mutable-item sequence. It is distinct from the producer's
+local dashboard publication sequence. The producer signing public key is a
+copyable trust anchor and is logged in full; internal torrent info hashes and
+DHT target IDs are shortened in routine logs.
 
 If `last_seq` is `0`, the mirror has never successfully discovered a snapshot.
 

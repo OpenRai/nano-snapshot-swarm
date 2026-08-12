@@ -364,10 +364,45 @@ PY
     log "Updated metadata with torrent hash: $TORRENT_HASH"
 fi
 
-# --- Step 6: Restart seeder to pick up new torrent ---
+# --- Step 6: Ask the long-lived seeder to reload the new torrent ---
+# SIGHUP preserves the producer's libtorrent/DHT session and retained swarms.
+# A fully stopped seeder is started normally, which exercises restart recovery.
 if systemctl --user is-enabled nano-seed.service &>/dev/null; then
-    log "Restarting nano-seed.service to seed updated snapshot"
-    systemctl --user restart nano-seed.service
+    if systemctl --user is-active nano-seed.service &>/dev/null; then
+        log "Requesting nano-seed.service to reload the updated torrent"
+        systemctl --user kill --signal=HUP nano-seed.service
+    else
+        log "Starting nano-seed.service to seed updated snapshot"
+        systemctl --user start nano-seed.service
+    fi
+
+    SEEDER_STATS_FILE="${OUTPUT_DIR}/seeder-stats.json"
+    SEEDER_READY=0
+    for _ in $(seq 1 180); do
+        if [ -f "$SEEDER_STATS_FILE" ] && python3 - "$SEEDER_STATS_FILE" "$TORRENT_HASH" <<'PY'
+import json
+import sys
+
+try:
+    status = json.loads(open(sys.argv[1]).read())
+except (OSError, json.JSONDecodeError):
+    raise SystemExit(1)
+
+if status.get("torrent_info_hash") == sys.argv[2] and status.get("dht_verified") is True:
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+        then
+            SEEDER_READY=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$SEEDER_READY" -ne 1 ]; then
+        log "ERROR: Seeder did not verify the published torrent within 180s"
+        exit 1
+    fi
+    log "Seeder verified current torrent and DHT publication"
 fi
 
 # --- Step 7: Push status to API ---

@@ -37,7 +37,9 @@ def discover_latest_snapshot(
     target_id = compute_bep46_target_id(pub_key_bytes, salt)
 
     logger.info(
-        f"Querying DHT for mutable item (target: {target_id.hex()[:16]}..., salt: '{salt}')"
+        "Querying DHT mutable item: target ID (SHA-1)=%s..., salt=%r",
+        target_id.hex()[:16],
+        salt,
     )
 
     for attempt in range(MAX_RETRIES):
@@ -55,7 +57,7 @@ def discover_latest_snapshot(
                 if result.sequence >= min_sequence:
                     return result
                 logger.warning(
-                    "Ignoring stale DHT item: seq=%d is below stored seq=%d; "
+                    "Ignoring stale DHT item: sequence=%d is below stored sequence=%d; "
                     "querying again",
                     result.sequence,
                     min_sequence,
@@ -82,7 +84,9 @@ def _process_mutable_item_snapshot(
         item = snap.extra.get("item")
 
         if seq == 0 and item is None:
-            logger.info("DHT item not found (seq=0, empty entry) — item may have expired")
+            logger.info(
+                "DHT mutable item not found (sequence=0, empty entry) — item may have expired"
+            )
             return None
 
         # Convert item to bytes — libtorrent returns an entry object.
@@ -151,8 +155,11 @@ def _process_mutable_item_snapshot(
             return None
 
         logger.info(
-            f"Discovered DHT item: seq={seq}, info_hash={info_hash_hex[:16]}..., "
-            f"verified={verified}"
+            "Discovered DHT mutable item: sequence=%s, torrent v2 info hash=%s..., "
+            "signature verified=%s",
+            seq,
+            info_hash_hex[:16],
+            verified,
         )
 
         return DHTDiscoveryResult(

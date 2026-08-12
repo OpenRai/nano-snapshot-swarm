@@ -68,7 +68,8 @@ class MirrorState:
                 self.phase = data.get("phase", "starting")
                 self.last_error = data.get("last_error", "")
                 logger.info(
-                    "Loaded state: seq=%s, hash=%s..., phase=%s",
+                    "Loaded state: DHT mutable-item sequence=%s, "
+                    "torrent v2 info hash=%s..., phase=%s",
                     self.last_seq,
                     self.last_info_hash[:16],
                     self.phase,
@@ -95,7 +96,11 @@ class MirrorState:
         if torrent_name is not None:
             self.current_torrent_name = torrent_name
         self._save()
-        logger.info(f"State updated: seq={seq}, hash={info_hash[:16]}...")
+        logger.info(
+            "State updated: DHT mutable-item sequence=%s, torrent v2 info hash=%s...",
+            seq,
+            info_hash[:16],
+        )
 
     def set_phase(self, phase: str, last_error: str = "") -> None:
         self.phase = phase

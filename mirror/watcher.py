@@ -98,7 +98,10 @@ class MirrorWatcher:
         self._once_mode = once
         logger.info("=" * 60)
         logger.info("Nano P2P Mirror Service Starting")
-        logger.info("Producer signing public key: %s", self.producer_signing_pubkey_hex)
+        logger.info(
+            "Producer signing public key (PRODUCER_SIGNING_PUBKEY): %s",
+            self.producer_signing_pubkey_hex,
+        )
         logger.info(f"Data directory: {self.data_dir}")
         logger.info(f"DHT salt: '{self.salt}'")
         if once:
@@ -192,7 +195,10 @@ class MirrorWatcher:
             sys.exit(1)
 
         logger.info(
-            f"Leecher: discovered seq={result.sequence}, info_hash={result.info_hash_hex[:16]}..."
+            "Leecher discovered snapshot: DHT mutable-item sequence=%s, "
+            "torrent v2 info hash=%s...",
+            result.sequence,
+            result.info_hash_hex[:16],
         )
         self._set_desired_snapshot(result)
         self._ensure_monitor_thread()
@@ -318,7 +324,7 @@ class MirrorWatcher:
         with self._state_lock:
             if result.sequence < self.state.last_seq:
                 logger.warning(
-                    "Ignoring stale DHT item: seq=%d is below stored seq=%d",
+                    "Ignoring stale DHT item: sequence=%d is below stored sequence=%d",
                     result.sequence,
                     self.state.last_seq,
                 )
@@ -329,15 +335,19 @@ class MirrorWatcher:
                 and result.sequence <= self.state.last_seq
             ):
                 logger.info(
-                    f"Discovery seq {result.sequence} <= stored seq "
-                    f"{self.state.last_seq}; no update needed"
+                    "DHT mutable-item sequence %s <= stored sequence %s; no update needed",
+                    result.sequence,
+                    self.state.last_seq,
                 )
                 return
 
             if result.sequence > self.state.last_seq:
                 logger.info(
-                    f"New snapshot detected! seq={result.sequence}, "
-                    f"info_hash={result.info_hash_hex[:16]}... (was seq={self.state.last_seq})"
+                    "New snapshot detected: DHT mutable-item sequence=%s "
+                    "(was %s), torrent v2 info hash=%s...",
+                    result.sequence,
+                    self.state.last_seq,
+                    result.info_hash_hex[:16],
                 )
 
             self._desired_snapshot = DesiredSnapshot(
@@ -389,7 +399,8 @@ class MirrorWatcher:
                 if decision.should_recheck:
                     self.state.set_phase("resuming")
                     logger.info(
-                        f"Resuming torrent from previous session: {target.info_hash[:16]}..."
+                        "Resuming torrent from previous session: v2 info hash=%s...",
+                        target.info_hash[:16],
                     )
                 else:
                     self.state.set_phase("metadata")
@@ -425,7 +436,8 @@ class MirrorWatcher:
                 f"Failed to activate torrent for {target.info_hash[:16]}...",
             )
             logger.exception(
-                f"Failed to activate torrent for info_hash {target.info_hash[:16]}..."
+                "Failed to activate torrent with v2 info hash %s...",
+                target.info_hash[:16],
             )
             self._stop_reason = DownloadStatus.ERROR
             self._running = False
@@ -630,7 +642,8 @@ class MirrorWatcher:
             self.state.set_phase("seeding")
             if status.state != last_state:
                 logger.info(
-                    f"Snapshot download complete; now seeding: {info_hash[:16]}..."
+                    "Snapshot download complete; now seeding torrent v2 info hash=%s...",
+                    info_hash[:16],
                 )
 
         if status.num_peers == 0 and no_peer_seconds >= 60:

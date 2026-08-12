@@ -16,6 +16,7 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -23,9 +24,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import libtorrent as lt  # noqa: E402
-
 from mirror.libtorrent_session import LibtorrentSession  # noqa: E402
+from producer.publish import _wait_for_verified_snapshot  # noqa: E402
 from producer.retention import retained_torrent_pairs  # noqa: E402
 from shared.bep46 import build_dht_value  # noqa: E402
 from shared.nano_identity import compute_bep46_target_id  # noqa: E402
@@ -83,21 +83,110 @@ def _load_info_hash(data_dir: str) -> str | None:
 
 
 def _dht_publish(
-    lt_session: lt.session,
+    session: LibtorrentSession,
     privkey_64: bytes,
     pubkey_32: bytes,
     info_hash_hex: str,
     salt: str,
-) -> None:
-    """Publish info hash to DHT via BEP 46 mutable item."""
+) -> dict[str, int | None]:
+    """Publish and read back the exact info hash on the live DHT session."""
     value_bytes = build_dht_value(info_hash_hex)
-    salt_bytes = salt.encode("utf-8")
-    lt_session.dht_put_mutable_item(privkey_64, pubkey_32, value_bytes, salt_bytes)
     target = compute_bep46_target_id(pubkey_32, salt)
-    logger.info(
-        f"DHT publish: info_hash={info_hash_hex[:16]}... "
-        f"target={target.hex()[:16]}... salt='{salt}'"
+    last_error = "unknown publication error"
+    for attempt in range(1, 4):
+        session.publish_dht_mutable_item(privkey_64, pubkey_32, value_bytes, salt)
+        put_alert = session.wait_for_dht_put(timeout=60, salt=salt)
+        dht_sequence = None
+        acknowledgements = None
+        if put_alert is not None:
+            dht_sequence = int(put_alert.extra.get("seq", 0))
+            acknowledgements = put_alert.extra.get("num_success")
+            logger.info(
+                "DHT mutable-item put completed: sequence=%s, "
+                "direct acknowledgements=%s",
+                dht_sequence,
+                acknowledgements,
+            )
+        else:
+            last_error = "no dht_put_alert"
+            logger.warning("DHT mutable-item put produced no completion alert")
+
+        verified = _wait_for_verified_snapshot(
+            session,
+            pubkey_32,
+            info_hash_hex,
+            salt,
+            timeout=120,
+        )
+        if verified is not None:
+            verified_sequence, _ = verified
+            logger.info(
+                "DHT mutable item verified: sequence=%s, "
+                "torrent v2 info hash=%s...",
+                verified_sequence,
+                info_hash_hex[:16],
+            )
+            return {
+                "sequence": verified_sequence,
+                "direct_acknowledgements": acknowledgements,
+            }
+        last_error = "read-back did not contain the exact signed snapshot"
+        if attempt < 3:
+            logger.warning(
+                "DHT mutable-item read-back did not verify; retrying attempt %s/3",
+                attempt + 1,
+            )
+            time.sleep(5)
+
+    raise RuntimeError(
+        f"DHT publication was not verified for torrent v2 info hash "
+        f"{info_hash_hex[:16]}... (target ID (SHA-1)={target.hex()[:16]}..., {last_error})"
     )
+
+
+def _load_current_torrent(
+    session: LibtorrentSession,
+    data_dir: str,
+    current_info_hash: str | None,
+) -> tuple[str, object, int]:
+    """Load the canonical torrent while moving the previous one to retention."""
+    data_path = Path(data_dir)
+    torrent_path = data_path / f"{SNAPSHOT_NAME}.torrent"
+    snapshot_path = data_path / SNAPSHOT_NAME
+    info_hash = _load_info_hash(data_dir)
+    if not info_hash:
+        raise RuntimeError("snapshot-meta.json has no torrent v2 info hash")
+    if not snapshot_path.exists() or not torrent_path.exists():
+        raise RuntimeError("canonical snapshot or torrent is missing")
+
+    if current_info_hash and current_info_hash != info_hash:
+        for archive_path, retained_torrent in retained_torrent_pairs(data_dir):
+            if retained_torrent.parent.name == current_info_hash and not session.has_torrent(
+                current_info_hash
+            ):
+                session.add_torrent(
+                    info_hash="",
+                    save_path=str(archive_path.parent),
+                    torrent_file=str(retained_torrent),
+                )
+                logger.info(
+                    "Previous torrent retained for seeding: v2 info hash=%s...",
+                    current_info_hash[:16],
+                )
+                break
+        session.remove_torrent(current_info_hash)
+
+    if not session.has_torrent(info_hash):
+        session.add_torrent(
+            info_hash="",
+            save_path=data_dir,
+            torrent_file=str(torrent_path),
+        )
+        logger.info("Canonical torrent loaded for seeding: v2 info hash=%s...", info_hash[:16])
+    handle = session.get_handle(info_hash)
+    if handle is None:
+        raise RuntimeError(f"canonical torrent handle unavailable: {info_hash[:16]}...")
+    return info_hash, handle, snapshot_path.stat().st_size
 
 
 def main() -> None:
@@ -141,64 +230,110 @@ def main() -> None:
     )
     session.start()
 
-    # Wait for DHT bootstrap alert (required before dht_put will succeed)
+    # Wait for DHT bootstrap alert before the first publication.
     bootstrapped = session.wait_for_dht_bootstrap(timeout=120)
     if not bootstrapped:
-        logger.warning("Proceeding without DHT bootstrap alert — puts may fail")
+        logger.warning("DHT bootstrap did not complete — publication will retry")
 
-    handle = session.add_torrent(
-        info_hash="",  # unused when torrent_file is provided
-        save_path=data_dir,
-        torrent_file=str(torrent_path),
+    current_info_hash, handle, snapshot_size = _load_current_torrent(
+        session, data_dir, None
     )
-    logger.info("Torrent added, seeding...")
+    logger.info("Canonical torrent added, seeding...")
     for archive_path, retained_torrent in retained_torrent_pairs(data_dir):
-        session.add_torrent(
-            info_hash="",
-            save_path=str(archive_path.parent),
-            torrent_file=str(retained_torrent),
-        )
-        logger.info("Retained torrent added for seeding: %s", retained_torrent)
+        retained_info_hash = retained_torrent.parent.name
+        if not session.has_torrent(retained_info_hash):
+            session.add_torrent(
+                info_hash="",
+                save_path=str(archive_path.parent),
+                torrent_file=str(retained_torrent),
+            )
+            logger.info(
+                "Retained torrent added for seeding: v2 info hash=%s...",
+                retained_info_hash[:16],
+            )
 
-    # Graceful shutdown on SIGTERM/SIGINT
+    # Graceful shutdown on SIGTERM/SIGINT; SIGHUP reloads the canonical torrent
+    # without destroying the DHT session or the retained swarms.
     running = True
+    reload_requested = threading.Event()
 
     def on_signal(signum, _frame):
         nonlocal running
-        logger.info(f"Received signal {signum}, shutting down...")
-        running = False
+        if signum == signal.SIGHUP:
+            logger.info("Received SIGHUP; scheduling canonical torrent reload")
+            reload_requested.set()
+        else:
+            logger.info(f"Received signal {signum}, shutting down...")
+            running = False
 
     signal.signal(signal.SIGTERM, on_signal)
     signal.signal(signal.SIGINT, on_signal)
+    signal.signal(signal.SIGHUP, on_signal)
 
     # Stats file path
     stats_path = Path(data_dir) / "seeder-stats.json"
     started_at = time.time()
     last_dht_publish = 0.0
+    last_dht_sequence: int | None = None
+    dht_verified = False
+
+    def publish_current() -> None:
+        nonlocal last_dht_publish, last_dht_sequence, dht_verified
+        if not dht_keys or not session._session:
+            dht_verified = False
+            return
+        dht_nodes = session.dht_node_count()
+        logger.info("DHT has %s nodes, publishing current torrent...", dht_nodes)
+        privkey_64, pubkey_32 = dht_keys
+        result = _dht_publish(
+            session,
+            privkey_64,
+            pubkey_32,
+            current_info_hash,
+            salt,
+        )
+        last_dht_publish = time.time()
+        last_dht_sequence = int(result["sequence"])
+        dht_verified = True
+
+    try:
+        publish_current()
+    except Exception as exc:
+        dht_verified = False
+        logger.error("Initial DHT publication is not verified: %s", exc)
 
     # Periodic status logging + stats file + DHT publishing
     while running:
         now = time.time()
 
+        if reload_requested.is_set():
+            reload_requested.clear()
+            try:
+                new_info_hash, new_handle, new_snapshot_size = _load_current_torrent(
+                    session, data_dir, current_info_hash
+                )
+                current_info_hash = new_info_hash
+                handle = new_handle
+                snapshot_size = new_snapshot_size
+                dht_verified = False
+                logger.info(
+                    "Canonical torrent reload complete: v2 info hash=%s...",
+                    current_info_hash[:16],
+                )
+                try:
+                    publish_current()
+                except Exception as exc:
+                    logger.error("Reloaded torrent DHT publication is not verified: %s", exc)
+            except Exception as exc:
+                logger.error("Canonical torrent reload failed: %s", exc)
+
         # DHT publishing (every 30 min)
         if dht_keys and (now - last_dht_publish) >= DHT_REPUBLISH_INTERVAL:
-            info_hash_hex = _load_info_hash(data_dir)
-            if info_hash_hex and session._session:
-                dht_nodes = session.dht_node_count()
-                logger.info(f"DHT has {dht_nodes} nodes, publishing...")
-                try:
-                    privkey_64, pubkey_32 = dht_keys
-                    _dht_publish(session._session, privkey_64, pubkey_32, info_hash_hex, salt)
-                    last_dht_publish = now
-
-                    snap = session.wait_for_dht_put(timeout=60)
-                    if snap is not None:
-                        num = snap.extra.get("num_success", "?")
-                        logger.info(f"DHT put result: success={num} extra={snap.extra}")
-                    else:
-                        logger.warning("DHT put: no dht_put_alert within 60s")
-                except Exception as e:
-                    logger.error(f"DHT publish error: {e}")
+            try:
+                publish_current()
+            except Exception as exc:
+                dht_verified = False
+                logger.error("DHT publication is not verified: %s", exc)
             # Save DHT state periodically for faster re-bootstrap
             session.save_dht_state()
 
@@ -217,6 +352,10 @@ def main() -> None:
                 "uptime_seconds": int(now - started_at),
                 "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
                 "dht_publishing": dht_keys is not None,
+                "torrent_info_hash": current_info_hash,
+                "dht_verified": dht_verified,
+                "dht_sequence": last_dht_sequence,
+                "retained_torrent_count": len(retained_torrent_pairs(data_dir)),
                 "last_dht_publish": time.strftime(
                     "%Y-%m-%dT%H:%M:%S%z", time.localtime(last_dht_publish)
                 )
@@ -235,7 +374,7 @@ def main() -> None:
             )
         except Exception as e:
             logger.error(f"Status error: {e}")
-        for _ in range(60):
+        for _ in range(5):
             if not running:
                 break
             time.sleep(1)

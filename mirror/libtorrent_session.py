@@ -223,14 +223,14 @@ class LibtorrentSession:
             handle = self._session.add_torrent(params)
 
         self._handles[handle_key] = handle
-        logger.info(f"Added torrent: {handle_key[:16]}...")
+        logger.info("Added torrent: v2 info hash=%s...", handle_key[:16])
         return handle
 
     def remove_torrent(self, info_hash: str) -> None:
         handle = self._handles.pop(info_hash, None)
         if handle and self._session:
             self._session.remove_torrent(handle)
-            logger.info(f"Removed torrent: {info_hash[:16]}...")
+            logger.info("Removed torrent: v2 info hash=%s...", info_hash[:16])
 
     def has_torrent(self, info_hash: str) -> bool:
         return info_hash in self._handles
@@ -253,19 +253,19 @@ class LibtorrentSession:
         handle = self._handles.get(info_hash)
         if handle:
             handle.pause()
-            logger.info(f"Paused torrent: {info_hash[:16]}...")
+            logger.info("Paused torrent: v2 info hash=%s...", info_hash[:16])
 
     def resume_torrent(self, info_hash: str) -> None:
         handle = self._handles.get(info_hash)
         if handle:
             handle.resume()
-            logger.info(f"Resumed torrent: {info_hash[:16]}...")
+            logger.info("Resumed torrent: v2 info hash=%s...", info_hash[:16])
 
     def force_recheck(self, info_hash: str) -> None:
         handle = self._handles.get(info_hash)
         if handle:
             handle.force_recheck()
-            logger.info(f"Force recheck started: {info_hash[:16]}...")
+            logger.info("Force recheck started: torrent v2 info hash=%s...", info_hash[:16])
 
     def get_handle(self, info_hash: str) -> Optional[lt.torrent_handle]:
         return self._handles.get(info_hash)
@@ -387,8 +387,46 @@ class LibtorrentSession:
             predicate=lambda snap: snap.extra.get("salt", "") == salt,
         )
 
-    def wait_for_dht_put(self, timeout: float = 60.0) -> Optional[AlertSnapshot]:
-        return self.wait_for_alert("dht_put_alert", timeout=timeout)
+    def wait_for_dht_put(
+        self,
+        timeout: float = 60.0,
+        *,
+        salt: Optional[str] = None,
+    ) -> Optional[AlertSnapshot]:
+        predicate = None
+        if salt is not None:
+            def matches_salt(snap: AlertSnapshot) -> bool:
+                return snap.extra.get("salt", "") == salt
+
+            predicate = matches_salt
+        return self.wait_for_alert("dht_put_alert", timeout=timeout, predicate=predicate)
+
+    def clear_alerts(self, type_name: Optional[str] = None) -> None:
+        """Discard queued alert snapshots before starting a new operation."""
+        with self._alert_lock:
+            if type_name is None:
+                self._alerts.clear()
+            else:
+                self._alerts = [snap for snap in self._alerts if snap.type_name != type_name]
+
+    def publish_dht_mutable_item(
+        self,
+        private_key_64: bytes,
+        public_key: bytes,
+        value: bytes,
+        salt: str = "daily",
+    ) -> None:
+        """Start a libtorrent mutable-item put on the live session."""
+        if self._session is None:
+            raise RuntimeError("Session not started")
+        self.clear_alerts("dht_put_alert")
+        self._session.dht_put_mutable_item(
+            private_key_64,
+            public_key,
+            value,
+            salt.encode("utf-8"),
+        )
+        logger.info("DHT mutable-item publish requested: salt=%r", salt)
 
     def _alert_loop(self) -> None:
         while self._running and self._session:
@@ -447,4 +485,6 @@ class LibtorrentSession:
 
         pk_list = [int(b) for b in public_key]
         self._session.dht_put_item(pk_list, callback, salt.encode("utf-8"))
-        logger.info(f"DHT put_mutable_item requested for salt='{salt}', seq={seq}")
+        logger.info(
+            "DHT mutable-item put requested: salt=%r, sequence=%s", salt, seq
+        )

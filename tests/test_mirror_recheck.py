@@ -302,4 +302,7 @@ def test_start_logs_the_complete_producer_public_key(tmp_path, monkeypatch, capl
     with caplog.at_level("INFO", logger="mirror.watcher"):
         watcher.start(once=True)
 
-    assert f"Producer signing public key: {public_key}" in caplog.text
+    assert (
+        f"Producer signing public key (PRODUCER_SIGNING_PUBKEY): {public_key}"
+        in caplog.text
+    )

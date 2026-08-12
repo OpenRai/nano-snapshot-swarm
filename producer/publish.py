@@ -1,19 +1,23 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
 import time
 from pathlib import Path
 
-import libtorrent as lt
-
-from shared.bep46 import build_dht_value
+from mirror.libtorrent_session import AlertSnapshot, LibtorrentSession
+from shared.bep46 import build_dht_value, parse_dht_value, verify_mutable_item
 from shared.nano_identity import compute_bep46_target_id, derive_nano_address
 
 STATE_FILE = "publisher_state.json"
 DEFAULT_SALT = "daily"
 DHT_PUBLISH_TIMEOUT = 120
+DHT_BOOTSTRAP_TIMEOUT = 120
+DHT_PUBLISH_ATTEMPTS = 3
+DHT_RETRY_DELAY = 5
+DHT_VERIFY_TIMEOUT = 120
 
 
 def load_state(state_path: str = STATE_FILE) -> dict:
@@ -33,6 +37,94 @@ class PublishError(Exception):
     pass
 
 
+def _expanded_libtorrent_private_key(private_key_hex: str) -> bytes:
+    """Return libtorrent's 64-byte expanded Ed25519 secret key."""
+    seed = bytes.fromhex(private_key_hex)
+    if len(seed) == 64:
+        seed = seed[:32]
+    if len(seed) != 32:
+        raise ValueError("DHT private key must be 32 or 64 bytes")
+    expanded = bytearray(hashlib.sha512(seed).digest())
+    expanded[0] &= 248
+    expanded[31] &= 63
+    expanded[31] |= 64
+    # libtorrent's secret key is the expanded 64-byte Ed25519 hash.
+    return bytes(expanded)
+
+
+def _raw_dht_value(item: object) -> bytes | None:
+    if isinstance(item, (bytes, bytearray)):
+        return bytes(item)
+    if isinstance(item, str):
+        return item.encode("latin-1")
+    if isinstance(item, dict):
+        value = item.get("value") or item.get(b"value")
+        return _raw_dht_value(value)
+    return None
+
+
+def _verified_snapshot_from_alert(
+    alert: AlertSnapshot,
+    expected_public_key: bytes,
+    expected_info_hash: str,
+    salt: str,
+) -> tuple[int, str] | None:
+    returned_key_hex = alert.extra.get("key")
+    signature_hex = alert.extra.get("signature")
+    sequence = alert.extra.get("seq", 0)
+    value = _raw_dht_value(alert.extra.get("item"))
+    if not isinstance(returned_key_hex, str) or not isinstance(signature_hex, str):
+        return None
+    if value is None:
+        return None
+    try:
+        returned_key = bytes.fromhex(returned_key_hex)
+        signature = bytes.fromhex(signature_hex)
+    except ValueError:
+        return None
+    if returned_key != expected_public_key:
+        return None
+    if not verify_mutable_item(returned_key, value, int(sequence), signature, salt):
+        return None
+    try:
+        info_hash = parse_dht_value(value)[b"info_hash"].hex()
+    except (KeyError, TypeError, ValueError):
+        return None
+    if info_hash != expected_info_hash:
+        return None
+    return int(sequence), info_hash
+
+
+def _wait_for_verified_snapshot(
+    session: LibtorrentSession,
+    public_key: bytes,
+    expected_info_hash: str,
+    salt: str,
+    timeout: float,
+) -> tuple[int, str] | None:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        session.clear_alerts("dht_mutable_item_alert")
+        session.dht_get_mutable_item(public_key, salt)
+        remaining = max(1.0, deadline - time.time())
+        alert = session.wait_for_dht_mutable_item(
+            salt=salt,
+            timeout=min(15.0, remaining),
+        )
+        if alert is None:
+            continue
+        verified = _verified_snapshot_from_alert(
+            alert,
+            public_key,
+            expected_info_hash,
+            salt,
+        )
+        if verified is not None:
+            return verified
+        time.sleep(1)
+    return None
+
+
 def publish_to_dht(
     private_key_hex: str,
     info_hash_hex: str,
@@ -48,8 +140,12 @@ def publish_to_dht(
     target_id = compute_bep46_target_id(pub_key_bytes, salt)
 
     print(f"Producer signing public key (PRODUCER_SIGNING_PUBKEY): {pub_key_bytes.hex()}")
-    print(f"DHT target ID (SHA-1): {target_id.hex()}")
-    print(f"Publishing seq={seq}, info_hash={info_hash_hex}, salt='{salt}'")
+    print(f"DHT mutable-item target ID (SHA-1): {target_id.hex()[:16]}...")
+    print(
+        "Publishing snapshot: "
+        f"publisher status sequence={seq}, torrent v2 info hash={info_hash_hex[:16]}..., "
+        f"salt='{salt}'"
+    )
 
     value_bytes = build_dht_value(info_hash_hex, piece_size)
 
@@ -63,68 +159,74 @@ def publish_to_dht(
             "dry_run": True,
         }
 
-    # Build 64-byte ed25519 secret key (seed + pubkey) for libtorrent
-    import nacl.signing
-
-    sk = nacl.signing.SigningKey(bytes.fromhex(private_key_hex))
-    secret_key_64 = bytes(sk._signing_key)  # 64 bytes: seed || pubkey
-
-    settings = {
-        "enable_dht": True,
-        "listen_interfaces": "0.0.0.0:6883",
-        "alert_mask": lt.alert.category_t.all_categories,
-    }
-    ses = lt.session(settings)
-
-    bootstrap_nodes = [
-        ("router.bittorrent.com", 6881),
-        ("router.utorrent.com", 6881),
-        ("dht.transmissionbt.com", 6881),
-    ]
-    for host, port in bootstrap_nodes:
-        ses.add_dht_node((host, port))
-
-    print("Waiting for DHT to bootstrap...")
-    time.sleep(30)
-
-    # dht_put_mutable_item handles seq and signing internally.
-    # IMPORTANT: pass bytes, not str. Python str→C++ std::string uses UTF-8,
-    # which corrupts binary data (bytes >0x7F become multi-byte sequences).
-    ses.dht_put_mutable_item(
-        secret_key_64,
-        pub_key_bytes if isinstance(pub_key_bytes, bytes) else pub_key_bytes.encode("latin-1"),
-        value_bytes if isinstance(value_bytes, bytes) else value_bytes.encode("latin-1"),
-        salt.encode("utf-8") if isinstance(salt, str) else salt,
+    secret_key_64 = _expanded_libtorrent_private_key(private_key_hex)
+    dht_session = LibtorrentSession(
+        data_dir=str(Path(state_path).resolve().parent),
+        listen_port=6883,
     )
+    dht_session.start()
+    try:
+        print("Waiting for DHT to bootstrap...")
+        if not dht_session.wait_for_dht_bootstrap(timeout=DHT_BOOTSTRAP_TIMEOUT):
+            raise PublishError("DHT bootstrap did not complete")
 
-    print("Waiting for DHT put confirmation...")
-    deadline = time.time() + DHT_PUBLISH_TIMEOUT
-    confirmed = False
+        print("Publishing and verifying DHT mutable item...")
+        dht_sequence: int | None = None
+        acknowledgements: int | None = None
+        for attempt in range(1, DHT_PUBLISH_ATTEMPTS + 1):
+            dht_session.publish_dht_mutable_item(
+                secret_key_64,
+                pub_key_bytes,
+                value_bytes,
+                salt,
+            )
+            put_alert = dht_session.wait_for_dht_put(
+                timeout=DHT_PUBLISH_TIMEOUT,
+                salt=salt,
+            )
+            if put_alert is not None:
+                dht_sequence = int(put_alert.extra.get("seq", 0))
+                acknowledgements = put_alert.extra.get("num_success")
+                print(
+                    "DHT mutable-item put completed: "
+                    f"sequence={dht_sequence}, direct acknowledgements={acknowledgements}"
+                )
+            else:
+                print(f"DHT mutable-item put produced no completion alert (attempt {attempt})")
 
-    while time.time() < deadline:
-        alerts = ses.pop_alerts()
-        for alert in alerts:
-            if isinstance(alert, lt.dht_put_alert):
-                print(f"DHT put confirmed: {alert}")
-                confirmed = True
-                break
-        if confirmed:
-            break
-        time.sleep(1)
-
-    if not confirmed:
-        print("WARNING: DHT put not confirmed within timeout (may still have propagated)")
-
-    state["last_seq"] = seq
-    state["last_info_hash"] = info_hash_hex
-    save_state(state, state_path)
-
-    print(f"Published seq={seq} to DHT")
-    return {
-        "seq": seq,
-        "info_hash_hex": info_hash_hex,
-        "confirmed": confirmed,
-    }
+            verified = _wait_for_verified_snapshot(
+                dht_session,
+                pub_key_bytes,
+                info_hash_hex,
+                salt,
+                timeout=DHT_VERIFY_TIMEOUT,
+            )
+            if verified is not None:
+                dht_sequence, verified_hash = verified
+                state["last_seq"] = seq
+                state["last_info_hash"] = info_hash_hex
+                state["last_dht_seq"] = dht_sequence
+                state["last_dht_info_hash"] = verified_hash
+                save_state(state, state_path)
+                print(
+                    "DHT mutable item verified: "
+                    f"sequence={dht_sequence}, torrent v2 info hash={verified_hash[:16]}..."
+                )
+                return {
+                    "seq": seq,
+                    "dht_seq": dht_sequence,
+                    "info_hash_hex": info_hash_hex,
+                    "confirmed": True,
+                    "direct_acknowledgements": acknowledgements,
+                }
+            if attempt < DHT_PUBLISH_ATTEMPTS:
+                print(f"DHT read-back did not verify; retrying in {DHT_RETRY_DELAY}s")
+                time.sleep(DHT_RETRY_DELAY)
+        raise PublishError(
+            "DHT publication was not verified by reading back the exact signed snapshot"
+        )
+    finally:
+        dht_session.stop()
 
 
 def main() -> None:

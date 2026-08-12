@@ -129,7 +129,7 @@ journalctl --user -u nano-snapshot -f
 
 The pipeline creates a fresh timestamped `nano-ledger-snapshot-*.7z` payload of
 exactly 128 MiB, links it to the canonical `nano-ledger-snapshot.7z` name, and
-continues through torrent creation, signed DHT publication, seeder restart, and
+continues through torrent creation, verified signed DHT publication, seeder reload, and
 status push. The payload is intentionally not a valid 7z archive; this mode
 tests transfer, mutation, recheck, and seeding behavior.
 
@@ -163,14 +163,13 @@ composition contract, including the hybrid hashes and magnet URI.
 
 Expected publish output:
 ```
-Publisher DHT pubkey: <64-char hex>
-DHT target ID (SHA-1): <target>
-Publishing seq=1, info_hash=<info_hash>
-Signature: <sig_hex>
+Producer signing public key (PRODUCER_SIGNING_PUBKEY): <64-char hex>
+DHT mutable-item target ID (SHA-1): <short target>...
+Publishing snapshot: publisher status sequence=1, torrent v2 info hash=<short hash>...
 Value size: N bytes
 Waiting for DHT to bootstrap...
-DHT put confirmed
-Published seq=1 to DHT
+DHT mutable-item put completed: sequence=N, direct acknowledgements=N
+DHT mutable item verified: sequence=N, torrent v2 info hash=<short hash>...
 ```
 
 ---
@@ -304,4 +303,14 @@ Expected Fly.io cost: **under $5/month** (mostly idle 256 MB VM + 1 GB volume).
 
 ## Sequence Number
 
-Each publish increments the sequence number. Mirrors use this to detect whether they have the latest snapshot. Do not manually edit `publisher_state.json` — the sequence number must monotonically increase.
+The DHT mutable-item sequence is chosen by libtorrent from the current network
+value and is verified by reading the signed item back. `publisher_state.json`
+also contains the local dashboard publication sequence; it is not authoritative
+for DHT ordering and must not be manually edited. A publication is not pushed to
+the dashboard until the exact DHT value has been verified and the seeder reports
+the matching torrent as loaded.
+
+The daily pipeline sends `SIGHUP` to an active `nano-seed.service` so it reloads
+the canonical torrent without destroying its DHT session or retained swarms. If
+the seeder is stopped, the pipeline starts it, exercising the restart recovery
+path.

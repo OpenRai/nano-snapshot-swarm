@@ -23,7 +23,8 @@ journalctl --user -u nano-snapshot -f
 
 The output directory must contain a fresh timestamped placeholder, the
 canonical symlink, its torrent, and updated `snapshot-meta.json`. The producer
-seeder must be active and report the canonical torrent as seeding.
+seeder must be active, report the canonical torrent as seeding, and write
+`dht_verified=true` with the matching `torrent_info_hash` in `seeder-stats.json`.
 
 ## Mirror
 
@@ -48,7 +49,10 @@ not restart the mirror. Acceptance for mutation:
 5. The mirror container uptime is continuous across the replacement.
 6. `mirror_state.json` and `snapshot-meta.json` contain the second hash.
 
-Record producer DHT publication logs, mirror transition logs, both info hashes,
+Also stop and start the producer seeder between two publications. Acceptance is
+that the restarted seeder publishes or verifies a strictly current DHT sequence
+without reusing a sequence for a different value, and the mirror still detects
+the next update. Record producer DHT publication logs, mirror transition logs, both info hashes,
 file sizes, peer/source counters, and the final seeding state. Do not describe
 the transfer as P2P-proven unless the leecher receive/source counters and
 producer upload/peer-transfer counters show peer-sourced bytes.
