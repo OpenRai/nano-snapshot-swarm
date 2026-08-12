@@ -121,8 +121,9 @@ python -m producer.cli publish \
   --output-dir /opt/nano-snapshots
 ```
 
-Published torrents are hybrid v1+v2 and contain only BitTorrent metadata and the
-signed raw-v2 DHT reference; they do not contain an HTTP download URL or webseed.
+Published torrents contain only BitTorrent metadata and the signed raw-v2 DHT
+reference; see [Torrent and Magnet Format](torrent-format.md) for the complete
+composition contract, including the hybrid hashes and magnet URI.
 
 Expected publish output:
 ```

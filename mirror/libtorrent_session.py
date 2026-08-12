@@ -180,6 +180,7 @@ class LibtorrentSession:
         torrent_file: Optional[str] = None,
         paused: bool = False,
     ) -> lt.torrent_handle:
+        """Add a torrent or v2 magnet; see ../docs/torrent-format.md."""
         if self._session is None:
             raise RuntimeError("Session not started")
 

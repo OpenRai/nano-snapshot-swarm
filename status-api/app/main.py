@@ -99,6 +99,7 @@ def _save_state(status: dict, torrent_bytes: bytes) -> None:
 
 
 def _build_magnet(info_hash: str, torrent_name: str, info_hash_v1: str | None = None) -> str:
+    """Compose the public hybrid magnet; see ../../docs/torrent-format.md."""
     params = [
         f"dn={quote(torrent_name)}",
     ]

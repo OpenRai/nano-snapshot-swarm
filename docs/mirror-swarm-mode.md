@@ -151,6 +151,9 @@ the archive before it resumes piece requests. This lets normal BitTorrent piece
 checking reuse matching data across snapshots; it does not promise a measured
 daily compression-reuse rate.
 
+See [Torrent and Magnet Format](torrent-format.md) for the torrent identity,
+magnet, DHT pointer, and public-route contract used while diagnosing updates.
+
 ### snapshot-meta.json
 
 This file is updated locally after DHT discovery and torrent metadata resolution, so mirrors and leechers can inspect the latest resolved snapshot details without scraping logs:

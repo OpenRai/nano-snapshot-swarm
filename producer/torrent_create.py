@@ -25,6 +25,9 @@ def create_torrent(
 ) -> tuple[str, TorrentHashes]:
     """Create a hybrid v1+v2 torrent for a single file.
 
+    See [docs/torrent-format.md](../docs/torrent-format.md) for the canonical
+    torrent and magnet composition contract.
+
     Args:
         snapshot_meta: JSON string embedded as 'x-snapshot' in the info dict.
             Survives magnet link metadata exchange (BEP 9). Only include

@@ -18,6 +18,8 @@ The ledger lives as an LMDB database (~80 GB). Rather than serving it from a sin
 | **Mirror** | `mirror/` | Mirror service. Discovers snapshots via DHT, downloads and seeds them. |
 | **Producer** | `producer/` | CLI tool. Creates a torrent for a snapshot archive and publishes its info-hash to the DHT. |
 
+For the exact hybrid torrent, raw-v2 DHT pointer, magnet, and download-route contract, see [Torrent and Magnet Format](docs/torrent-format.md).
+
 ## Two Mirror Modes
 
 | Mode | Flag | Use Case |

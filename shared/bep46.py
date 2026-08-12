@@ -79,6 +79,9 @@ def verify_mutable_item(
 def build_dht_value(info_hash_hex: str, piece_size: int = 0) -> bytes:
     """Build the DHT mutable item value: raw 32-byte info hash.
 
+    See ../docs/torrent-format.md for the canonical torrent identity and DHT
+    pointer contract.
+
     libtorrent's dht_put_mutable_item() treats the data arg as a raw string
     and bencodes it internally. Passing already-bencoded data causes double
     bencoding and signature verification failures. So we pass just the raw
