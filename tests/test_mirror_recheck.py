@@ -68,3 +68,30 @@ def test_old_authority_pubkey_environment_is_ignored(monkeypatch, caplog) -> Non
         assert resolve_producer_signing_pubkey() == "ab" * 32
 
     assert "AUTHORITY_PUBKEY is ignored; use PRODUCER_SIGNING_PUBKEY." in caplog.text
+
+
+def test_start_logs_the_complete_producer_public_key(tmp_path, monkeypatch, caplog) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    import mirror.watcher as watcher_module
+
+    class FakeLibtorrentSession:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        def start(self) -> None:
+            pass
+
+    public_key = "ab" * 32
+    watcher = watcher_module.MirrorWatcher(
+        producer_signing_pubkey_hex=public_key,
+        data_dir=str(tmp_path),
+    )
+    monkeypatch.setattr(watcher_module, "LibtorrentSession", FakeLibtorrentSession)
+    monkeypatch.setattr(watcher_module.time, "sleep", lambda _: None)
+    monkeypatch.setattr(watcher, "_run_once", lambda: None)
+    monkeypatch.setattr(watcher, "stop", lambda: None)
+
+    with caplog.at_level("INFO", logger="mirror.watcher"):
+        watcher.start(once=True)
+
+    assert f"Producer signing public key: {public_key}" in caplog.text

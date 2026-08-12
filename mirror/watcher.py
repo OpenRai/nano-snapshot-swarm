@@ -96,7 +96,7 @@ class MirrorWatcher:
     def start(self, *, once: bool = False) -> None:
         logger.info("=" * 60)
         logger.info("Nano P2P Mirror Service Starting")
-        logger.info(f"Producer signing public key: {self.producer_signing_pubkey_hex[:16]}...")
+        logger.info("Producer signing public key: %s", self.producer_signing_pubkey_hex)
         logger.info(f"Data directory: {self.data_dir}")
         logger.info(f"DHT salt: '{self.salt}'")
         if once:
