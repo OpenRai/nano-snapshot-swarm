@@ -52,7 +52,7 @@ if docker run --rm \
     ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
     --once; then
   echo "Download succeeded"
-  # decompress and use the ledger
+  # extract and use the ledger
 else
   echo "Download failed"
 fi
@@ -62,25 +62,28 @@ fi
 
 ## Where the File Ends Up
 
-The downloaded file is saved to `DATA_DIR` (default `/data`) using the torrent's filename, typically:
+The downloaded archive is saved to `DATA_DIR` (default `/data`) using the torrent's filename:
 
 ```
-/data/nano-daily.ldb.zst
+/data/nano-ledger-snapshot.7z
 ```
 
 ---
 
-## Decompressing the Ledger
+## Extracting and Validating the Ledger
 
 ```bash
-zstd -d /data/nano-daily.ldb.zst -o /tmp/data.ldb
-# Verify it opens with mdb_copy
+7z x -y -o/tmp /data/nano-ledger-snapshot.7z
+# Verify the extracted database opens with mdb_copy
 mdb_copy /tmp/data.ldb /tmp/data_copy
 ```
 
 For the official Nano node Docker image, place the resulting `data.ldb` into the host directory you mount at `/root` inside the node container. Nano's Docker docs describe the node data directory as the path bound with `-v`/`--volume`, and they recommend keeping that directory persistent instead of treating the ledger as disposable.
 
-As of 2026-04, unpacking needs roughly `{compressed size} + {2 * compressed size}` GB of temporary space, so a ~60 GB archive means about ~180 GB free while decompressing.
+The archive contains `data.ldb`. The Docker image's `--extract` option runs
+`7z x -mmt=3 -y`, writes `data.ldb` beside the archive, and deletes the archive
+after a successful extraction. It is supported only with `--once`; in swarm mode
+the option is ignored. Without `--extract`, the `.7z` archive remains in `/data`.
 
 ---
 
@@ -122,11 +125,11 @@ docker run --rm \
 
 ## How It Works
 
-1. Waits 15 seconds for DHT to bootstrap (shorter than swarm mode since no polling is needed)
+1. Waits 30 seconds for DHT to bootstrap
 2. Queries DHT for the latest mutable item under the configured authority key and salt
 3. On success: adds the torrent, begins P2P download
 4. Tracks progress every 5 seconds
-5. On seeding complete: logs file path, exits `0`
+5. On download complete: logs the `.7z` file path, exits `0` (or extracts it with `--extract`)
 6. On error: logs error, exits `1`
 
 ## Validation Stream Example
@@ -160,11 +163,11 @@ extracted `data.ldb`:
       --once
 
     echo " Ledger downloaded:"
-    ls -lh nano-data/*.ldb.zst
+    ls -lh nano-data/nano-ledger-snapshot.7z
 
 - name: Decompress and verify
   run: |
-    zstd -d nano-data/*.ldb.zst -o nano-data/data.ldb
+    7z x -y -onano-data nano-data/nano-ledger-snapshot.7z
     mdb_copy nano-data/data.ldb /tmp/verify_copy
     echo "Ledger verified OK"
 ```

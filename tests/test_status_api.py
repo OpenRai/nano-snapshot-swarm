@@ -8,8 +8,6 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "status-api"))
 
-pytest.importorskip("fastapi")
-
 from app.main import app
 from fastapi.testclient import TestClient
 
@@ -40,6 +38,8 @@ def sample_push_payload():
     """Return a valid push payload with signature pre-computed."""
     from nacl.signing import SigningKey
 
+    from producer.push_status import sign_push
+
     # Use a known seed for deterministic tests
     seed = bytes.fromhex("e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d")
     signing_key = SigningKey(seed)
@@ -48,12 +48,9 @@ def sample_push_payload():
     sequence = 42
     info_hash = "ab" * 32
     timestamp = "2026-04-23T00:00:00Z"
-    message = f"{sequence}:{info_hash}:{timestamp}".encode("ascii")
-    signature = signing_key.sign(message).signature.hex()
-
     import base64
 
-    return {
+    payload = {
         "sequence": sequence,
         "info_hash": info_hash,
         "info_hash_v1": "cd" * 20,
@@ -62,8 +59,10 @@ def sample_push_payload():
         "snapshot_size_bytes": 64320000000,
         "timestamp": timestamp,
         "torrent_file_b64": base64.b64encode(b"fake-torrent-data").decode("ascii"),
-        "signature": signature,
-    }, pubkey_hex
+        "archive_listing": "--\n2026-04-23 00:00:00 ....A 12 data.ldb",
+    }
+    payload["signature"] = sign_push(signing_key._signing_key.hex(), payload)
+    return payload, pubkey_hex
 
 
 class TestPush:
@@ -98,6 +97,14 @@ class TestPush:
         main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
         try:
             payload["torrent_name"] = "upstream-snapshot.7z"
+            from producer.push_status import sign_push
+
+            payload["signature"] = sign_push(
+                bytes.fromhex(
+                    "e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d"
+                ).hex(),
+                payload,
+            )
             resp = client.post("/api/push", json=payload)
             assert resp.status_code == 422
         finally:
@@ -116,12 +123,12 @@ class TestPush:
 
             # Second push at seq 41 should be rejected
             payload["sequence"] = 41
-            message = f"41:{payload['info_hash']}:{payload['timestamp']}".encode("ascii")
-            from nacl.signing import SigningKey
+            from producer.push_status import sign_push
 
-            seed = bytes.fromhex("e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d")
-            signing_key = SigningKey(seed)
-            payload["signature"] = signing_key.sign(message).signature.hex()
+            payload["signature"] = sign_push(
+                "e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d",
+                payload,
+            )
 
             resp = client.post("/api/push", json=payload)
             assert resp.status_code == 409
@@ -129,6 +136,126 @@ class TestPush:
             main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None
             main_module._torrent_bytes = b""
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("sequence", 43),
+            ("info_hash", "ef" * 32),
+            ("info_hash_v1", "12" * 20),
+            ("torrent_name", "upstream-snapshot.7z"),
+            ("piece_size", 65536),
+            ("snapshot_size_bytes", 12),
+            ("timestamp", "2026-04-24T00:00:00Z"),
+            ("torrent_file_b64", "bW9kaWZpZWQ="),
+            ("archive_listing", "changed"),
+        ],
+    )
+    def test_mutating_any_signed_field_invalidates_signature(
+        self, client, sample_push_payload, field, value
+    ):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        try:
+            payload[field] = value
+            response = client.post("/api/push", json=payload)
+            assert response.status_code == 401
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+
+    def test_equal_sequence_identical_retry_is_idempotent(self, client, sample_push_payload):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        try:
+            assert client.post("/api/push", json=payload).status_code == 200
+            response = client.post("/api/push", json=payload)
+            assert response.status_code == 200
+            assert response.json() == {"ok": True, "sequence": payload["sequence"]}
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+
+    def test_equal_sequence_different_signed_payload_is_rejected(
+        self, client, sample_push_payload
+    ):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        from producer.push_status import sign_push
+
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        try:
+            assert client.post("/api/push", json=payload).status_code == 200
+            changed = {**payload, "snapshot_size_bytes": payload["snapshot_size_bytes"] + 1}
+            changed["signature"] = sign_push(
+                "e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d",
+                changed,
+            )
+            assert client.post("/api/push", json=changed).status_code == 409
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+
+    def test_equal_sequence_modified_torrent_bytes_are_rejected(
+        self, client, sample_push_payload
+    ):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        from producer.push_status import sign_push
+
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        try:
+            assert client.post("/api/push", json=payload).status_code == 200
+            changed = {**payload, "torrent_file_b64": "bW9kaWZpZWQtdG9ycmVudA=="}
+            changed["signature"] = sign_push(
+                "e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d",
+                changed,
+            )
+            assert client.post("/api/push", json=changed).status_code == 409
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+
+    def test_malformed_public_key_is_a_controlled_4xx(self, client, sample_push_payload):
+        payload, _ = sample_push_payload
+        import app.main as main_module
+
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = "not-a-key"
+        try:
+            assert client.post("/api/push", json=payload).status_code == 401
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+
+    def test_equal_sequence_identical_retry_survives_reload(
+        self, client, sample_push_payload
+    ):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        try:
+            assert client.post("/api/push", json=payload).status_code == 200
+            main_module._current_status = None
+            main_module._torrent_bytes = b""
+            main_module._load_state()
+            assert client.post("/api/push", json=payload).status_code == 200
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+
+    def test_malformed_signature_and_base64_are_4xx(self, client, sample_push_payload):
+        payload, _ = sample_push_payload
+        malformed_signature = {**payload, "signature": "not-a-signature"}
+        assert client.post("/api/push", json=malformed_signature).status_code == 422
+        malformed_base64 = {**payload, "torrent_file_b64": "%%%"}
+        assert client.post("/api/push", json=malformed_base64).status_code == 422
 
 
 class TestGetEndpoints:
@@ -331,6 +458,33 @@ class TestGetEndpoints:
             assert expected_short_hash in resp.text
             # It should not contain the full info_hash as a literal {{ info_hash[:16] }}
             assert "{{ info_hash[:16] }}" not in resp.text
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+            main_module._current_status = None
+            main_module._torrent_bytes = b""
+
+    def test_status_fragment_escapes_archive_listing_and_attributes(
+        self, client, sample_push_payload
+    ):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        from producer.push_status import sign_push
+
+        payload["archive_listing"] = '<script>alert("x")</script> & details'
+        payload["signature"] = sign_push(
+            "e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d",
+            payload,
+        )
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        try:
+            assert client.post("/api/push", json=payload).status_code == 200
+            response = client.get("/api/status-fragment")
+            assert response.status_code == 200
+            assert "&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt; &amp; details" in response.text
+            assert "<script>alert" not in response.text
+            assert 'data-ts="2026-04-23T00:00:00Z"' in response.text
         finally:
             main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
             main_module._current_status = None

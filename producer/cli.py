@@ -113,6 +113,7 @@ def cmd_validation_fixture_publish(args: argparse.Namespace) -> None:
         state_file=args.state_file,
         dry_run=args.dry_run,
         salt=args.salt,
+        require_canonical_name=False,
     )
     cmd_publish(publish_args)
 

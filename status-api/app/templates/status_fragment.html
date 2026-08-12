@@ -9,11 +9,12 @@
       <span id="ts-render">{{ timestamp }}</span>
     </dd>
   </dl>
-  <details class="archive-listing">
+  <details class="archive-listing"{% if not archive_listing %} hidden{% endif %}>
     <summary>Peek inside the archive</summary>
     <pre><code>{{ archive_listing }}</code></pre>
   </details>
 </section>
+<span id="_push-ts" data-ts="{{ timestamp }}" hidden></span>
 <section id="downloads">
   <div class="download-grid">
     <a href="{{ magnet }}" class="download-card">

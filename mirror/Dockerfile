@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-libtorrent \
     python3-venv \
     zstd \
+    7zip \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 

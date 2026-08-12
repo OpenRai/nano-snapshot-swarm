@@ -5,9 +5,11 @@ import sys
 
 import pytest
 
+sys.path.insert(0, "status-api")
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from producer.push_status import sign_push
+from producer.push_status import canonical_push_payload, sign_push
 
 
 @pytest.fixture
@@ -25,18 +27,41 @@ class TestSignPush:
     def test_sign_and_verify_roundtrip(self, key_pair):
         signing_key, verify_key = key_pair
         private_key_hex = signing_key._signing_key.hex()
+        payload = {
+            "sequence": 42,
+            "info_hash": "ab" * 32,
+            "info_hash_v1": "cd" * 20,
+            "torrent_name": "nano-ledger-snapshot.7z",
+            "piece_size": 33554432,
+            "snapshot_size_bytes": 64320000000,
+            "timestamp": "2026-04-23T00:00:00Z",
+            "torrent_file_b64": "ZmFrZQ==",
+            "archive_listing": "listing",
+        }
 
-        signature_hex = sign_push(private_key_hex, 42, "ab" * 32, "2026-04-23T00:00:00Z")
+        signature_hex = sign_push(private_key_hex, payload)
         signature = bytes.fromhex(signature_hex)
 
-        message = b"42:" + b"ab" * 32 + b":2026-04-23T00:00:00Z"
-        verify_key.verify(message, signature)
+        verify_key.verify(canonical_push_payload(payload), signature)
+
+        from app.main import canonical_push_payload as api_canonical_push_payload
+
+        assert api_canonical_push_payload(payload) == canonical_push_payload(payload)
 
     def test_sign_rejects_wrong_key(self, key_pair):
         signing_key, _ = key_pair
         private_key_hex = signing_key._signing_key.hex()
 
-        signature_hex = sign_push(private_key_hex, 42, "ab" * 32, "2026-04-23T00:00:00Z")
+        payload = {
+            "sequence": 42,
+            "info_hash": "ab" * 32,
+            "torrent_name": "nano-ledger-snapshot.7z",
+            "piece_size": 1,
+            "snapshot_size_bytes": 1,
+            "timestamp": "2026-04-23T00:00:00Z",
+            "torrent_file_b64": "ZmFrZQ==",
+        }
+        signature_hex = sign_push(private_key_hex, payload)
         signature = bytes.fromhex(signature_hex)
 
         wrong_key = bytes.fromhex(
@@ -46,22 +71,25 @@ class TestSignPush:
         from nacl.signing import VerifyKey
 
         verify_key = VerifyKey(wrong_key)
-        message = b"42:" + b"ab" * 32 + b":2026-04-23T00:00:00Z"
         with pytest.raises(BadSignatureError):
-            verify_key.verify(message, signature)
+            verify_key.verify(canonical_push_payload(payload), signature)
 
     def test_different_sequence_produces_different_signature(self, key_pair):
         signing_key, _ = key_pair
         private_key_hex = signing_key._signing_key.hex()
 
-        sig1 = sign_push(private_key_hex, 1, "ab" * 32, "2026-04-23T00:00:00Z")
-        sig2 = sign_push(private_key_hex, 2, "ab" * 32, "2026-04-23T00:00:00Z")
+        first = {"sequence": 1, "info_hash": "ab" * 32, "timestamp": "2026-04-23T00:00:00Z"}
+        second = {**first, "sequence": 2}
+        sig1 = sign_push(private_key_hex, first)
+        sig2 = sign_push(private_key_hex, second)
         assert sig1 != sig2
 
     def test_different_info_hash_produces_different_signature(self, key_pair):
         signing_key, _ = key_pair
         private_key_hex = signing_key._signing_key.hex()
 
-        sig1 = sign_push(private_key_hex, 1, "ab" * 32, "2026-04-23T00:00:00Z")
-        sig2 = sign_push(private_key_hex, 1, "cd" * 32, "2026-04-23T00:00:00Z")
+        first = {"sequence": 1, "info_hash": "ab" * 32, "timestamp": "2026-04-23T00:00:00Z"}
+        second = {**first, "info_hash": "cd" * 32}
+        sig1 = sign_push(private_key_hex, first)
+        sig2 = sign_push(private_key_hex, second)
         assert sig1 != sig2

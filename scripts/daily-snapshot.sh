@@ -81,9 +81,21 @@ PARTIAL_FILE="${TARGET_FILE}.partial"
 # --- Early exit: if metadata says this filename is already fully processed, re-publish to DHT ---
 # DHT entries expire after a few hours, so we must re-publish even when snapshot is unchanged.
 if [ -f "$META_FILE" ] && [ -f "$STABLE_FILE" ] && [ -s "$STABLE_FILE" ]; then
-    PREV_FILENAME=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('original_filename',''))" 2>/dev/null || true)
-    PREV_TORRENT=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('torrent_info_hash',''))" 2>/dev/null || true)
-    PREV_TORRENT_FORMAT_VERSION=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('torrent_format_version',''))" 2>/dev/null || true)
+    readarray -t PREVIOUS_METADATA < <(python3 - "$META_FILE" <<'PY'
+import json
+import sys
+
+try:
+    metadata = json.load(open(sys.argv[1]))
+except (OSError, json.JSONDecodeError):
+    metadata = {}
+for key in ("original_filename", "torrent_info_hash", "torrent_format_version"):
+    print(metadata.get(key, ""))
+PY
+    )
+    PREV_FILENAME="${PREVIOUS_METADATA[0]:-}"
+    PREV_TORRENT="${PREVIOUS_METADATA[1]:-}"
+    PREV_TORRENT_FORMAT_VERSION="${PREVIOUS_METADATA[2]:-}"
     if [ "$PREV_FILENAME" = "$FILENAME" ] && [ -n "$PREV_TORRENT" ] && [ "$PREV_TORRENT_FORMAT_VERSION" = "$TORRENT_FORMAT_VERSION" ]; then
         log "Snapshot unchanged (${FILENAME}, torrent ${PREV_TORRENT}) — re-publishing to DHT"
 
@@ -94,15 +106,19 @@ if [ -f "$META_FILE" ] && [ -f "$STABLE_FILE" ] && [ -s "$STABLE_FILE" ]; then
         fi
 
         # Re-publish using existing info hash — skip expensive torrent re-creation
-        python3 -c "
+        python3 - "$PREV_TORRENT" "${DHT_SALT:-daily}" <<'PY' || log "WARNING: DHT re-publish failed (non-fatal)"
+import os
+import sys
+
 from producer.publish import publish_to_dht
+
 result = publish_to_dht(
-    private_key_hex='$DHT_PRIVATE_KEY',
-    info_hash_hex='$PREV_TORRENT',
-    salt='${DHT_SALT:-daily}',
+    private_key_hex=os.environ["DHT_PRIVATE_KEY"],
+    info_hash_hex=sys.argv[1],
+    salt=sys.argv[2],
 )
 print(result)
-" || log "WARNING: DHT re-publish failed (non-fatal)"
+PY
 
         # --- Step 7: Push status to API (re-publish path) ---
         if [ -n "${STATUS_API_URL:-}" ]; then
@@ -244,11 +260,26 @@ fi
 
 # Preserve the current canonical pair before repointing it to the new archive.
 if [ -f "$META_FILE" ] && [ -f "$STABLE_FILE" ] && [ -f "${STABLE_FILE}.torrent" ]; then
-    PREVIOUS_TORRENT=$(python3 -c "import json; print(json.load(open('$META_FILE')).get('torrent_info_hash',''))" 2>/dev/null || true)
+    PREVIOUS_TORRENT=$(python3 - "$META_FILE" <<'PY'
+import json
+import sys
+
+try:
+    print(json.load(open(sys.argv[1])).get("torrent_info_hash", ""))
+except (OSError, json.JSONDecodeError):
+    print("")
+PY
+    )
     if [ -n "$PREVIOUS_TORRENT" ]; then
         cd "$REPO_DIR"
         source .venv/bin/activate
-        python -c "from producer.retention import retain_current_snapshot; retain_current_snapshot('$OUTPUT_DIR', '$PREVIOUS_TORRENT', $SNAPSHOT_RETENTION)"
+        python - "$OUTPUT_DIR" "$PREVIOUS_TORRENT" "$SNAPSHOT_RETENTION" <<'PY'
+import sys
+
+from producer.retention import retain_current_snapshot
+
+retain_current_snapshot(sys.argv[1], sys.argv[2], int(sys.argv[3]))
+PY
     fi
 fi
 
@@ -264,17 +295,22 @@ log "SHA-256: ${SHA256}"
 log "Symlinking ${FILENAME} → ${STABLE_NAME}"
 ln -sf "$TARGET_FILE" "$STABLE_FILE"
 
-# Write provenance metadata (written BEFORE publish; updated with torrent hash after)
-python3 -c "
-import json, datetime
-json.dump({
-    'original_filename': '$FILENAME',
-    'sha256': '$SHA256',
-    'size_bytes': $FILE_SIZE,
-    'torrent_format_version': $TORRENT_FORMAT_VERSION,
-    'downloaded_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-}, open('$META_FILE', 'w'), indent=2)
-"
+# Write provenance metadata (written BEFORE publish; updated with torrent hash after).
+python3 - "$META_FILE" "$FILENAME" "$SHA256" "$FILE_SIZE" "$TORRENT_FORMAT_VERSION" <<'PY'
+import datetime
+import json
+import sys
+
+metadata = {
+    "original_filename": sys.argv[2],
+    "sha256": sys.argv[3],
+    "size_bytes": int(sys.argv[4]),
+    "torrent_format_version": int(sys.argv[5]),
+    "downloaded_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+}
+with open(sys.argv[1], "w") as metadata_file:
+    json.dump(metadata, metadata_file, indent=2)
+PY
 log "Wrote ${META_FILE}"
 
 # --- Step 5: Create torrent and publish to DHT ---
@@ -297,13 +333,17 @@ echo "$PUBLISH_OUTPUT"
 TORRENT_HASH=$(echo "$PUBLISH_OUTPUT" | grep -oP '(?<=Info-hash \(v2\): ).*' || true)
 TORRENT_HASH_V1=$(echo "$PUBLISH_OUTPUT" | grep -oP '(?<=Info-hash \(v1\): ).*' || true)
 if [ -n "$TORRENT_HASH" ]; then
-    python3 -c "
+    python3 - "$META_FILE" "$TORRENT_HASH" "$TORRENT_HASH_V1" <<'PY'
 import json
-m = json.load(open('$META_FILE'))
-m['torrent_info_hash'] = '$TORRENT_HASH'
-m['torrent_info_hash_v1'] = '$TORRENT_HASH_V1'
-json.dump(m, open('$META_FILE', 'w'), indent=2)
-"
+import sys
+
+with open(sys.argv[1]) as metadata_file:
+    metadata = json.load(metadata_file)
+metadata["torrent_info_hash"] = sys.argv[2]
+metadata["torrent_info_hash_v1"] = sys.argv[3]
+with open(sys.argv[1], "w") as metadata_file:
+    json.dump(metadata, metadata_file, indent=2)
+PY
     log "Updated metadata with torrent hash: $TORRENT_HASH"
 fi
 

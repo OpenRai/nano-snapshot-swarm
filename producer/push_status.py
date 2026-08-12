@@ -23,11 +23,25 @@ def _parse_private_key(hex_key: str) -> bytes:
     raise ValueError(f"Private key must be 32 or 64 bytes, got {len(key_bytes)}")
 
 
-def sign_push(private_key_hex: str, sequence: int, info_hash: str, timestamp: str) -> str:
+def canonical_push_payload(payload: dict) -> bytes:
+    """Return the canonical JSON bytes signed by the Status API protocol."""
+    unsigned = {
+        key: value
+        for key, value in payload.items()
+        if key != "signature" and value is not None
+    }
+    return json.dumps(
+        unsigned,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def sign_push(private_key_hex: str, payload: dict) -> str:
     seed = _parse_private_key(private_key_hex)
     signing_key = SigningKey(seed)
-    message = f"{sequence}:{info_hash}:{timestamp}".encode("ascii")
-    signed = signing_key.sign(message)
+    signed = signing_key.sign(canonical_push_payload(payload))
     return signed.signature.hex()
 
 
@@ -67,8 +81,6 @@ def push_status(
     torrent_b64 = base64.b64encode(torrent_bytes).decode("ascii")
 
     timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    signature = sign_push(private_key_hex, sequence, info_hash, timestamp)
-
     payload = {
         "sequence": sequence,
         "info_hash": info_hash,
@@ -77,7 +89,6 @@ def push_status(
         "snapshot_size_bytes": Path(snapshot_file).stat().st_size,
         "timestamp": timestamp,
         "torrent_file_b64": torrent_b64,
-        "signature": signature,
     }
     if info_hash_v1:
         payload["info_hash_v1"] = info_hash_v1
@@ -85,6 +96,7 @@ def push_status(
     listing = get_archive_listing(snapshot_file)
     if listing:
         payload["archive_listing"] = listing
+    payload["signature"] = sign_push(private_key_hex, payload)
 
     req = urllib.request.Request(
         f"{status_api_url.rstrip('/')}/api/push",

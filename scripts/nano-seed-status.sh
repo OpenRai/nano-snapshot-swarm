@@ -21,9 +21,11 @@ echo
 # Stats file
 if [[ -f "$STATS_FILE" ]]; then
     # Parse JSON with python (available on server)
-    python3 -c "
-import json, sys
-s = json.load(open('$STATS_FILE'))
+    python3 - "$STATS_FILE" <<'PY'
+import json
+import sys
+
+s = json.load(open(sys.argv[1]))
 
 uptime = s.get('uptime_seconds', 0)
 h, m = divmod(uptime, 3600)
@@ -31,17 +33,17 @@ m, sec = divmod(m, 60)
 
 state = s.get('state', '?')
 progress = s.get('progress_pct', 100)
-state_str = f\"{state} ({progress}%)\" if state != 'seeding' else state
-print(f\"  State:         {state_str}\")
-print(f\"  Torrent:       {s.get('torrent_name', '?')}\")
-print(f\"  Snapshot:      {s.get('snapshot_size_gib', '?')} GiB\")
-print(f\"  Peers:         {s.get('peers', '?')}\")
-print(f\"  Upload rate:   {s.get('upload_rate_kbps', '?')} KB/s\")
-print(f\"  Download rate: {s.get('download_rate_kbps', '?')} KB/s\")
-print(f\"  Total upload:  {s.get('total_upload_mib', '?')} MiB\")
-print(f\"  Uptime:        {int(h)}h {int(m)}m {int(sec)}s\")
-print(f\"  Updated:       {s.get('updated_at', '?')}\")
-"
+state_str = f"{state} ({progress}%)" if state != 'seeding' else state
+print(f"  State:         {state_str}")
+print(f"  Torrent:       {s.get('torrent_name', '?')}")
+print(f"  Snapshot:      {s.get('snapshot_size_gib', '?')} GiB")
+print(f"  Peers:         {s.get('peers', '?')}")
+print(f"  Upload rate:   {s.get('upload_rate_kbps', '?')} KB/s")
+print(f"  Download rate: {s.get('download_rate_kbps', '?')} KB/s")
+print(f"  Total upload:  {s.get('total_upload_mib', '?')} MiB")
+print(f"  Uptime:        {int(h)}h {int(m)}m {int(sec)}s")
+print(f"  Updated:       {s.get('updated_at', '?')}")
+PY
 else
     echo "  (no stats file yet — seeder may not have started)"
 fi

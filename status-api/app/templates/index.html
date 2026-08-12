@@ -110,7 +110,7 @@
     <div hx-get="/api/status-fragment"
          hx-trigger="load, every 300s"
          hx-swap="innerHTML">
-        {{ status_fragment }}
+        {{ status_fragment | safe }}
     </div>
 
     <noscript>

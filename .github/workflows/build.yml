@@ -26,7 +26,7 @@ jobs:
         run: uv sync --extra dev
 
       - name: Lint with ruff
-        run: uv run ruff check shared/ producer/ mirror/ tests/
+        run: uv run ruff check shared/ producer/ mirror/ tests/ status-api/
 
       - name: Prune uv cache for CI
         run: uv cache prune --ci
@@ -53,6 +53,15 @@ jobs:
         run: uv run pytest tests/ -v
         env:
           PYTHONPATH: ${{ github.workspace }}
+
+      - name: Install Status API dependencies
+        run: uv sync --project status-api --extra dev
+
+      - name: Run required Status API tests
+        working-directory: status-api
+        run: uv run --extra dev pytest ../tests/test_status_api.py -v
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/status-api
 
       - name: Prune uv cache for CI
         run: uv cache prune --ci

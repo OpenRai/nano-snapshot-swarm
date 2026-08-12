@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import binascii
+import hashlib
 import json
 import logging
 import os
@@ -12,6 +14,7 @@ from urllib.parse import quote
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
@@ -40,6 +43,11 @@ MAGNET_TRACKERS = (
     "udp://tracker.torrent.eu.org:451/announce",
 )
 CANONICAL_TORRENT_NAME = "nano-ledger-snapshot.7z"
+TEMPLATE_DIR = Path(__file__).parent / "templates"
+JINJA = Environment(
+    loader=FileSystemLoader(TEMPLATE_DIR),
+    autoescape=select_autoescape(["html", "xml"]),
+)
 
 app = FastAPI(title="Nano Snapshot Status API")
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -124,14 +132,41 @@ def _build_magnet(info_hash: str, torrent_name: str, info_hash_v1: str | None = 
     return "magnet:?" + "&".join(params)
 
 
-def verify_push(payload: PushRequest, producer_signing_pubkey_hex: str) -> bool:
-    pubkey_bytes = bytes.fromhex(producer_signing_pubkey_hex)
-    verify_key = VerifyKey(pubkey_bytes)
-    message = f"{payload.sequence}:{payload.info_hash}:{payload.timestamp}".encode("ascii")
+def canonical_push_payload(payload: PushRequest | dict) -> bytes:
+    """Return the one signed JSON representation of a status push envelope."""
+    if isinstance(payload, PushRequest):
+        data = payload.model_dump(exclude={"signature"}, exclude_none=True)
+    else:
+        data = {
+            key: value
+            for key, value in payload.items()
+            if key != "signature" and value is not None
+        }
+    return json.dumps(
+        data,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _decode_torrent(payload: PushRequest) -> bytes:
     try:
-        verify_key.verify(message, bytes.fromhex(payload.signature))
+        return base64.b64decode(payload.torrent_file_b64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="Invalid torrent Base64") from exc
+
+
+def verify_push(payload: PushRequest, producer_signing_pubkey_hex: str) -> bool:
+    try:
+        pubkey_bytes = bytes.fromhex(producer_signing_pubkey_hex)
+        signature_bytes = bytes.fromhex(payload.signature)
+        if len(pubkey_bytes) != 32 or len(signature_bytes) != 64:
+            return False
+        verify_key = VerifyKey(pubkey_bytes)
+        verify_key.verify(canonical_push_payload(payload), signature_bytes)
         return True
-    except BadSignatureError:
+    except (BadSignatureError, TypeError, ValueError):
         return False
 
 
@@ -149,13 +184,22 @@ def push(payload: PushRequest) -> JSONResponse:
     if payload.torrent_name != CANONICAL_TORRENT_NAME:
         raise HTTPException(status_code=422, detail="Unexpected torrent name")
 
+    torrent_bytes = _decode_torrent(payload)
+    payload_digest = hashlib.sha256(canonical_push_payload(payload)).hexdigest()
     current_seq = _current_status.get("sequence", 0) if _current_status else 0
     if payload.sequence < current_seq:
         raise HTTPException(
             status_code=409, detail=f"Replay rejected (seq {payload.sequence} < {current_seq})"
         )
 
-    torrent_bytes = base64.b64decode(payload.torrent_file_b64)
+    if payload.sequence == current_seq and _current_status is not None:
+        if (
+            _current_status.get("payload_digest") == payload_digest
+            and torrent_bytes == _torrent_bytes
+        ):
+            return JSONResponse({"ok": True, "sequence": payload.sequence})
+        raise HTTPException(status_code=409, detail="Conflicting payload for existing sequence")
+
     magnet = _build_magnet(payload.info_hash, payload.torrent_name, payload.info_hash_v1)
 
     status = {
@@ -175,6 +219,7 @@ def push(payload: PushRequest) -> JSONResponse:
         "verified": True,
         "timestamp": payload.timestamp,
         "archive_listing": payload.archive_listing,
+        "payload_digest": payload_digest,
     }
 
     _save_state(status, torrent_bytes)
@@ -193,21 +238,8 @@ def get_status() -> JSONResponse:
 
 
 def _render_fragment() -> str:
-    html = (Path(__file__).parent / "templates" / "status_fragment.html").read_text()
-    rendered = html.replace("{{ sequence }}", str(_current_status["sequence"]))
-    rendered = rendered.replace("{{ info_hash }}", _current_status["info_hash"])
-    rendered = rendered.replace("{{ torrent_name }}", _current_status["torrent_name"] + ".torrent")
-    rendered = rendered.replace("{{ timestamp }}", _current_status["timestamp"])
-    rendered = rendered.replace("{{ magnet }}", _current_status["magnet"])
-    listing = _current_status.get("archive_listing") or ""
-    rendered = rendered.replace("{{ archive_listing }}", listing)
-    if not listing:
-        rendered = rendered.replace(
-            '<details class="archive-listing">',
-            '<details class="archive-listing" hidden>',
-        )
-    rendered += f'<span id="_push-ts" data-ts="{_current_status["timestamp"]}" hidden></span>'
-    return rendered
+    status = {**_current_status, "torrent_name": _current_status["torrent_name"] + ".torrent"}
+    return JINJA.get_template("status_fragment.html").render(**status)
 
 
 @app.get("/api/status-fragment")
@@ -267,14 +299,12 @@ def get_public_key() -> Response:
 
 @app.get("/")
 def index() -> Response:
-    template_path = Path(__file__).parent / "templates" / "index.html"
-    html = template_path.read_text()
     if _current_status is None:
+        html = JINJA.get_template("index.html").render(status_fragment="")
         return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
     fragment = _render_fragment()
-
-    html = html.replace("{{ status_fragment }}", fragment)
+    html = JINJA.get_template("index.html").render(status_fragment=fragment)
     return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
 
