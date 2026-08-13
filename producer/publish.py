@@ -130,9 +130,11 @@ def _wait_for_verified_snapshot(
                 pass
         logger.info(
             "DHT mutable-item read-back candidate: authoritative=true, sequence=%s, "
-            "public key match=%s, info hash=%s",
+            "public key match=%s, signature bytes=%s, signed value bytes=%s, info hash=%s",
             alert.extra.get("seq", 0),
             returned_key == public_key.hex(),
+            len(str(alert.extra.get("signature", ""))) // 2,
+            len(returned_value) if returned_value is not None else 0,
             returned_hash,
         )
         verified = _verified_snapshot_from_alert(
