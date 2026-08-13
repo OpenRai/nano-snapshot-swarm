@@ -13,14 +13,15 @@ For protocol mechanics, use the specifications and library reference: [BEP 9
 
 ## What is published
 
-The snapshot is one canonical archive:
+The current snapshot is one canonical archive:
 
 ```text
 nano-ledger-snapshot.7z
 ```
 
-The producer creates one hybrid v1+v2 `.torrent` for that archive. It exposes
 two identifiers for the same torrent:
+The producer creates a hybrid v1+v2 `.torrent` for that archive. It exposes two
+identifiers for the same torrent:
 
 - `info_hash_v1`: the v1 compatibility identifier.
 - `info_hash`: the v2 identifier and the repository's canonical DHT/API key.

@@ -6,8 +6,8 @@ Notes for running the authority side: generating keys, publishing snapshots, and
 
 ## Prerequisites
 
-- `mdb_copy` — from [LMDB](https://github.com/LMDB/lmdb), usually installed as `lmdb-utils` or `lmdb` package
-- `zstd` — [Facebook zstd](https://facebook.github.io/zstd/), widely available
+- `aria2c` — resumable upstream archive download
+- `7z` — archive inspection for the status push and optional validation fixtures
 - Python 3.12+
 - `uv` — [Astral uv](https://github.com/astral-sh/uv) package manager
 
@@ -19,10 +19,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv .venv --python 3.12
 source .venv/bin/activate
 
-# Install Python dependencies
-uv pip install pynacl bencodepy nano_lib_py
-
-# libtorrent is C++ and must be installed separately — see mirror/Dockerfile for build instructions
+# Install the project dependencies
+uv sync --extra dev
 ```
 
 ---
@@ -31,7 +29,9 @@ uv pip install pynacl bencodepy nano_lib_py
 
 The producer needs an Ed25519 key pair. The **private key** (hex) is used to sign DHT mutable items. The **public key** (hex) is what mirrors use as `PRODUCER_SIGNING_PUBKEY`.
 
-Important: the BEP 46 / libtorrent keypair uses standard Ed25519 derivation. A Nano account address uses Nano's Ed25519-Blake2b derivation. Reusing the same 32-byte secret across both systems does not make the DHT public key numerically equal to the Nano account public key.
+Important: the DHT signer uses standard Ed25519 derivation. A Nano account uses
+Nano's Ed25519-Blake2b derivation. Reusing one 32-byte secret does not make the
+two public keys numerically equal.
 
 ### Option A: Reuse a 32-byte secret you already control
 
@@ -65,10 +65,10 @@ print(f'Public key  (PRODUCER_SIGNING_PUBKEY):  {sk.verify_key.encode().hex()}')
 "
 ```
 
-Sample output:
+The command prints a 64-character private key and a 64-character public key:
 ```
-Private key (DHT_PRIVATE_KEY): a06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d...
-Public key  (PRODUCER_SIGNING_PUBKEY):  77ff84905a91936367c01360803104f92432fcd904a43511876df5cdf3e7e548...
+Private key (DHT_PRIVATE_KEY): <64 hex characters>
+Public key  (PRODUCER_SIGNING_PUBKEY): <64 hex characters>
 ```
 
 **Store the private key securely.** Never commit it, never log it, never share it. The public key is safe to share.
@@ -157,9 +157,9 @@ python -m producer.cli publish \
   --output-dir /opt/nano-snapshots
 ```
 
-Published torrents contain only BitTorrent metadata and the signed raw-v2 DHT
-reference; see [Torrent and Magnet Format](torrent-format.md) for the complete
-composition contract, including the hybrid hashes and magnet URI.
+The `.torrent` contains BitTorrent metadata. The producer publishes the signed
+raw-v2 DHT pointer separately. See [Torrent and Magnet Format](torrent-format.md)
+for the hybrid hashes, DHT value, and magnet contract.
 
 Expected publish output:
 ```
@@ -223,7 +223,9 @@ systemctl --user start nano-snapshot.service
 # /opt/nano-snapshots/nano-snapshot.log
 ```
 
-The service runs with `TimeoutStopSec=3600` (1 hour) to accommodate large downloads.
+The pipeline unit allows 12 hours to start and finish. Its stop timeout is five
+minutes. Do not stop it during an archive download unless you intend to resume
+that download later.
 
 ---
 
@@ -241,10 +243,6 @@ Producer ──HTTPS signed push──► Fly.io: nano-snapshot-hub
                                      ├── GET /api/latest.magnet
                                      ├── GET /             (SSR dashboard)
                                      └── /data volume      (persistent)
-                                          ▼
-                                   Cloudflare CDN cache
-                                          ▼
-                              GitHub Pages static dashboard
 ```
 
 ### Deploy the Status API
@@ -289,7 +287,8 @@ systemctl --user enable nano-status-push.timer
 
 Place Cloudflare in front of the Fly app to cache immutable `.torrent` files at the edge. Keep the dashboard and live status routes bypassed so a reload cannot combine responses from different snapshot sequences. See `status-api/deploy/fly.io/README.md` §5 for exact DNS and cache-rule settings.
 
-Expected Fly.io cost: **under $5/month** (mostly idle 256 MB VM + 1 GB volume).
+Fly.io charges and included allowances can change. Review the current Fly.io
+pricing before creating the app or increasing capacity.
 
 ---
 

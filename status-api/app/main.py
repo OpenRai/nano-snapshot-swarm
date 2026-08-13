@@ -179,6 +179,24 @@ def verify_push(payload: PushRequest, producer_signing_pubkey_hex: str) -> bool:
         return False
 
 
+def _same_snapshot_identity(payload: PushRequest, torrent_bytes: bytes) -> bool:
+    """Return whether a signed refresh describes the currently stored torrent."""
+    if _current_status is None:
+        return False
+    immutable_fields = (
+        "sequence",
+        "info_hash",
+        "info_hash_v1",
+        "torrent_name",
+        "piece_size",
+        "snapshot_size_bytes",
+        "archive_listing",
+    )
+    return all(
+        getattr(payload, field) == _current_status.get(field) for field in immutable_fields
+    ) and torrent_bytes == _torrent_bytes
+
+
 @app.post("/api/push")
 def push(payload: PushRequest) -> JSONResponse:
     global _current_status, _torrent_bytes
@@ -202,7 +220,8 @@ def push(payload: PushRequest) -> JSONResponse:
             and torrent_bytes == _torrent_bytes
         ):
             return JSONResponse({"ok": True, "sequence": payload.sequence})
-        raise HTTPException(status_code=409, detail="Conflicting payload for existing sequence")
+        if not _same_snapshot_identity(payload, torrent_bytes):
+            raise HTTPException(status_code=409, detail="Conflicting payload for existing sequence")
 
     magnet = _build_magnet(payload.info_hash, payload.torrent_name, payload.info_hash_v1)
 

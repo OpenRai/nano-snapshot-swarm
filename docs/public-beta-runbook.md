@@ -28,8 +28,9 @@ docker logs --tail 100 nano-mirror
 cat ./nano-data/mirror_state.json
 ```
 
-Healthy steady state has `phase: "seeding"`, `progress: 1`, and a running
-container. The five-minute `Seeding | ...` heartbeat is expected even when
+Healthy steady state has `phase: "seeding"` and a running container. Confirm
+completion from the `Snapshot download complete; now seeding ...` log or the
+five-minute `Seeding | ...` heartbeat. The heartbeat is expected even when
 there are no peers. `Peers` means established BitTorrent peers; a queued
 seed-peer connection is not an established peer.
 
@@ -53,7 +54,7 @@ cat /path/to/nano-snapshots/seeder-stats.json
 ```
 
 For a ready producer, `state` is `seeding`, `dht_verified` and `seeder_ready`
-are true, `torrent_info_hash` equals `dht_verified`'s hash, and
+are true, `torrent_info_hash` identifies the current torrent, and
 `dht_sequence` is present. `dht_direct_acknowledgements` is a diagnostic count,
 not a substitute for authoritative read-back.
 

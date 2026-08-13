@@ -1,27 +1,29 @@
 # Manual End-to-End Validation
 
-This procedure validates the producer, DHT update, BitTorrent transfer, and
-mirror replacement path with small local payloads. It uses the isolated
-`validation` DHT salt and does not modify the production stream.
+This procedure validates producer publication, DHT discovery, BitTorrent
+transfer, and mirror replacement with a small payload. Use an isolated
+validation environment. Do not change the production producer's `.env`, output
+directory, or `nano-seed.service` to run this test.
+
+This repository does not yet provision the isolated producer automatically.
+Treat this as an operator procedure, not a turnkey test command.
 
 ## Producer
 
-On the producer host, ensure the normal user-level `nano-seed.service` is
-available and set the temporary test flag in `~/.env`:
+On an isolated host or temporary checkout, create a separate output directory
+and start a separate `producer.seeder` process. Give that process the same
+signing key, `DHT_SALT=validation`, `USE_PLACEHOLDER_SNAPSHOT=1`, and its own
+`OUTPUT_DIR`. Keep it separate from the production `nano-seed.service`.
 
-```text
-USE_PLACEHOLDER_SNAPSHOT=1
-DHT_SALT=validation
-```
+The normal `nano-snapshot.service` is not a validation harness. It signals the
+production service name and uses the production output directory. Do not run it
+after changing only `DHT_SALT`.
 
-Trigger the pipeline and record the published sequence and v2 info hash:
+Create and publish a placeholder through the isolated producer path. Record the
+published DHT sequence and v2 info hash. Confirm that the temporary seeder logs
+an authoritative DHT verification before starting the mirror.
 
-```bash
-systemctl --user start nano-snapshot.service
-journalctl --user -u nano-snapshot -f
-```
-
-The output directory must contain a fresh timestamped placeholder, the
+The validation output directory must contain a fresh timestamped placeholder, the
 canonical symlink, its torrent, and updated `snapshot-meta.json`. The producer
 seeder must be active, report the canonical torrent as seeding, and write
 `dht_verified=true` with the matching `torrent_info_hash` in `seeder-stats.json`.
@@ -39,8 +41,8 @@ Acceptance for the first publication:
 3. The mirror remains running after completion.
 4. `mirror_state.json` records the discovered sequence and info hash.
 
-Run the producer service again to create and publish a second placeholder. Do
-not restart the mirror. Acceptance for mutation:
+Create and publish a second placeholder through the isolated producer. Do not
+restart the mirror. Acceptance for mutation:
 
 1. The mirror discovers a higher sequence and different info hash.
 2. It pauses/removes the old torrent and resolves the new torrent metadata.
@@ -49,17 +51,19 @@ not restart the mirror. Acceptance for mutation:
 5. The mirror container uptime is continuous across the replacement.
 6. `mirror_state.json` and `snapshot-meta.json` contain the second hash.
 
-Also stop and start the producer seeder between two publications. Acceptance is
-that the restarted seeder publishes or verifies a strictly current DHT sequence
-without reusing a sequence for a different value, and the mirror still detects
-the next update. Record producer DHT publication logs, mirror transition logs, both info hashes,
-file sizes, peer/source counters, and the final seeding state. Do not describe
-the transfer as P2P-proven unless the leecher receive/source counters and
-producer upload/peer-transfer counters show peer-sourced bytes.
+Also restart the temporary producer seeder between two publications. Confirm
+that it uses a current DHT sequence for each distinct value. Confirm that the
+mirror detects the next update.
 
-After the test, remove `USE_PLACEHOLDER_SNAPSHOT` or set it to `0`, restore the
-production DHT salt, and trigger or wait for the normal production pipeline as
-appropriate.
+Record producer DHT publication logs, mirror transition logs, both info hashes,
+file sizes, `Peers` and `Seeds` counters, producer upload counters, and the
+final seeding state. Claim peer-sourced transfer only when a mirror shows
+nonzero progress with a connected source and the producer reports matching
+upload activity.
+
+Stop the temporary producer process and remove its temporary output directory
+after collecting evidence. Do not change the production DHT salt to clean up a
+validation run.
 
 ## Evidence gate
 

@@ -201,6 +201,58 @@ class TestPush:
         finally:
             main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
 
+    def test_equal_sequence_signed_timestamp_refresh_is_accepted(
+        self, client, sample_push_payload
+    ):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        from producer.push_status import sign_push
+
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        try:
+            assert client.post("/api/push", json=payload).status_code == 200
+            refreshed = {**payload, "timestamp": "2026-04-23T01:00:00Z"}
+            refreshed["signature"] = sign_push(
+                "e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d",
+                refreshed,
+            )
+
+            response = client.post("/api/push", json=refreshed)
+
+            assert response.status_code == 200
+            assert client.get("/api/status").json()["timestamp"] == refreshed["timestamp"]
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+            main_module._current_status = None
+            main_module._torrent_bytes = b""
+
+    def test_equal_sequence_timestamp_refresh_survives_legacy_saved_state(
+        self, client, sample_push_payload
+    ):
+        payload, pubkey_hex = sample_push_payload
+        import app.main as main_module
+
+        from producer.push_status import sign_push
+
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        try:
+            assert client.post("/api/push", json=payload).status_code == 200
+            main_module._current_status.pop("payload_digest")
+            refreshed = {**payload, "timestamp": "2026-04-23T01:00:00Z"}
+            refreshed["signature"] = sign_push(
+                "e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d",
+                refreshed,
+            )
+
+            assert client.post("/api/push", json=refreshed).status_code == 200
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+            main_module._current_status = None
+            main_module._torrent_bytes = b""
+
     def test_equal_sequence_modified_torrent_bytes_are_rejected(
         self, client, sample_push_payload
     ):

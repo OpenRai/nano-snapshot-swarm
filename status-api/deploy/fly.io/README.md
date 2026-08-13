@@ -2,13 +2,15 @@
 
 This guide covers how to set up, deploy, and automate the Nano Snapshot Status API on [Fly.io](https://fly.io).
 
-The Status API is a standalone FastAPI service that receives signed snapshot updates from the Producer and serves them as JSON, `.torrent` files, and an SSR dashboard. It is intentionally lightweight (~100 MB, no libtorrent) and sits behind Cloudflare for CDN caching.
+The Status API is a standalone FastAPI service that receives signed snapshot
+updates from the Producer and serves JSON, `.torrent` files, and an SSR
+dashboard. It does not import or run libtorrent.
 
 ---
 
 ## 1. Prerequisites (Operator Setup)
 
-1. **Sign up / log in** at [Fly.io](https://fly.io). You will need to add a credit card to activate the free tier.
+1. **Sign up / log in** at [Fly.io](https://fly.io). Check Fly.io's current account and billing requirements.
 2. **Install `flyctl`:**
    - **macOS (Homebrew):** `brew install flyctl`
    - **Linux:** `curl -L https://fly.io/install.sh | sh`
@@ -95,10 +97,9 @@ Initially, `GET /api/status`, `GET /api/torrent`, and `GET /api/latest.magnet` r
 The canonical public URL is `https://nano-snapshots.openrai.org`, fronted by Cloudflare.
 
 1. In Fly: `fly certs add nano-snapshots.openrai.org --app nano-snapshot-hub`
-2. In Cloudflare DNS for `openrai.org`:
-   - **A** `nano-snapshots` → `66.241.124.49` (orange cloud / proxied)
-   - **AAAA** `nano-snapshots` → `2a09:8280:1::109:b32e:0` (orange cloud / proxied)
-   - **TXT** `_fly-ownership.nano-snapshots` → `app-0pd61ql` (DNS only)
+2. In Cloudflare DNS for `openrai.org`, create the A, AAAA, and ownership TXT
+   records that `fly certs add` reports for this app. Do not copy fixed IP
+   addresses or ownership tokens from another deployment.
 3. In Cloudflare SSL/TLS: set mode to **Full (strict)**
 4. Optionally add Cloudflare Cache Rules:
    - `nano-snapshots.openrai.org/` and `/api/status*` → **Cache Level: Bypass**
@@ -108,7 +109,7 @@ The canonical public URL is `https://nano-snapshots.openrai.org`, fronted by Clo
 
 Cache bypass does not disable Cloudflare security rules. If `POST /api/push` returns HTTP 403, add a narrowly scoped WAF/security skip for that path or keep the Producer on the direct Fly hostname.
 
-The `_acme-challenge` and `_fly-ownership` records are only needed for initial certificate issuance and can be removed afterwards.
+Keep the DNS records required by Fly.io while the custom domain is active.
 
 ---
 
@@ -131,7 +132,8 @@ In your GitHub repository → **Settings** → **Secrets and variables** → **A
 
 ### 6.3 GitHub Actions Workflow
 
-Create `.github/workflows/deploy-status-api.yml`:
+The repository already contains `.github/workflows/deploy-status-api.yml`. It
+deploys on pushes to `main` that change `status-api/**`:
 
 ```yaml
 name: Deploy Status API
@@ -150,7 +152,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - name: Deploy
-        run: fly deploy --config status-api/fly.toml
+        run: flyctl deploy --config fly.toml
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 ```
@@ -196,12 +198,7 @@ systemctl --user start nano-status-push.service
 
 ---
 
-## 9. Cost Estimate
+## 9. Cost and capacity
 
-With Cloudflare caching in front:
-
-- Fly VM (256 MB, shared CPU, mostly idle): **~$2–3/month**
-- 1 GB volume: **~$0.15/month**
-- Bandwidth: essentially free (served from Cloudflare edge)
-
-Total expected: **under $5/month**.
+Billing depends on Fly.io's current plans, VM uptime, volume size, and egress.
+Review the provider's current pricing and monitor the app's usage after launch.

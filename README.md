@@ -1,13 +1,19 @@
 # nano-snapshot-swarm
 
-Decentralized [Nano](https://nano.org) ledger snapshot distribution using BitTorrent BEP 46 mutable torrents and DHT.
+Decentralized [Nano](https://nano.org) ledger snapshot distribution over
+BitTorrent. The producer signs a Mainline DHT mutable item that points to the
+current BitTorrent v2 info hash. The value is a project-specific v2 extension
+inspired by BEP 46; see [Torrent and Magnet Format](docs/torrent-format.md).
 
 There are two main user-facing workflows:
 
 1. Download the latest snapshot once, then unpack it into a Nano node data directory.
-2. Run a long-lived mirror that continuously republishes and seeds fresh snapshots for the community.
+2. Run a long-lived mirror that discovers updates and seeds fresh snapshots for the community.
 
-The ledger lives as an LMDB database (~80 GB). Rather than serving it from a single S3 bucket, this system lets anyone contribute bandwidth by seeding snapshots peer-to-peer. New snapshots are published to the Mainline DHT under an Ed25519 authority key; mirrors discover updates and download only the changed pieces via BitTorrent v2 delta efficiency.
+Rather than relying on a single download host, this system lets anyone
+contribute bandwidth by seeding snapshots peer-to-peer. Mirrors recheck their
+existing archive before requesting a replacement torrent, so matching pieces
+can be reused. Reuse depends on the two torrent contents and is not guaranteed.
 
 ---
 
@@ -16,7 +22,7 @@ The ledger lives as an LMDB database (~80 GB). Rather than serving it from a sin
 | Service | Location | Description |
 |---|---|---|
 | **Mirror** | `mirror/` | Mirror service. Discovers snapshots via DHT, downloads and seeds them. |
-| **Producer** | `producer/` | CLI tool. Creates a torrent for a snapshot archive and publishes its info-hash to the DHT. |
+| **Producer** | `producer/` | Pipeline and long-lived seeder. Creates torrents, publishes the signed DHT pointer, and seeds the current snapshot. |
 
 For the exact hybrid torrent, raw-v2 DHT pointer, magnet, and download-route contract, see [Torrent and Magnet Format](docs/torrent-format.md).
 
@@ -50,7 +56,8 @@ To unpack the archive into the directory that the official Nano node Docker imag
 cp nano-data/data.ldb /path/to/nano-node-data/data.ldb
 ```
 
-That extraction path needs roughly `{compressed size} + {2 * compressed size}` GB of temporary space, so as of 2026-04 a ~60 GB archive means about ~180 GB free.
+Provision space for the downloaded archive, the extracted ledger, and working
+headroom. Check the current archive size before starting an extraction.
 
 ### 2. Host a P2P Mirror
 
@@ -69,7 +76,8 @@ kubectl logs -f deploy/nano-mirror
 kubectl describe pod <pod-name>
 ```
 
-As of 2026-04, compressed snapshot hosting needs less than 60 GB of disk space.
+Provision storage for one complete archive plus filesystem and resume-data
+headroom. The required size changes with the published snapshot.
 
 ---
 
@@ -81,3 +89,5 @@ As of 2026-04, compressed snapshot hosting needs less than 60 GB of disk space.
 | [docs/mirror-leech-mode.md](docs/mirror-leech-mode.md) | One-shot download (--once) |
 | [docs/producer-guide.md](docs/producer-guide.md) | Running the Producer, key generation, scheduling |
 | [docs/configuration.md](docs/configuration.md) | All environment variables, CLI flags, docker-compose reference |
+| [docs/public-beta-runbook.md](docs/public-beta-runbook.md) | Operating and troubleshooting a beta mirror |
+| [docs/release-checklist.md](docs/release-checklist.md) | Evidence required before a public beta announcement |

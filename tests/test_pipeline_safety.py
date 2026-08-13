@@ -27,6 +27,12 @@ def test_daily_pipeline_reloads_seeder_without_destroying_its_dht_session() -> N
     assert "from producer.publish import publish_to_dht" not in script
 
 
+def test_daily_pipeline_waits_for_the_full_cold_seeder_publication_budget() -> None:
+    script = Path("scripts/daily-snapshot.sh").read_text()
+
+    assert "seq 1 360" in script
+
+
 def test_shell_special_filename_stays_data_when_passed_as_an_argument(tmp_path) -> None:
     metadata_path = tmp_path / "metadata.json"
     marker = tmp_path / "SHOULD_NOT_RUN"

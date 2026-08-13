@@ -199,7 +199,9 @@ du -sh ./nano-data/
 docker exec nano-mirror ls -lh /data/
 ```
 
-A complete compressed snapshot is approximately 60 GB or less as of 2026-04. During download, a partial file of the same size exists (BitTorrent pre-allocates).
+Plan for one complete archive plus filesystem and resume-data headroom. The
+required size changes with the published snapshot. Libtorrent can allocate a
+partial file while the download is in progress.
 
 ### Network
 
@@ -289,7 +291,7 @@ The mirror rejects such items and retries on the next poll cycle.
 
 DHT bootstrap can take 5–15 minutes on a cold start, especially behind NAT. The 30-second bootstrap wait is intentionally conservative. Mirror downloads are P2P-only.
 
-### "No peers"
+### "No connected peers or seeds"
 
 `Attempting seed-peer connection: ...` means libtorrent queued an asynchronous
 connection request. It does not confirm a TCP connection or BitTorrent handshake.
@@ -303,10 +305,10 @@ handshake. The seed peer must be reachable on TCP port 6881.
 
 ### Download appears stuck at 0%
 
-Check `num_peers: 0`. If the torrent has no reachable peers, the download cannot proceed. This can happen if:
-- The torrent info-hash is not yet announced to any tracker (if trackers are used)
-
-Use `--log-level DEBUG` and look for `alert` messages to understand what's happening.
+Check the transfer line for `Peers`, `Seeds`, and `Connections`. If neither a
+peer nor a seed stays connected, the download cannot progress. Check the
+configured seed peer first, then use `LOG_LEVEL=DEBUG` to inspect connection
+attempts and disconnect reasons.
 
 ### Volume Permissions
 

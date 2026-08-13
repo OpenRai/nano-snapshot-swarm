@@ -54,7 +54,9 @@ wait_for_authoritative_seeder() {
 
     local stats_file="${OUTPUT_DIR}/seeder-stats.json"
     local state_file="${REPO_DIR}/publisher_state.json"
-    for _ in $(seq 1 180); do
+    # A cold seeder may use its full 120s bootstrap wait, 60s DHT put wait,
+    # and 120s signed read-back wait. Leave a small margin for reload handling.
+    for _ in $(seq 1 360); do
         if [ -f "$stats_file" ] && python3 - "$stats_file" "$state_file" "$expected_hash" <<'PY'
 import json
 import sys

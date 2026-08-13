@@ -4,7 +4,7 @@
 
 The production publisher and mirror should remain on the Mainline BitTorrent
 DHT. The current design publishes a signed mutable pointer to a BitTorrent v2
-infohash and works with this project's v2 torrent and mirror implementation.
+info hash and works with this project's hybrid torrent and mirror implementation.
 Neither `dmt`, `dhtup`, nor HyperDHT provides a reason to replace it.
 
 The current value format is a project-specific v2 extension of the BEP 46
@@ -13,8 +13,8 @@ third-party BEP 46 consumers becomes a stated requirement.
 
 ## Current implementation
 
-`producer/torrent_create.py` creates v2-only torrents. `shared/bep46.py`
-publishes the raw 32-byte v2 infohash as the mutable item's value. Libtorrent
+`producer/torrent_create.py` creates hybrid v1+v2 torrents. `shared/bep46.py`
+publishes the raw 32-byte v2 info hash as the mutable item's value. Libtorrent
 bencodes and signs that value for the BEP 44 mutable-item protocol.
 
 The publisher derives the mutable-item target from the Ed25519 public key and
@@ -40,9 +40,8 @@ The project instead stores a raw 32-byte v2 infohash. That is valid as a BEP 44
 mutable value, but it is not the BEP 46 payload shape. A generic BEP 46 client
 that expects `v = {"ih": <20-byte hash>}` cannot consume the current stream.
 
-This is intentional and appropriate for v2-only torrents. Do not replace the
-production stream merely to match a draft whose payload cannot express a
-v2-only infohash.
+This is intentional. Do not replace the production stream merely to match a
+draft whose payload cannot express its 32-byte v2 pointer.
 
 ## dmt
 
@@ -91,13 +90,14 @@ out of scope for the production publisher.
 
 ## Decision and conditional future work
 
-Keep the current publisher, seeder republish interval, v2 torrent format, and
-raw 32-byte pointer value unchanged.
+Keep the current publisher, seeder republish interval, hybrid torrent format,
+and raw 32-byte pointer value unchanged.
 
 If third-party BEP 46 consumption becomes a requirement, add a separate
 compatibility stream rather than changing the existing one:
 
-1. Create a hybrid or v1 torrent and retain its 20-byte v1 infohash.
+1. Use the 20-byte v1 info hash from the existing hybrid torrent, or publish a
+   distinct v1-compatible torrent if a consumer requires one.
 2. Publish a second mutable item, under a distinct documented salt.
 3. Encode its value as the canonical bencoded `{ih: <20-byte v1 infohash>}`
    payload.
