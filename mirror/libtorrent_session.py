@@ -384,13 +384,8 @@ class LibtorrentSession:
         if handle is None:
             raise KeyError(f"Unknown torrent: {info_hash}")
         ip = socket.gethostbyname(host)
-        logger.info("Attempting connection to seed peer %s:%d (%s)", host, port, ip)
+        logger.info("Attempting seed-peer connection: %s:%d", host, port)
         handle.connect_peer((ip, port))
-        logger.info(
-            "Seed-peer connection attempt queued for %s:%d; connection not yet confirmed",
-            host,
-            port,
-        )
 
     def torrent_status(self, info_hash: str) -> Optional[TorrentStatusSnapshot]:
         handle = self._handles.get(info_hash)
@@ -562,9 +557,9 @@ class LibtorrentSession:
                             logger.info("DHT bootstrap complete (%d nodes)", self.dht_node_count())
                             self._dht_bootstrapped.set()
                         elif snap.type_name == "peer_connect_alert":
-                            logger.info("Peer connection established: %s", snap.message)
+                            logger.debug("Peer connection established: %s", snap.message)
                         elif snap.type_name == "peer_disconnected_alert":
-                            logger.info("Peer disconnected: %s", snap.message)
+                            logger.debug("Peer disconnected: %s", snap.message)
                         elif snap.type_name == "fastresume_rejected_alert":
                             logger.warning(
                                 "Resume data rejected for v2 info hash=%s...: %s",

@@ -82,3 +82,11 @@ docker rm -f nano-mirror
 Keep `mirror_state.json`, the relevant container logs, the image digest, and the
 timestamps of the affected DHT discovery cycles when reporting a problem. Do
 not include private keys or other host secrets.
+
+## Log verbosity
+
+The default `LOG_LEVEL=INFO` keeps lifecycle churn quiet: individual peer
+connect and disconnect events are DEBUG diagnostics, not operator milestones.
+Use `-e LOG_LEVEL=DEBUG` when investigating peer negotiation, transport
+failures, or reconnect behavior. Discovery, state transitions, transfer
+progress, warnings, and errors remain visible at the default level.

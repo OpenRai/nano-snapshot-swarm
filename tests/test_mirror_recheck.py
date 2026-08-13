@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import sys
 from types import SimpleNamespace
 
@@ -266,6 +267,15 @@ def test_libtorrent_stop_saves_resume_data_before_releasing_session(tmp_path) ->
     assert session._session is None
 
 
+def test_peer_lifecycle_alerts_are_debug_only() -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    from mirror.libtorrent_session import LibtorrentSession
+
+    source = inspect.getsource(LibtorrentSession._alert_loop)
+    assert 'logger.debug("Peer connection established: %s", snap.message)' in source
+    assert 'logger.debug("Peer disconnected: %s", snap.message)' in source
+
+
 def test_old_authority_pubkey_environment_is_ignored(monkeypatch, caplog) -> None:
     sys.modules.setdefault("libtorrent", SimpleNamespace())
     from mirror.watcher import resolve_producer_signing_pubkey
@@ -304,6 +314,6 @@ def test_start_logs_the_complete_producer_public_key(tmp_path, monkeypatch, capl
         watcher.start(once=True)
 
     assert (
-        f"Producer signing public key (PRODUCER_SIGNING_PUBKEY): {public_key}"
+        f"Verification using PRODUCER_SIGNING_PUBKEY: {public_key}"
         in caplog.text
     )
