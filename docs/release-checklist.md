@@ -1,8 +1,6 @@
-# Release verification and soak checklist
+# Public beta release checklist
 
-The public beta is open. Use this checklist to record the evidence required to
-promote a beta build or make stronger reliability claims. Record one release
-commit and do not mix image, producer, or dashboard commits.
+Record one release commit and do not mix image, producer, or dashboard commits.
 
 - [ ] `git rev-parse HEAD` is the intended release commit.
 - [ ] Ruff and the complete pytest suite pass.
