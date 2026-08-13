@@ -211,21 +211,30 @@ def _load_current_torrent(
         raise RuntimeError("canonical snapshot or torrent is missing")
 
     if current_info_hash and current_info_hash != info_hash:
+        previous_retained = False
         for archive_path, retained_torrent in retained_torrent_pairs(data_dir):
-            if retained_torrent.parent.name == current_info_hash and not session.has_torrent(
-                current_info_hash
-            ):
-                session.add_torrent(
-                    info_hash="",
-                    save_path=str(archive_path.parent),
-                    torrent_file=str(retained_torrent),
-                )
-                logger.info(
-                    "Previous torrent retained for seeding: v2 info hash=%s...",
-                    current_info_hash[:16],
-                )
+            if retained_torrent.parent.name == current_info_hash:
+                previous_retained = True
+                if not session.has_torrent(current_info_hash):
+                    session.add_torrent(
+                        info_hash="",
+                        save_path=str(archive_path.parent),
+                        torrent_file=str(retained_torrent),
+                    )
+                    logger.info(
+                        "Previous torrent reloaded for continued seeding: "
+                        "v2 info hash=%s...",
+                        current_info_hash[:16],
+                    )
+                else:
+                    logger.info(
+                        "Previous torrent remains active for continued seeding: "
+                        "v2 info hash=%s...",
+                        current_info_hash[:16],
+                    )
                 break
-        session.remove_torrent(current_info_hash)
+        if not previous_retained:
+            session.remove_torrent(current_info_hash)
 
     if not session.has_torrent(info_hash):
         session.add_torrent(

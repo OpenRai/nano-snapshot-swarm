@@ -59,7 +59,11 @@ not a substitute for authoritative read-back.
 
 ## No-peer troubleshooting
 
-`No peers` is not itself a failed download. Check, in order:
+`Peers: N (Seeds: M) | Connections: K` separates connected non-seed peers,
+connected complete seeds, and all connections including handshakes. A download
+can progress with `Peers: 0` when `Seeds` is greater than zero.
+
+`No connected peers or seeds` is not itself a failed download. Check, in order:
 
 1. The DHT discovery log reports the expected signed sequence and info hash.
 2. The mirror is listening on both TCP and UDP 6881.
@@ -68,8 +72,8 @@ not a substitute for authoritative read-back.
 5. The producer and dashboard advertise the same torrent v2 info hash.
 
 Queued connection messages only mean that libtorrent accepted an asynchronous
-request. Look for an established peer event or `Peers: N` before claiming a
-peer path is working.
+request. Look for `Connections: K` followed by a non-zero `Peers` or `Seeds`
+count before claiming a peer path is working.
 
 ## Upgrade and report a problem
 

@@ -130,6 +130,7 @@ def test_swarm_mode_logs_seeding_heartbeat_every_five_minutes(
                 progress=1.0,
                 state="seeding",
                 num_peers=2,
+                num_connections=2,
                 download_rate=0,
                 upload_rate=2048,
                 is_seeding=True,
@@ -167,7 +168,65 @@ def test_swarm_mode_logs_seeding_heartbeat_every_five_minutes(
         watcher._monitor_active_torrent_loop()
 
     heartbeats = [line for line in caplog.messages if line.startswith("Seeding |")]
-    assert heartbeats == ["Seeding | Peers: 2 | UL: 2.0 KB/s | Total UL: 3.0 MiB"]
+    assert heartbeats == [
+        "Seeding | Peers: 2 (Seeds: 0) | Connections: 2 | UL: 2.0 KB/s | Total UL: 3.0 MiB"
+    ]
+
+
+def test_connected_seed_is_shown_and_does_not_trigger_no_peer_warning(
+    tmp_path, caplog
+) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    from mirror.libtorrent_session import TorrentStatusSnapshot
+    from mirror.watcher import MirrorWatcher
+
+    watcher = MirrorWatcher(
+        producer_signing_pubkey_hex="ab" * 32,
+        data_dir=str(tmp_path),
+    )
+    status = TorrentStatusSnapshot(
+        progress=0.4,
+        state="downloading",
+        num_peers=0,
+        num_seeds=1,
+        num_connections=1,
+        download_rate=1024,
+        upload_rate=0,
+        is_seeding=False,
+    )
+
+    with caplog.at_level("INFO", logger="mirror.watcher"):
+        watcher._update_transfer_state(status, "cd" * 32, "downloading", 60, True)
+
+    assert "Peers: 0 (Seeds: 1) | Connections: 1" in caplog.text
+    assert "No connected peers or seeds" not in caplog.text
+
+
+def test_no_source_warning_reports_connections(tmp_path, caplog) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    from mirror.libtorrent_session import TorrentStatusSnapshot
+    from mirror.watcher import MirrorWatcher
+
+    watcher = MirrorWatcher(
+        producer_signing_pubkey_hex="ab" * 32,
+        data_dir=str(tmp_path),
+    )
+    status = TorrentStatusSnapshot(
+        progress=0.0,
+        state="downloading",
+        num_peers=0,
+        num_seeds=0,
+        num_connections=2,
+        download_rate=0,
+        upload_rate=0,
+        is_seeding=False,
+    )
+
+    with caplog.at_level("WARNING", logger="mirror.watcher"):
+        watcher._update_transfer_state(status, "cd" * 32, "downloading", 60, False)
+
+    assert "No connected peers or seeds" in caplog.text
+    assert "Connections: 2" in caplog.text
 
 
 def test_once_mode_stops_monitoring_after_seeding(tmp_path, monkeypatch) -> None:

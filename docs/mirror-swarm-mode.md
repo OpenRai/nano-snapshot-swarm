@@ -93,9 +93,9 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 |---|---|
 | `Force recheck on existing data...` | Hashing local file to find reusable pieces |
 | `State transition: downloading → checking_files` | Mirror phase changed |
-| `Download: 45.2% \| State: downloading \| DL: 1234.5 KB/s \| Peers: 3` | Active transfer with progress |
+| `Download: 45.2% \| State: downloading \| DL: 1234.5 KB/s \| Peers: 2 (Seeds: 1) \| Connections: 3` | Active transfer with progress; seeds are connected peers with the complete torrent |
 | `Snapshot download complete; now seeding torrent v2 info hash=<short hash>` | Download finished, now seeding to others |
-| `Download: 0.0% ... Peers: 0` | No reachable peers — check connectivity |
+| `Download: 0.0% ... Peers: 0 (Seeds: 0) \| Connections: 0` | No connected download sources — check connectivity |
 
 **Seeding (steady state):**
 
@@ -293,8 +293,10 @@ DHT bootstrap can take 5–15 minutes on a cold start, especially behind NAT. Th
 
 `Attempting seed-peer connection: ...` means libtorrent queued an asynchronous
 connection request. It does not confirm a TCP connection or BitTorrent handshake.
-`No peers` is based on torrent status and means that no usable torrent peer has
-connected yet while the download is incomplete. The mirror queues another
+`No connected peers or seeds` means that no usable download source is connected
+while the download is incomplete. A connected seed can supply bytes even when
+the non-seed `Peers` count is zero. `Connections` also includes handshakes that
+have not completed yet. The mirror queues another
 configured seed-peer request after each 60-second no-peer warning during the
 download. A queued request does not confirm a TCP connection or BitTorrent
 handshake. The seed peer must be reachable on TCP port 6881.

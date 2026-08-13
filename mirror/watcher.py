@@ -35,6 +35,14 @@ DEFAULT_PRODUCER_SIGNING_PUBKEY_FILE = (
 )
 
 
+def _peer_summary(status: TorrentStatusSnapshot) -> str:
+    """Format connected peer, seed, and in-progress connection counts."""
+    return (
+        f"Peers: {status.num_peers} (Seeds: {status.num_seeds}) | "
+        f"Connections: {status.num_connections}"
+    )
+
+
 def load_default_producer_signing_pubkey() -> str:
     try:
         return DEFAULT_PRODUCER_SIGNING_PUBKEY_FILE.read_text(encoding="ascii").strip()
@@ -559,8 +567,8 @@ class MirrorWatcher:
                         last_seeding_heartbeat = now
                     elif now - last_seeding_heartbeat >= 300:
                         logger.info(
-                            "Seeding | Peers: %d | UL: %.1f KB/s | Total UL: %.1f MiB",
-                            status.num_peers,
+                            "Seeding | %s | UL: %.1f KB/s | Total UL: %.1f MiB",
+                            _peer_summary(status),
                             status.upload_rate / 1024,
                             status.total_upload / (1024**2),
                         )
@@ -571,11 +579,12 @@ class MirrorWatcher:
                 if status.state != last_state:
                     last_state = status.state
 
-                if status.num_peers == 0 and not status.is_seeding:
+                if status.num_peers == 0 and status.num_seeds == 0 and not status.is_seeding:
                     no_peer_seconds += 5
                     if no_peer_seconds >= 60:
                         logger.warning(
-                            f"No peers, {status.progress * 100:.1f}% progress for 60s "
+                            f"No connected peers or seeds, {status.progress * 100:.1f}% "
+                            f"progress for 60s | Connections: {status.num_connections} "
                             f"— download may be stalled"
                         )
                         if self.seed_peers:
@@ -635,7 +644,7 @@ class MirrorWatcher:
                 f"Download: {status.progress * 100:.1f}% | State: {status.state} | "
                 f"DL: {status.download_rate / 1000:.1f} KB/s | "
                 f"UL: {status.upload_rate / 1000:.1f} KB/s | "
-                f"Peers: {status.num_peers} | Seeds: {status.num_seeds}"
+                f"{_peer_summary(status)}"
             )
 
         if status.is_seeding:
@@ -646,10 +655,11 @@ class MirrorWatcher:
                     info_hash[:16],
                 )
 
-        if status.num_peers == 0 and no_peer_seconds >= 60:
+        if status.num_peers == 0 and status.num_seeds == 0 and no_peer_seconds >= 60:
             detail = f"; native error: {status.error}" if status.error else ""
             logger.warning(
-                f"No peers, {status.progress * 100:.1f}% progress for 60s "
+                f"No connected peers or seeds, {status.progress * 100:.1f}% progress "
+                f"for 60s | Connections: {status.num_connections} "
                 f"— download may be stalled{detail}"
             )
 
