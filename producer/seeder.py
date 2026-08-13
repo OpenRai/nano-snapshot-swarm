@@ -34,6 +34,7 @@ logger = logging.getLogger("producer.seeder")
 
 SNAPSHOT_NAME = "nano-ledger-snapshot.7z"
 DHT_REPUBLISH_INTERVAL = 1800  # 30 minutes
+DHT_FAILURE_RETRY_INTERVAL = 300  # 5 minutes
 
 
 def _record_verified_publication(
@@ -155,17 +156,32 @@ def _dht_publish(
         )
         if verified is not None:
             verified_sequence, _ = verified
-            logger.info(
-                "DHT mutable item verified: sequence=%s, "
-                "torrent v2 info hash=%s...",
-                verified_sequence,
-                info_hash_hex[:16],
+            if dht_sequence is not None and verified_sequence < dht_sequence:
+                last_error = (
+                    f"authoritative read-back sequence {verified_sequence} is below "
+                    f"put sequence {dht_sequence}"
+                )
+                logger.warning("Ignoring stale DHT mutable-item read-back: %s", last_error)
+                verified = None
+            else:
+                logger.info(
+                    "DHT mutable item verified: sequence=%s, "
+                    "torrent v2 info hash=%s...",
+                    verified_sequence,
+                    info_hash_hex[:16],
+                )
+                return {
+                    "sequence": verified_sequence,
+                    "direct_acknowledgements": acknowledgements,
+                }
+        if verified is None and not last_error.startswith("authoritative read-back sequence"):
+            last_error = "read-back did not contain the exact signed snapshot"
+        if put_alert is not None:
+            logger.warning(
+                "DHT put completed but read-back did not verify; "
+                "continuing without republishing to preserve sequence monotonicity"
             )
-            return {
-                "sequence": verified_sequence,
-                "direct_acknowledgements": acknowledgements,
-            }
-        last_error = "read-back did not contain the exact signed snapshot"
+            break
         if attempt < 3:
             logger.warning(
                 "DHT mutable-item read-back did not verify; retrying attempt %s/3",
@@ -314,12 +330,13 @@ def main() -> None:
     last_dht_acknowledgements: int | None = None
     last_dht_error: str | None = None
     last_dht_attempt = 0
+    last_dht_attempt_at = 0.0
     dht_verified = False
 
     def publish_current() -> None:
         nonlocal last_dht_publish, last_dht_sequence
         nonlocal last_dht_acknowledgements, last_dht_error
-        nonlocal last_dht_attempt, dht_verified
+        nonlocal last_dht_attempt, last_dht_attempt_at, dht_verified
         if not dht_keys or not session._session:
             dht_verified = False
             last_dht_error = "DHT_PRIVATE_KEY is not configured"
@@ -328,6 +345,7 @@ def main() -> None:
         logger.info("DHT has %s nodes, publishing current torrent...", dht_nodes)
         privkey_64, pubkey_32 = dht_keys
         last_dht_attempt += 1
+        last_dht_attempt_at = time.time()
         try:
             result = _dht_publish(
                 session,
@@ -379,7 +397,9 @@ def main() -> None:
                 logger.error("Canonical torrent reload failed: %s", exc)
 
         # DHT publishing (every 30 min)
-        if dht_keys and (now - last_dht_publish) >= DHT_REPUBLISH_INTERVAL:
+        if dht_keys and (
+            now - last_dht_attempt_at
+        ) >= (DHT_REPUBLISH_INTERVAL if dht_verified else DHT_FAILURE_RETRY_INTERVAL):
             try:
                 publish_current()
             except Exception as exc:

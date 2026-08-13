@@ -183,3 +183,34 @@ def test_publication_does_not_persist_state_without_verified_readback(
         "last_seq": 7,
         "last_info_hash": "ef" * 32,
     }
+
+
+def test_completed_put_is_not_republished_when_readback_is_delayed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class DelayedReadbackSession(FakeDHTSession):
+        def __init__(self, **kwargs: object) -> None:
+            super().__init__(**kwargs)
+            self.publish_count = 0
+
+        def publish_dht_mutable_item(
+            self, private_key: bytes, public_key: bytes, value: bytes, salt: str
+        ) -> None:
+            self.publish_count += 1
+            super().publish_dht_mutable_item(private_key, public_key, value, salt)
+
+    session = DelayedReadbackSession()
+    from producer import seeder as seeder_module
+
+    monkeypatch.setattr(seeder_module, "_wait_for_verified_snapshot", lambda *args, **kwargs: None)
+
+    with pytest.raises(RuntimeError, match="not verified"):
+        seeder_module._dht_publish(
+            session,
+            bytes(64),
+            _public_key(),
+            "ab" * 32,
+            "daily",
+        )
+
+    assert session.publish_count == 1

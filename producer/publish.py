@@ -210,23 +210,37 @@ def publish_to_dht(
                 timeout=DHT_VERIFY_TIMEOUT,
             )
             if verified is not None:
-                dht_sequence, verified_hash = verified
-                state["last_seq"] = seq
-                state["last_info_hash"] = info_hash_hex
-                state["last_dht_seq"] = dht_sequence
-                state["last_dht_info_hash"] = verified_hash
-                save_state(state, state_path)
+                verified_sequence, verified_hash = verified
+                put_sequence = int(put_alert.extra.get("seq", 0)) if put_alert else 0
+                if put_sequence and verified_sequence < put_sequence:
+                    print(
+                        "DHT read-back returned a stale sequence; "
+                        "not accepting publication"
+                    )
+                else:
+                    dht_sequence = verified_sequence
+                    state["last_seq"] = seq
+                    state["last_info_hash"] = info_hash_hex
+                    state["last_dht_seq"] = dht_sequence
+                    state["last_dht_info_hash"] = verified_hash
+                    save_state(state, state_path)
+                    print(
+                        "DHT mutable item verified: "
+                        f"sequence={dht_sequence}, torrent v2 info hash={verified_hash[:16]}..."
+                    )
+                    return {
+                        "seq": seq,
+                        "dht_seq": dht_sequence,
+                        "info_hash_hex": info_hash_hex,
+                        "confirmed": True,
+                        "direct_acknowledgements": acknowledgements,
+                    }
+            if put_alert is not None:
                 print(
-                    "DHT mutable item verified: "
-                    f"sequence={dht_sequence}, torrent v2 info hash={verified_hash[:16]}..."
+                    "DHT put completed but read-back did not verify; "
+                    "not republishing to preserve sequence monotonicity"
                 )
-                return {
-                    "seq": seq,
-                    "dht_seq": dht_sequence,
-                    "info_hash_hex": info_hash_hex,
-                    "confirmed": True,
-                    "direct_acknowledgements": acknowledgements,
-                }
+                break
             if attempt < DHT_PUBLISH_ATTEMPTS:
                 print(f"DHT read-back did not verify; retrying in {DHT_RETRY_DELAY}s")
                 time.sleep(DHT_RETRY_DELAY)
