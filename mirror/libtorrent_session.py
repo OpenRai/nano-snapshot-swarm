@@ -40,6 +40,9 @@ class TorrentStatusSnapshot:
     upload_rate: int
     is_seeding: bool
     total_upload: int = 0
+    error: str = ""
+    num_seeds: int = 0
+    num_connections: int = 0
 
 
 @dataclass(frozen=True)
@@ -93,6 +96,34 @@ def _snapshot_alert(alert: lt.alert) -> AlertSnapshot:
             extra["item"] = None
         try:
             extra["key"] = bytes(alert.key).hex()
+        except Exception:
+            pass
+
+    elif isinstance(alert, lt.save_resume_data_alert):
+        try:
+            extra["resume_data"] = alert.resume_data
+        except Exception:
+            pass
+        try:
+            extra["info_hash"] = str(alert.handle.info_hashes().v2)
+        except Exception:
+            pass
+    elif isinstance(alert, lt.save_resume_data_failed_alert):
+        try:
+            extra["info_hash"] = str(alert.handle.info_hashes().v2)
+        except Exception:
+            pass
+        try:
+            extra["error"] = str(alert.error)
+        except Exception:
+            pass
+    elif isinstance(alert, lt.fastresume_rejected_alert):
+        try:
+            extra["info_hash"] = str(alert.handle.info_hashes().v2)
+        except Exception:
+            pass
+        try:
+            extra["error"] = str(alert.error)
         except Exception:
             pass
         try:
@@ -168,6 +199,8 @@ class LibtorrentSession:
         logger.info(f"libtorrent session started, listening on port {self._listen_port}")
 
     def stop(self) -> None:
+        if self._session:
+            self.save_resume_data()
         self._running = False
         if self._alert_thread:
             logger.info("Stopping libtorrent alert loop...")
@@ -195,19 +228,42 @@ class LibtorrentSession:
         save_path = save_path or self.data_dir
         handle_key = info_hash
 
+        info = None
         if torrent_file:
             info = lt.torrent_info(torrent_file)
             handle_key = str(info.info_hashes().v2)
-            params = {
-                "ti": info,
-                "save_path": save_path,
-            }
+
+        resume_path = self._resume_path(handle_key)
+        resume_params = None
+        if resume_path.exists():
+            try:
+                resume_params = lt.read_resume_data(resume_path.read_bytes())
+                logger.info("Loaded saved resume data: v2 info hash=%s...", handle_key[:16])
+            except Exception as exc:
+                logger.warning(
+                    "Ignoring invalid resume data for v2 info hash=%s...: %s",
+                    handle_key[:16],
+                    exc,
+                )
+                resume_path.unlink(missing_ok=True)
+
+        if torrent_file:
+            assert info is not None
+            if resume_params is not None:
+                resume_params.ti = info
+                resume_params.save_path = save_path
+                params = resume_params
+            else:
+                params = {"ti": info, "save_path": save_path}
             flags = lt.torrent_flags.auto_managed
             if paused:
                 flags |= lt.torrent_flags.paused
             if hasattr(lt.torrent_flags, "update_subscribe"):
                 flags |= lt.torrent_flags.update_subscribe
-            params["flags"] = flags
+            if isinstance(params, dict):
+                params["flags"] = flags
+            else:
+                params.flags = flags
             handle = self._session.add_torrent(params)
         else:
             # Determine magnet URI format based on info hash length
@@ -217,7 +273,7 @@ class LibtorrentSession:
             else:
                 # v2: 32 bytes (64 hex chars) — use btmh with SHA-256 multihash prefix
                 magnet_uri = f"magnet:?xt=urn:btmh:1220{info_hash}"
-            params = lt.parse_magnet_uri(magnet_uri)
+            params = resume_params or lt.parse_magnet_uri(magnet_uri)
             params.save_path = save_path
             params.flags = lt.torrent_flags.auto_managed
             if paused:
@@ -229,6 +285,55 @@ class LibtorrentSession:
         self._handles[handle_key] = handle
         logger.info("Added torrent: v2 info hash=%s...", handle_key[:16])
         return handle
+
+    def _resume_path(self, info_hash: str) -> Path:
+        return Path(self.data_dir) / ".resume" / f"{info_hash}.fastresume"
+
+    def save_resume_data(self, timeout: float = 15.0) -> None:
+        """Atomically persist fast-resume data for every active torrent."""
+        if not self._session or not self._handles:
+            return
+        resume_dir = Path(self.data_dir) / ".resume"
+        resume_dir.mkdir(parents=True, exist_ok=True)
+        for info_hash, handle in list(self._handles.items()):
+            self.clear_alerts("save_resume_data_alert")
+            self.clear_alerts("save_resume_data_failed_alert")
+            try:
+                handle.save_resume_data(lt.save_resume_flags_t.save_info_dict)
+            except Exception as exc:
+                logger.warning(
+                    "Could not request resume data for v2 info hash=%s...: %s",
+                    info_hash[:16],
+                    exc,
+                )
+                continue
+            alert = self.wait_for_alert(
+                "save_resume_data_alert",
+                timeout=timeout,
+                predicate=lambda snap, expected=info_hash: snap.extra.get("info_hash")
+                == expected,
+            )
+            if alert is None:
+                logger.warning(
+                    "Resume data was not saved for v2 info hash=%s...", info_hash[:16]
+                )
+                continue
+            resume_data = alert.extra.get("resume_data")
+            if resume_data is None:
+                logger.warning("Resume alert had no data for v2 info hash=%s...", info_hash[:16])
+                continue
+            temporary = resume_dir / f".{info_hash}.fastresume.tmp"
+            try:
+                temporary.write_bytes(lt.bencode(resume_data))
+                temporary.replace(self._resume_path(info_hash))
+                logger.info("Saved resume data: v2 info hash=%s...", info_hash[:16])
+            except Exception as exc:
+                temporary.unlink(missing_ok=True)
+                logger.warning(
+                    "Could not write resume data for v2 info hash=%s...: %s",
+                    info_hash[:16],
+                    exc,
+                )
 
     def remove_torrent(self, info_hash: str) -> None:
         handle = self._handles.pop(info_hash, None)
@@ -300,6 +405,9 @@ class LibtorrentSession:
             upload_rate=status.upload_rate,
             is_seeding=status.is_seeding,
             total_upload=status.total_upload,
+            error=str(getattr(status, "errc", "") or ""),
+            num_seeds=getattr(status, "num_seeds", 0),
+            num_connections=getattr(status, "num_connections", 0),
         )
 
     def torrent_metadata(self, info_hash: str) -> Optional[TorrentMetadataSnapshot]:
@@ -453,6 +561,16 @@ class LibtorrentSession:
                         if snap.type_name == "dht_bootstrap_alert":
                             logger.info("DHT bootstrap complete (%d nodes)", self.dht_node_count())
                             self._dht_bootstrapped.set()
+                        elif snap.type_name == "peer_connect_alert":
+                            logger.info("Peer connection established: %s", snap.message)
+                        elif snap.type_name == "peer_disconnected_alert":
+                            logger.info("Peer disconnected: %s", snap.message)
+                        elif snap.type_name == "fastresume_rejected_alert":
+                            logger.warning(
+                                "Resume data rejected for v2 info hash=%s...: %s",
+                                snap.extra.get("info_hash", "unknown")[:16],
+                                snap.extra.get("error", snap.message),
+                            )
                         if snap.category & lt.alert.category_t.error_notification:
                             if "dropped alerts" in snap.message:
                                 logger.debug(f"libtorrent: {snap.message}")

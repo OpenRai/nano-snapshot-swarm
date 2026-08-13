@@ -311,27 +311,41 @@ def main() -> None:
     started_at = time.time()
     last_dht_publish = 0.0
     last_dht_sequence: int | None = None
+    last_dht_acknowledgements: int | None = None
+    last_dht_error: str | None = None
+    last_dht_attempt = 0
     dht_verified = False
 
     def publish_current() -> None:
-        nonlocal last_dht_publish, last_dht_sequence, dht_verified
+        nonlocal last_dht_publish, last_dht_sequence
+        nonlocal last_dht_acknowledgements, last_dht_error
+        nonlocal last_dht_attempt, dht_verified
         if not dht_keys or not session._session:
             dht_verified = False
+            last_dht_error = "DHT_PRIVATE_KEY is not configured"
             return
         dht_nodes = session.dht_node_count()
         logger.info("DHT has %s nodes, publishing current torrent...", dht_nodes)
         privkey_64, pubkey_32 = dht_keys
-        result = _dht_publish(
-            session,
-            privkey_64,
-            pubkey_32,
-            current_info_hash,
-            salt,
-        )
-        last_dht_publish = time.time()
-        last_dht_sequence = int(result["sequence"])
-        _record_verified_publication(current_info_hash, last_dht_sequence)
-        dht_verified = True
+        last_dht_attempt += 1
+        try:
+            result = _dht_publish(
+                session,
+                privkey_64,
+                pubkey_32,
+                current_info_hash,
+                salt,
+            )
+            last_dht_publish = time.time()
+            last_dht_sequence = int(result["sequence"])
+            last_dht_acknowledgements = result["direct_acknowledgements"]
+            _record_verified_publication(current_info_hash, last_dht_sequence)
+            last_dht_error = None
+            dht_verified = True
+        except Exception as exc:
+            last_dht_error = str(exc)
+            dht_verified = False
+            raise
 
     try:
         publish_current()
@@ -392,6 +406,10 @@ def main() -> None:
                 "torrent_info_hash": current_info_hash,
                 "dht_verified": dht_verified,
                 "dht_sequence": last_dht_sequence,
+                "dht_direct_acknowledgements": last_dht_acknowledgements,
+                "dht_publish_attempt": last_dht_attempt,
+                "dht_last_error": last_dht_error,
+                "seeder_ready": bool(status.is_seeding and dht_verified),
                 "retained_torrent_count": len(retained_torrent_pairs(data_dir)),
                 "last_dht_publish": time.strftime(
                     "%Y-%m-%dT%H:%M:%S%z", time.localtime(last_dht_publish)

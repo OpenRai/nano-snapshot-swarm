@@ -60,3 +60,35 @@ producer upload/peer-transfer counters show peer-sourced bytes.
 After the test, remove `USE_PLACEHOLDER_SNAPSHOT` or set it to `0`, restore the
 production DHT salt, and trigger or wait for the normal production pipeline as
 appropriate.
+
+## Evidence gate
+
+Save the captured values in a JSON bundle with this shape:
+
+```json
+{
+  "publications": [
+    {"dht_sequence": 1, "info_hash": "<64 hex>"},
+    {"dht_sequence": 2, "info_hash": "<64 hex>"},
+    {"dht_sequence": 3, "info_hash": "<64 hex>"}
+  ],
+  "producer": {
+    "restart_monotonic": true,
+    "sighup_pid_unchanged": true,
+    "all_dht_verified": true
+  },
+  "mirror": {
+    "final_phase": "seeding",
+    "container_stayed_running": true,
+    "discovered_sequences": [1, 2, 3],
+    "discovered_hashes": ["<64 hex>", "<64 hex>", "<64 hex>"]
+  },
+  "dashboard": {"final_info_hash": "<64 hex>", "verified": true}
+}
+```
+
+Run the release gate before closing the E2E issue:
+
+```bash
+./scripts/validate-e2e-evidence.py evidence.json
+```

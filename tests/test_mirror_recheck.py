@@ -247,7 +247,7 @@ def test_configured_seed_peer_attempt_is_forwarded(tmp_path) -> None:
     assert session.calls == [("connect", "cd" * 32, "seed.example", 6881)]
 
 
-def test_libtorrent_stop_does_not_request_unhandled_resume_data(tmp_path) -> None:
+def test_libtorrent_stop_saves_resume_data_before_releasing_session(tmp_path) -> None:
     sys.modules.setdefault("libtorrent", SimpleNamespace())
     from mirror.libtorrent_session import LibtorrentSession
 
@@ -257,11 +257,12 @@ def test_libtorrent_stop_does_not_request_unhandled_resume_data(tmp_path) -> Non
     session = LibtorrentSession(data_dir=str(tmp_path))
     session._session = FakeNativeSession()
     saved: list[str] = []
+    session.save_resume_data = lambda: saved.append("resume")
     session.save_dht_state = lambda: saved.append("dht")
 
     session.stop()
 
-    assert saved == ["dht"]
+    assert saved == ["resume", "dht"]
     assert session._session is None
 
 

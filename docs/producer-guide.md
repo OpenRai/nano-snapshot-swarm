@@ -321,3 +321,8 @@ path. The normal pipeline creates the torrent first and defers the only DHT put
 to that long-lived seeder. The seeder updates `publisher_state.json` only after
 authoritative verification, so the dashboard cannot be advanced by a separate
 short-lived publisher race.
+
+`seeder-stats.json` also exposes `dht_direct_acknowledgements`,
+`dht_publish_attempt`, `dht_last_error`, and `seeder_ready`. The acknowledgement
+count describes direct responses only; `dht_verified` and the matching hash are
+the readiness conditions.

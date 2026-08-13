@@ -635,7 +635,7 @@ class MirrorWatcher:
                 f"Download: {status.progress * 100:.1f}% | State: {status.state} | "
                 f"DL: {status.download_rate / 1000:.1f} KB/s | "
                 f"UL: {status.upload_rate / 1000:.1f} KB/s | "
-                f"Peers: {status.num_peers}"
+                f"Peers: {status.num_peers} | Seeds: {status.num_seeds}"
             )
 
         if status.is_seeding:
@@ -647,9 +647,10 @@ class MirrorWatcher:
                 )
 
         if status.num_peers == 0 and no_peer_seconds >= 60:
+            detail = f"; native error: {status.error}" if status.error else ""
             logger.warning(
                 f"No peers, {status.progress * 100:.1f}% progress for 60s "
-                f"— download may be stalled"
+                f"— download may be stalled{detail}"
             )
 
     def _wait_for_terminal_download_status(self) -> DownloadStatus:
