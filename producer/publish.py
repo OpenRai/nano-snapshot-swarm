@@ -120,6 +120,21 @@ def _wait_for_verified_snapshot(
         if alert.extra.get("authoritative") is not True:
             logger.debug("Ignoring non-authoritative DHT mutable-item read-back")
             continue
+        returned_key = alert.extra.get("key")
+        returned_value = _raw_dht_value(alert.extra.get("item"))
+        returned_hash = "unparseable"
+        if returned_value is not None:
+            try:
+                returned_hash = parse_dht_value(returned_value)[b"info_hash"].hex()[:16] + "..."
+            except (KeyError, TypeError, ValueError):
+                pass
+        logger.info(
+            "DHT mutable-item read-back candidate: authoritative=true, sequence=%s, "
+            "public key match=%s, info hash=%s",
+            alert.extra.get("seq", 0),
+            returned_key == public_key.hex(),
+            returned_hash,
+        )
         verified = _verified_snapshot_from_alert(
             alert,
             public_key,
