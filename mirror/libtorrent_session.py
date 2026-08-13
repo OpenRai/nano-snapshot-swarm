@@ -98,6 +98,10 @@ def _snapshot_alert(alert: lt.alert) -> AlertSnapshot:
             extra["key"] = bytes(alert.key).hex()
         except Exception:
             pass
+        try:
+            extra["signature"] = bytes(alert.signature).hex()
+        except Exception:
+            pass
 
     elif isinstance(alert, lt.save_resume_data_alert):
         try:
@@ -124,10 +128,6 @@ def _snapshot_alert(alert: lt.alert) -> AlertSnapshot:
             pass
         try:
             extra["error"] = str(alert.error)
-        except Exception:
-            pass
-        try:
-            extra["signature"] = bytes(alert.signature).hex()
         except Exception:
             pass
 

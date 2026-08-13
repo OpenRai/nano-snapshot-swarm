@@ -48,6 +48,13 @@ def _mutable_alert(
     )
 
 
+def test_verified_snapshot_requires_the_signed_alert_signature() -> None:
+    alert = _mutable_alert("ab" * 32, 55)
+    assert publish_module._verified_snapshot_from_alert(
+        alert, _public_key(), "ab" * 32, "daily"
+    ) == (55, "ab" * 32)
+
+
 class FakeDHTSession:
     def __init__(self, **_: object) -> None:
         self.info_hash = ""
