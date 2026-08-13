@@ -349,7 +349,16 @@ class MirrorWatcher:
                 )
                 return
 
-            if result.sequence > self.state.last_seq:
+            same_torrent = result.info_hash_hex == self.state.last_info_hash
+            if result.sequence > self.state.last_seq and same_torrent:
+                logger.info(
+                    "DHT mutable-item sequence advanced from %s to %s for the current "
+                    "torrent; continuing existing transfer: torrent v2 info hash=%s...",
+                    self.state.last_seq,
+                    result.sequence,
+                    result.info_hash_hex[:16],
+                )
+            elif result.sequence > self.state.last_seq:
                 logger.info(
                     "New snapshot detected: DHT mutable-item sequence=%s "
                     "(was %s), torrent v2 info hash=%s...",

@@ -61,6 +61,28 @@ def test_replacement_waits_for_metadata_recheck_before_resuming(tmp_path) -> Non
     assert session.calls[-2:] == [("recheck", "ef" * 32), ("resume", "ef" * 32)]
 
 
+def test_higher_dht_sequence_for_same_torrent_continues_transfer(tmp_path, caplog) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    from mirror.dht_discovery import DHTDiscoveryResult
+    from mirror.watcher import MirrorWatcher
+
+    info_hash = "ab" * 32
+    watcher = MirrorWatcher(producer_signing_pubkey_hex="cd" * 32, data_dir=str(tmp_path))
+    watcher._reconcile_to_desired = lambda: None
+
+    first = DHTDiscoveryResult(info_hash, 10, b"", True)
+    refresh = DHTDiscoveryResult(info_hash, 11, b"", True)
+    watcher._set_desired_snapshot(first)
+
+    with caplog.at_level("INFO", logger="mirror.watcher"):
+        watcher._set_desired_snapshot(refresh)
+
+    assert watcher.state.last_seq == 11
+    assert watcher.state.last_info_hash == info_hash
+    assert "sequence advanced from 10 to 11 for the current torrent" in caplog.text
+    assert "New snapshot detected" not in caplog.text
+
+
 def test_swarm_mode_keeps_monitoring_after_seeding(tmp_path, monkeypatch) -> None:
     sys.modules.setdefault("libtorrent", SimpleNamespace())
     import mirror.watcher as watcher_module
@@ -333,6 +355,7 @@ def test_peer_lifecycle_alerts_are_debug_only() -> None:
     source = inspect.getsource(LibtorrentSession._alert_loop)
     assert 'logger.debug("Peer connection established: %s", snap.message)' in source
     assert 'logger.debug("Peer disconnected: %s", snap.message)' in source
+    assert '"skipping tracker announce (unreachable)" in snap.message' in source
 
 
 def test_old_authority_pubkey_environment_is_ignored(monkeypatch, caplog) -> None:

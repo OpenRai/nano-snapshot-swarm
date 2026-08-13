@@ -36,6 +36,12 @@ logger = logging.getLogger("producer.seeder")
 SNAPSHOT_NAME = "nano-ledger-snapshot.7z"
 DHT_REPUBLISH_INTERVAL = 1800  # 30 minutes
 DHT_FAILURE_RETRY_INTERVAL = 300  # 5 minutes
+SEEDING_HEARTBEAT_INTERVAL = 300  # 5 minutes
+
+
+def _should_log_seeding_status(now: float, last_logged_at: float) -> bool:
+    """Keep normal seeding logs useful without starving the stats file."""
+    return now - last_logged_at >= SEEDING_HEARTBEAT_INTERVAL
 
 
 def _record_verified_publication(
@@ -358,6 +364,7 @@ def main() -> None:
     last_dht_error: str | None = None
     last_dht_attempt = 0
     last_dht_attempt_at = 0.0
+    last_seeding_log_at = 0.0
     dht_verified = False
 
     def publish_current() -> None:
@@ -469,11 +476,13 @@ def main() -> None:
             tmp.write_text(json.dumps(stats, indent=2) + "\n")
             tmp.rename(stats_path)
 
-            logger.info(
-                f"Seeding | Peers: {status.num_peers} | "
-                f"UL: {status.upload_rate / 1024:.1f} KB/s | "
-                f"Total UL: {status.total_upload / (1024**2):.1f} MiB"
-            )
+            if _should_log_seeding_status(now, last_seeding_log_at):
+                logger.info(
+                    f"Seeding | Peers: {status.num_peers} | "
+                    f"UL: {status.upload_rate / 1024:.1f} KB/s | "
+                    f"Total UL: {status.total_upload / (1024**2):.1f} MiB"
+                )
+                last_seeding_log_at = now
         except Exception as e:
             logger.error(f"Status error: {e}")
         for _ in range(5):

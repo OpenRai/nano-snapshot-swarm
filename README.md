@@ -15,6 +15,18 @@ contribute bandwidth by seeding snapshots peer-to-peer. Mirrors recheck their
 existing archive before requesting a replacement torrent, so matching pieces
 can be reused. Reuse depends on the two torrent contents and is not guaranteed.
 
+## Public beta
+
+The default OpenRAI snapshot stream is open for public beta testing. Run a
+mirror if you have persistent disk space, upload bandwidth, and can expose TCP
+and UDP port 6881. The mirror discovers a signed DHT record, downloads the
+current archive, and remains available to seed it to other users.
+
+This is a beta service: availability, peer discovery, and update latency have
+no service-level guarantee. Keep `mirror_state.json`, relevant logs, and the
+image digest when reporting a problem. See the [public beta operator
+runbook](docs/public-beta-runbook.md) before joining the swarm.
+
 ---
 
 ## Two Services
@@ -90,4 +102,4 @@ headroom. The required size changes with the published snapshot.
 | [docs/producer-guide.md](docs/producer-guide.md) | Running the Producer, key generation, scheduling |
 | [docs/configuration.md](docs/configuration.md) | All environment variables, CLI flags, docker-compose reference |
 | [docs/public-beta-runbook.md](docs/public-beta-runbook.md) | Operating and troubleshooting a beta mirror |
-| [docs/release-checklist.md](docs/release-checklist.md) | Evidence required before a public beta announcement |
+| [docs/release-checklist.md](docs/release-checklist.md) | Release verification and soak evidence |

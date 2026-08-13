@@ -89,7 +89,7 @@ PY
         fi
         sleep 1
     done
-    log "ERROR: Seeder did not authoritatively verify the published torrent within 180s"
+    log "ERROR: Seeder did not authoritatively verify the published torrent within 360s"
     return 1
 }
 

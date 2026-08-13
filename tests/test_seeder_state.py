@@ -11,6 +11,7 @@ from producer.retention import SNAPSHOT_NAME, retain_current_snapshot  # noqa: E
 from producer.seeder import (  # noqa: E402
     _load_current_torrent,
     _record_verified_publication,
+    _should_log_seeding_status,
 )
 
 
@@ -72,6 +73,11 @@ def test_seeder_restart_does_not_increment_dashboard_sequence(tmp_path: Path) ->
     state = json.loads(state_path.read_text())
     assert state["last_seq"] == 1
     assert state["last_dht_seq"] == 41
+
+
+def test_seeding_heartbeat_logs_every_five_minutes() -> None:
+    assert _should_log_seeding_status(300, 0)
+    assert not _should_log_seeding_status(299, 0)
 
 
 @pytest.mark.parametrize("previous_already_active", [False, True])
