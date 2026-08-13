@@ -65,6 +65,11 @@ Stop the temporary producer process and remove its temporary output directory
 after collecting evidence. Do not change the production DHT salt to clean up a
 validation run.
 
+The hub's **Status updated** time is the time its signed status payload was
+pushed. It is not the timestamp embedded in the archive or a claim that the
+snapshot content changed; use the DHT sequence and info hash to identify a new
+snapshot.
+
 ## Evidence gate
 
 Save the captured values in a JSON bundle with this shape:
@@ -78,7 +83,6 @@ Save the captured values in a JSON bundle with this shape:
   ],
   "producer": {
     "restart_monotonic": true,
-    "sighup_pid_unchanged": true,
     "all_dht_verified": true
   },
   "mirror": {

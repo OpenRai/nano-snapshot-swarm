@@ -17,6 +17,7 @@ class PushRequest(BaseModel):
     torrent_name: str
     piece_size: StrictInt = Field(gt=0)
     snapshot_size_bytes: StrictInt = Field(gt=0)
+    # Time this signed status was published; it is not the archive creation time.
     timestamp: str  # ISO 8601
     torrent_file_b64: str  # base64-encoded .torrent
     signature: str = Field(pattern=r"^[0-9a-f]{128}$")  # hex Ed25519 signature

@@ -45,8 +45,13 @@ wait_for_authoritative_seeder() {
     fi
 
     if systemctl --user is-active nano-seed.service &>/dev/null; then
-        log "Requesting nano-seed.service to reload the updated torrent"
-        systemctl --user kill --signal=HUP nano-seed.service
+        # A direct SIGHUP is only safe after producer.seeder has installed its
+        # handler. During DHT bootstrap the default action terminates Python,
+        # and Restart=on-failure does not recover a clean HUP exit. Restarting
+        # is safe at every lifecycle point and saves the DHT/resume state on a
+        # graceful stop before loading the canonical torrent again.
+        log "Restarting nano-seed.service to load the updated torrent"
+        systemctl --user restart nano-seed.service
     else
         log "Starting nano-seed.service to seed updated snapshot"
         systemctl --user start nano-seed.service
@@ -404,8 +409,9 @@ PY
     log "Updated metadata with torrent hash: $TORRENT_HASH"
 fi
 
-# --- Step 6: Ask the long-lived seeder to reload and publish the new torrent ---
-# SIGHUP preserves the producer's libtorrent/DHT session and retained swarms.
+# --- Step 6: Restart the long-lived seeder and publish the new torrent ---
+# Restarting is safe even while the seeder is still bootstrapping. It preserves
+# retained swarm files and writes libtorrent state during graceful shutdown.
 # The seeder writes publisher_state.json only after authoritative verification.
 wait_for_authoritative_seeder "$TORRENT_HASH"
 

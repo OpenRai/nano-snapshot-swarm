@@ -54,8 +54,6 @@ def main() -> int:
     producer = evidence.get("producer", {})
     if producer.get("restart_monotonic") is not True:
         fail("producer restart_monotonic must be true")
-    if producer.get("sighup_pid_unchanged") is not True:
-        fail("producer SIGHUP reload must preserve the seeder PID")
     if producer.get("all_dht_verified") is not True:
         fail("all producer publications must be DHT verified")
 
@@ -67,7 +65,7 @@ def main() -> int:
 
     print(
         "PASS: %d strictly monotonic publications, mirror reseeded every update, "
-        "producer restart/SIGHUP and dashboard agreement verified"
+        "producer restart and dashboard agreement verified"
         % len(publications)
     )
     return 0

@@ -16,11 +16,11 @@ def test_daily_pipeline_does_not_interpolate_metadata_into_python_source() -> No
     assert 'open(\'$META_FILE\'' not in script
 
 
-def test_daily_pipeline_reloads_seeder_without_destroying_its_dht_session() -> None:
+def test_daily_pipeline_restarts_seeder_safely_at_any_lifecycle_point() -> None:
     script = Path("scripts/daily-snapshot.sh").read_text()
 
-    assert "systemctl --user kill --signal=HUP nano-seed.service" in script
-    assert "systemctl --user restart nano-seed.service" not in script
+    assert "systemctl --user restart nano-seed.service" in script
+    assert "systemctl --user kill --signal=HUP nano-seed.service" not in script
     assert '"dht_verified"' in script
     assert "--defer-dht-publish" in script
     assert "last_dht_info_hash" in script
