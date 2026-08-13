@@ -50,9 +50,10 @@ def _mutable_alert(
 
 def test_verified_snapshot_requires_the_signed_alert_signature() -> None:
     alert = _mutable_alert("ab" * 32, 55)
-    assert publish_module._verified_snapshot_from_alert(
-        alert, _public_key(), "ab" * 32, "daily"
-    ) == (55, "ab" * 32)
+    assert publish_module._verified_snapshot_from_alert(alert, _public_key(), "daily") == (
+        55,
+        "ab" * 32,
+    )
 
 
 class FakeDHTSession:
@@ -72,7 +73,7 @@ class FakeDHTSession:
     def publish_dht_mutable_item(
         self, _private_key: bytes, _public_key: bytes, value: bytes, _salt: str
     ) -> None:
-        self.info_hash = value.hex()
+        self.info_hash = publish_module.parse_dht_value(value)[b"info_hash"].hex()
 
     def wait_for_dht_put(self, timeout: float, *, salt: str) -> AlertSnapshot:
         return AlertSnapshot(
@@ -82,21 +83,13 @@ class FakeDHTSession:
             extra={"salt": salt, "seq": 55, "num_success": 0},
         )
 
-    def clear_alerts(self, _type_name: str) -> None:
-        pass
-
-    def dht_get_mutable_item(self, _public_key: bytes, _salt: str) -> None:
-        pass
-
-    def wait_for_dht_mutable_item(
+    def lookup_dht_mutable_item(
         self,
-        *,
+        _public_key: bytes,
         salt: str,
         timeout: float,
-        authoritative_only: bool,
-    ) -> AlertSnapshot:
-        assert authoritative_only is True
-        return _mutable_alert(self.info_hash, 55)
+    ) -> list[AlertSnapshot]:
+        return [_mutable_alert(self.info_hash, 55)]
 
 
 def test_publication_requires_verified_readback_and_persists_dht_sequence(
@@ -120,15 +113,13 @@ def test_publication_requires_verified_readback_and_persists_dht_sequence(
 
 
 class NeverVerifiesSession(FakeDHTSession):
-    def wait_for_dht_mutable_item(
+    def lookup_dht_mutable_item(
         self,
-        *,
+        _public_key: bytes,
         salt: str,
         timeout: float,
-        authoritative_only: bool,
-    ) -> AlertSnapshot:
-        assert authoritative_only is True
-        return _mutable_alert("cd" * 32, 55)
+    ) -> list[AlertSnapshot]:
+        return [_mutable_alert("cd" * 32, 55)]
 
 
 class StaleThenAuthoritativeSession(FakeDHTSession):
@@ -136,21 +127,20 @@ class StaleThenAuthoritativeSession(FakeDHTSession):
         super().__init__(**kwargs)
         self.reads = 0
 
-    def wait_for_dht_mutable_item(
+    def lookup_dht_mutable_item(
         self,
-        *,
+        _public_key: bytes,
         salt: str,
         timeout: float,
-        authoritative_only: bool,
-    ) -> AlertSnapshot:
-        assert authoritative_only is True
+    ) -> list[AlertSnapshot]:
         self.reads += 1
-        if self.reads == 1:
-            return _mutable_alert("ab" * 32, 133, authoritative=False)
-        return _mutable_alert(self.info_hash, 1305, authoritative=True)
+        return [
+            _mutable_alert(self.info_hash, 1305, authoritative=False),
+            _mutable_alert(self.info_hash, 183, authoritative=True),
+        ]
 
 
-def test_publication_ignores_non_authoritative_signed_readback(
+def test_publication_uses_highest_signed_readback_before_authoritative_completion(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(publish_module, "LibtorrentSession", StaleThenAuthoritativeSession)

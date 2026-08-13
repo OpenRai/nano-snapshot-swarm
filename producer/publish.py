@@ -69,7 +69,6 @@ def _raw_dht_value(item: object) -> bytes | None:
 def _verified_snapshot_from_alert(
     alert: AlertSnapshot,
     expected_public_key: bytes,
-    expected_info_hash: str,
     salt: str,
 ) -> tuple[int, str] | None:
     returned_key_hex = alert.extra.get("key")
@@ -93,9 +92,43 @@ def _verified_snapshot_from_alert(
         info_hash = parse_dht_value(value)[b"info_hash"].hex()
     except (KeyError, TypeError, ValueError):
         return None
-    if info_hash != expected_info_hash:
-        return None
     return int(sequence), info_hash
+
+
+def _select_verified_snapshot(
+    alerts: list[AlertSnapshot],
+    expected_public_key: bytes,
+    expected_info_hash: str,
+    salt: str,
+) -> tuple[int, str] | None:
+    verified = [
+        result
+        for alert in alerts
+        if (result := _verified_snapshot_from_alert(alert, expected_public_key, salt))
+        is not None
+    ]
+    if not verified:
+        return None
+
+    highest_sequence = max(sequence for sequence, _ in verified)
+    highest_hashes = {info_hash for sequence, info_hash in verified if sequence == highest_sequence}
+    if len(highest_hashes) != 1:
+        logger.warning(
+            "Conflicting signed DHT mutable-item candidates at sequence=%s; rejecting lookup",
+            highest_sequence,
+        )
+        return None
+
+    info_hash = highest_hashes.pop()
+    if info_hash != expected_info_hash:
+        logger.warning(
+            "Highest verified DHT mutable-item candidate does not match the requested "
+            "torrent: sequence=%s, torrent v2 info hash=%s...",
+            highest_sequence,
+            info_hash[:16],
+        )
+        return None
+    return highest_sequence, info_hash
 
 
 def _wait_for_verified_snapshot(
@@ -107,38 +140,16 @@ def _wait_for_verified_snapshot(
 ) -> tuple[int, str] | None:
     deadline = time.time() + timeout
     while time.time() < deadline:
-        session.clear_alerts("dht_mutable_item_alert")
-        session.dht_get_mutable_item(public_key, salt)
         remaining = max(1.0, deadline - time.time())
-        alert = session.wait_for_dht_mutable_item(
-            salt=salt,
+        alerts = session.lookup_dht_mutable_item(
+            public_key,
+            salt,
             timeout=min(15.0, remaining),
-            authoritative_only=True,
         )
-        if alert is None:
+        if alerts is None:
             continue
-        if alert.extra.get("authoritative") is not True:
-            logger.debug("Ignoring non-authoritative DHT mutable-item read-back")
-            continue
-        returned_key = alert.extra.get("key")
-        returned_value = _raw_dht_value(alert.extra.get("item"))
-        returned_hash = "unparseable"
-        if returned_value is not None:
-            try:
-                returned_hash = parse_dht_value(returned_value)[b"info_hash"].hex()[:16] + "..."
-            except (KeyError, TypeError, ValueError):
-                pass
-        logger.info(
-            "DHT mutable-item read-back candidate: authoritative=true, sequence=%s, "
-            "public key match=%s, signature bytes=%s, signed value bytes=%s, info hash=%s",
-            alert.extra.get("seq", 0),
-            returned_key == public_key.hex(),
-            len(str(alert.extra.get("signature", ""))) // 2,
-            len(returned_value) if returned_value is not None else 0,
-            returned_hash,
-        )
-        verified = _verified_snapshot_from_alert(
-            alert,
+        verified = _select_verified_snapshot(
+            alerts,
             public_key,
             expected_info_hash,
             salt,

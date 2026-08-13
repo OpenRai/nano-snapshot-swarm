@@ -48,19 +48,30 @@ def discover_latest_snapshot(
             logger.info(f"Retry {attempt}/{MAX_RETRIES} after {wait_time}s")
             time.sleep(wait_time)
 
-        session.dht_get_mutable_item(pub_key_bytes, salt)
-
-        snap = session.wait_for_dht_mutable_item(
-            salt=salt,
+        snapshots = session.lookup_dht_mutable_item(
+            pub_key_bytes,
+            salt,
             timeout=timeout,
-            authoritative_only=True,
         )
-        if snap is not None:
-            if snap.extra.get("authoritative") is not True:
-                logger.warning("Ignoring non-authoritative DHT mutable-item response")
-                continue
-            result = _process_mutable_item_snapshot(snap, pub_key_bytes, salt)
-            if result is not None:
+        if snapshots is not None:
+            candidates = [
+                result
+                for snapshot in snapshots
+                if (result := _process_mutable_item_snapshot(snapshot, pub_key_bytes, salt))
+                is not None
+            ]
+            if candidates:
+                highest_sequence = max(result.sequence for result in candidates)
+                highest = [result for result in candidates if result.sequence == highest_sequence]
+                if len({result.info_hash_hex for result in highest}) != 1:
+                    logger.warning(
+                        "Conflicting signed DHT mutable-item candidates at sequence=%d; "
+                        "querying again",
+                        highest_sequence,
+                    )
+                    found = True
+                    continue
+                result = highest[0]
                 if result.sequence >= min_sequence:
                     return result
                 logger.warning(

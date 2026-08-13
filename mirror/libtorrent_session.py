@@ -500,6 +500,49 @@ class LibtorrentSession:
             predicate=matches,
         )
 
+    def lookup_dht_mutable_item(
+        self,
+        public_key: bytes,
+        salt: str = "daily",
+        timeout: float = 60.0,
+    ) -> Optional[list[AlertSnapshot]]:
+        """Return all mutable-item candidates from one completed DHT lookup.
+
+        ``authoritative`` marks completion, rather than identifying the newest
+        candidate. libtorrent's dht_tracker emits the final traversal's item at
+        completion, which may be older than an earlier response; see
+        https://github.com/arvidn/libtorrent/blob/RC_2_0/src/kademlia/dht_tracker.cpp#L358-L371
+        and https://www.libtorrent.org/reference-Alerts.html#dht_mutable_item_alert.
+        Mutable-item sequence numbers are monotonic per storage node; see
+        https://www.libtorrent.org/dht_store.html#mutable-items.
+        Callers must validate and select the highest sequence themselves.
+        """
+        self.clear_alerts("dht_mutable_item_alert")
+        self.dht_get_mutable_item(public_key, salt)
+        deadline = time.time() + timeout
+        candidates: list[AlertSnapshot] = []
+
+        while time.time() < deadline:
+            remaining = max(0.0, deadline - time.time())
+            self._alert_event.wait(timeout=min(1.0, remaining))
+            with self._alert_lock:
+                self._alert_event.clear()
+                matching = [
+                    snap
+                    for snap in self._alerts
+                    if snap.type_name == "dht_mutable_item_alert"
+                    and snap.extra.get("salt", "") == salt
+                ]
+                if matching:
+                    self._alerts = [snap for snap in self._alerts if snap not in matching]
+            if not matching:
+                continue
+            candidates.extend(matching)
+            if any(snap.extra.get("authoritative") is True for snap in matching):
+                return candidates
+
+        return None
+
     def wait_for_dht_put(
         self,
         timeout: float = 60.0,

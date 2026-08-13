@@ -67,14 +67,9 @@ def test_discovery_retries_stale_verified_item_until_minimum_sequence(monkeypatc
             self.snapshots = [stale, current]
             self.get_calls = 0
 
-        def dht_get_mutable_item(self, pubkey: bytes, salt: str) -> None:
+        def lookup_dht_mutable_item(self, pubkey: bytes, salt: str, timeout: float):
             self.get_calls += 1
-
-        def wait_for_dht_mutable_item(
-            self, *, salt: str, timeout: float, authoritative_only: bool
-        ):
-            assert authoritative_only is True
-            return self.snapshots.pop(0)
+            return [self.snapshots.pop(0)]
 
     session = FakeSession()
     monkeypatch.setattr("mirror.dht_discovery.time.sleep", lambda _seconds: None)
@@ -91,9 +86,9 @@ def test_discovery_retries_stale_verified_item_until_minimum_sequence(monkeypatc
     assert session.get_calls == 2
 
 
-def test_discovery_requires_authoritative_response(monkeypatch):
+def test_discovery_uses_highest_signed_response_before_authoritative_completion(monkeypatch):
     non_authoritative, public_key = signed_snapshot(
-        value=bytes.fromhex("cd" * 32), sequence=9, authoritative=False
+        value=bytes.fromhex("cd" * 32), sequence=11, authoritative=False
     )
     authoritative, _ = signed_snapshot(
         value=bytes.fromhex("ef" * 32), sequence=10, authoritative=True
@@ -101,17 +96,11 @@ def test_discovery_requires_authoritative_response(monkeypatch):
 
     class FakeSession:
         def __init__(self) -> None:
-            self.snapshots = [non_authoritative, authoritative]
             self.get_calls = 0
 
-        def dht_get_mutable_item(self, pubkey: bytes, salt: str) -> None:
+        def lookup_dht_mutable_item(self, pubkey: bytes, salt: str, timeout: float):
             self.get_calls += 1
-
-        def wait_for_dht_mutable_item(
-            self, *, salt: str, timeout: float, authoritative_only: bool
-        ):
-            assert authoritative_only is True
-            return self.snapshots.pop(0)
+            return [authoritative, non_authoritative]
 
     session = FakeSession()
     monkeypatch.setattr("mirror.dht_discovery.time.sleep", lambda _seconds: None)
@@ -119,6 +108,25 @@ def test_discovery_requires_authoritative_response(monkeypatch):
     result = discover_latest_snapshot(session, public_key.hex())
 
     assert result is not None
-    assert result.sequence == 10
-    assert result.info_hash_hex == "ef" * 32
-    assert session.get_calls == 2
+    assert result.sequence == 11
+    assert result.info_hash_hex == "cd" * 32
+    assert session.get_calls == 1
+
+
+def test_discovery_rejects_conflicting_highest_signed_candidates(monkeypatch):
+    first, public_key = signed_snapshot(value=bytes.fromhex("cd" * 32), sequence=10)
+    second, _ = signed_snapshot(value=bytes.fromhex("ef" * 32), sequence=10)
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.get_calls = 0
+
+        def lookup_dht_mutable_item(self, pubkey: bytes, salt: str, timeout: float):
+            self.get_calls += 1
+            return [first, second]
+
+    session = FakeSession()
+    monkeypatch.setattr("mirror.dht_discovery.time.sleep", lambda _seconds: None)
+
+    assert discover_latest_snapshot(session, public_key.hex()) is None
+    assert session.get_calls == 3
