@@ -211,3 +211,28 @@ def test_completed_put_is_not_republished_when_readback_is_delayed(
         )
 
     assert session.publish_count == 1
+
+
+def test_native_publisher_is_used_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    from producer import seeder as seeder_module
+
+    session = FakeDHTSession()
+    monkeypatch.setenv("DHT_PUT_HELPER", "/opt/nano-dht-put")
+    monkeypatch.setattr(
+        seeder_module,
+        "publish_with_highest_sequence",
+        lambda _info_hash, _salt: {
+            "sequence": 1361,
+            "observed_sequence": 1360,
+            "direct_acknowledgements": 7,
+        },
+    )
+    monkeypatch.setattr(
+        seeder_module,
+        "_wait_for_verified_snapshot",
+        lambda *_args, **_kwargs: (1361, "ab" * 32),
+    )
+
+    result = seeder_module._dht_publish(session, bytes(64), _public_key(), "ab" * 32, "daily")
+
+    assert result == {"sequence": 1361, "direct_acknowledgements": 7}

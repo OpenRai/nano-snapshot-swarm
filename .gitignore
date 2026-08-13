@@ -33,6 +33,8 @@ nano-daily.ldb.zst
 publisher_state.json
 mirror_state.json
 /data/
+/bin/nano-dht-put
+/.cache/
 
 # Environment
 .env

@@ -33,6 +33,13 @@ def test_daily_pipeline_waits_for_the_full_cold_seeder_publication_budget() -> N
     assert "seq 1 360" in script
 
 
+def test_producer_unit_builds_explicit_sequence_helper_before_start() -> None:
+    unit = Path("systemd/nano-seed.service").read_text()
+
+    assert "DHT_PUT_HELPER=%h/nano-snapshot-swarm/bin/nano-dht-put" in unit
+    assert "ExecStartPre=%h/nano-snapshot-swarm/scripts/build-dht-put-helper.sh" in unit
+
+
 def test_shell_special_filename_stays_data_when_passed_as_an_argument(tmp_path) -> None:
     metadata_path = tmp_path / "metadata.json"
     marker = tmp_path / "SHOULD_NOT_RUN"

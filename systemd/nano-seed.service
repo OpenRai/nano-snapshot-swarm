@@ -8,6 +8,8 @@ Type=simple
 EnvironmentFile=-%h/.env
 Environment=OUTPUT_DIR=%h/nano-snapshots
 Environment=LOG_LEVEL=INFO
+Environment=DHT_PUT_HELPER=%h/nano-snapshot-swarm/bin/nano-dht-put
+ExecStartPre=%h/nano-snapshot-swarm/scripts/build-dht-put-helper.sh
 ExecStart=%h/nano-snapshot-swarm/.venv/bin/python -m producer.seeder
 WorkingDirectory=%h/nano-snapshot-swarm
 Restart=on-failure

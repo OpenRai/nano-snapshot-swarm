@@ -25,6 +25,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from mirror.libtorrent_session import LibtorrentSession  # noqa: E402
+from producer.dht_put import publish_with_highest_sequence  # noqa: E402
 from producer.publish import _wait_for_verified_snapshot  # noqa: E402
 from producer.retention import retained_torrent_pairs  # noqa: E402
 from shared.bep46 import build_dht_value  # noqa: E402
@@ -130,22 +131,39 @@ def _dht_publish(
     target = compute_bep46_target_id(pubkey_32, salt)
     last_error = "unknown publication error"
     for attempt in range(1, 4):
-        session.publish_dht_mutable_item(privkey_64, pubkey_32, value_bytes, salt)
-        put_alert = session.wait_for_dht_put(timeout=60, salt=salt)
-        dht_sequence = None
-        acknowledgements = None
-        if put_alert is not None:
-            dht_sequence = int(put_alert.extra.get("seq", 0))
-            acknowledgements = put_alert.extra.get("num_success")
+        helper_path = os.environ.get("DHT_PUT_HELPER")
+        if helper_path:
+            helper_result = publish_with_highest_sequence(info_hash_hex, salt)
+            dht_sequence = helper_result["sequence"]
+            acknowledgements = helper_result["direct_acknowledgements"]
             logger.info(
-                "DHT mutable-item put completed: sequence=%s, "
-                "direct acknowledgements=%s",
+                "Native DHT mutable-item put completed: sequence=%s, "
+                "observed sequence=%s, direct acknowledgements=%s",
                 dht_sequence,
+                helper_result["observed_sequence"],
                 acknowledgements,
             )
         else:
-            last_error = "no dht_put_alert"
-            logger.warning("DHT mutable-item put produced no completion alert")
+            logger.warning(
+                "DHT_PUT_HELPER is not configured; using libtorrent Python convenience "
+                "publisher without explicit highest-sequence control"
+            )
+            session.publish_dht_mutable_item(privkey_64, pubkey_32, value_bytes, salt)
+            put_alert = session.wait_for_dht_put(timeout=60, salt=salt)
+            dht_sequence = None
+            acknowledgements = None
+            if put_alert is not None:
+                dht_sequence = int(put_alert.extra.get("seq", 0))
+                acknowledgements = put_alert.extra.get("num_success")
+                logger.info(
+                    "DHT mutable-item put completed: sequence=%s, "
+                    "direct acknowledgements=%s",
+                    dht_sequence,
+                    acknowledgements,
+                )
+            else:
+                last_error = "no dht_put_alert"
+                logger.warning("DHT mutable-item put produced no completion alert")
 
         verified = _wait_for_verified_snapshot(
             session,
@@ -176,7 +194,7 @@ def _dht_publish(
                 }
         if verified is None and not last_error.startswith("authoritative read-back sequence"):
             last_error = "read-back did not contain the exact signed snapshot"
-        if put_alert is not None:
+        if dht_sequence is not None:
             logger.warning(
                 "DHT put completed but read-back did not verify; "
                 "continuing without republishing to preserve sequence monotonicity"
