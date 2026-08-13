@@ -91,12 +91,13 @@ pieces can be reused without inventing an external chunk format.
 
 For a download that is not fetching the current snapshot, compare these values:
 
-1. `/api/status.sequence` and `/api/status.info_hash`.
+1. `/api/status.sequence` (the DHT mutable-item sequence) and `/api/status.info_hash`.
 2. The v2 `xt` in `/api/latest.magnet`.
 3. The v2 hash in the `/api/torrent` redirect location.
 4. The mirror's `last_seq`, `last_info_hash`, and phase in `mirror_state.json`.
 
-If those agree, inspect metadata resolution, the `checking_files` phase, and
+The dashboard sequence and the mirror's `last_seq` are the same DHT value. If
+those agree, inspect metadata resolution, the `checking_files` phase, and
 peer connectivity. A cached latest response, an upstream filename, or a v1 hash
 by itself is not evidence of a newer snapshot.
 

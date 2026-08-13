@@ -64,7 +64,7 @@ def _record_verified_publication(
     os.replace(temporary, path)
     logger.info(
         "Publisher state updated after authoritative DHT verification: "
-        "dashboard sequence=%s, DHT mutable-item sequence=%s, "
+        "local snapshot revision=%s, DHT mutable-item sequence=%s, "
         "torrent v2 info hash=%s...",
         state.get("last_seq", 0),
         dht_sequence,

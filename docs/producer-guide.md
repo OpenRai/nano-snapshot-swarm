@@ -303,11 +303,12 @@ pricing before creating the app or increasing capacity.
 ## Sequence Number
 
 The DHT mutable-item sequence is chosen by libtorrent from the current network
-value and is verified by reading the signed item back. `publisher_state.json`
-also contains the local dashboard publication sequence; it is not authoritative
-for DHT ordering and must not be manually edited. A publication is not pushed to
-the dashboard until the exact DHT value has been verified and the seeder reports
-the matching torrent as loaded.
+value and is verified by reading the signed item back. This is the sole public
+sequence: it is shown by the Status API/dashboard and compared by mirrors.
+`publisher_state.json` also contains a local revision counter for producer
+bookkeeping, but it is not exposed to operators and must not be manually edited.
+A publication is not pushed to the dashboard until the exact DHT value has been
+verified and the seeder reports the matching torrent as loaded.
 
 Producer read-back requires libtorrent's authoritative mutable-item response.
 The first signed response from a DHT lookup may be an older network view, so it

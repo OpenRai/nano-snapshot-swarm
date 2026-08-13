@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -9,6 +11,7 @@ sys.path.insert(0, "status-api")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from producer import push_status as push_status_module
 from producer.push_status import canonical_push_payload, sign_push
 
 
@@ -93,3 +96,70 @@ class TestSignPush:
         sig1 = sign_push(private_key_hex, first)
         sig2 = sign_push(private_key_hex, second)
         assert sig1 != sig2
+
+
+def test_main_uses_verified_dht_sequence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    state_path = tmp_path / "publisher_state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "last_seq": 12,
+                "last_dht_seq": 1360,
+                "last_info_hash": "ab" * 32,
+            }
+        )
+    )
+    captured: dict[str, object] = {}
+
+    def fake_push_status(**kwargs: object) -> dict[str, bool]:
+        captured.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setenv("DHT_PRIVATE_KEY", "00" * 32)
+    monkeypatch.setattr(push_status_module, "push_status", fake_push_status)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "push_status.py",
+            "--status-api-url",
+            "https://status.example",
+            "--state-file",
+            str(state_path),
+            "--torrent-file",
+            str(tmp_path / "snapshot.torrent"),
+            "--snapshot-file",
+            str(tmp_path / "snapshot.7z"),
+        ],
+    )
+
+    assert push_status_module.main() == 0
+    assert captured["sequence"] == 1360
+
+
+def test_main_rejects_unverified_dht_sequence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state_path = tmp_path / "publisher_state.json"
+    state_path.write_text(json.dumps({"last_seq": 12, "last_info_hash": "ab" * 32}))
+    monkeypatch.setenv("DHT_PRIVATE_KEY", "00" * 32)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "push_status.py",
+            "--status-api-url",
+            "https://status.example",
+            "--state-file",
+            str(state_path),
+            "--torrent-file",
+            str(tmp_path / "snapshot.torrent"),
+            "--snapshot-file",
+            str(tmp_path / "snapshot.7z"),
+        ],
+    )
+
+    assert push_status_module.main() == 1
+    assert "No verified DHT mutable-item sequence" in capsys.readouterr().err

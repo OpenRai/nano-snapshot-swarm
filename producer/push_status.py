@@ -125,11 +125,13 @@ def main() -> int:
         print("ERROR: DHT_PRIVATE_KEY not set (env or --private-key)", file=sys.stderr)
         return 1
 
-    # Read publisher state for sequence and v2 info_hash.
+    # The status API's sequence is the verified DHT mutable-item sequence.
+    # Mirrors make their update decisions from that exact signed value, so a
+    # separate local publication counter must never be shown to operators.
     state_path = Path(args.state_file)
     if state_path.exists():
         state = json.loads(state_path.read_text())
-        sequence = state.get("last_seq", 0)
+        sequence = state.get("last_dht_seq")
         info_hash = state.get("last_info_hash", "")
     else:
         print(f"ERROR: State file not found: {args.state_file}", file=sys.stderr)
@@ -137,6 +139,12 @@ def main() -> int:
 
     if not info_hash:
         print("ERROR: No info hash in state file", file=sys.stderr)
+        return 1
+    if not isinstance(sequence, int) or sequence < 0:
+        print(
+            "ERROR: No verified DHT mutable-item sequence in state file",
+            file=sys.stderr,
+        )
         return 1
 
     info_hash_v1 = None

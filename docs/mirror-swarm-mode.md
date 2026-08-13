@@ -147,10 +147,10 @@ docker exec nano-mirror cat /data/mirror_state.json
 | `phase` | Current mirror lifecycle phase |
 | `last_error` | Last persisted error, if any |
 
-`last_seq` is the DHT mutable-item sequence. It is distinct from the producer's
-local dashboard publication sequence. The producer signing public key is a
-copyable trust anchor and is logged in full; internal torrent info hashes and
-DHT target IDs are shortened in routine logs.
+`last_seq` is the DHT mutable-item sequence. The Status API/dashboard shows
+that same sequence. The producer signing public key is a copyable trust anchor
+and is logged in full; internal torrent info hashes and DHT target IDs are
+shortened in routine logs.
 
 Discovery accepts the authoritative response from the DHT lookup, not the first
 signed response. A lookup can return several signed responses while it is
