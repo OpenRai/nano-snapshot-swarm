@@ -163,7 +163,7 @@ def publish_to_dht(
     pub_key_bytes, _ = derive_nano_address(private_key_hex)
     target_id = compute_bep46_target_id(pub_key_bytes, salt)
 
-    print(f"Producer signing public key (PRODUCER_SIGNING_PUBKEY): {pub_key_bytes.hex()}")
+    print(f"Verification using PRODUCER_SIGNING_PUBKEY: {pub_key_bytes.hex()}")
     print(f"DHT mutable-item target ID (SHA-1): {target_id.hex()[:16]}...")
     print(
         "Publishing snapshot: "

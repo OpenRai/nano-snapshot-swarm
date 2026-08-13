@@ -317,3 +317,4 @@ def test_start_logs_the_complete_producer_public_key(tmp_path, monkeypatch, capl
         f"Verification using PRODUCER_SIGNING_PUBKEY: {public_key}"
         in caplog.text
     )
+    assert "Producer signing public key (PRODUCER_SIGNING_PUBKEY):" not in caplog.text

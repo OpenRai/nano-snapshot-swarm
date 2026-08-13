@@ -258,7 +258,7 @@ def main() -> None:
     if dht_keys:
         logger.info("DHT publishing enabled (DHT_PRIVATE_KEY set)")
         logger.info(
-            "Producer signing public key (PRODUCER_SIGNING_PUBKEY): %s",
+            "Verification using PRODUCER_SIGNING_PUBKEY: %s",
             dht_keys[1].hex(),
         )
     else:

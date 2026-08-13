@@ -73,7 +73,7 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 
 | Log | Meaning |
 |---|---|
-| `Producer signing public key (PRODUCER_SIGNING_PUBKEY): <full hex>` | The complete, copyable key that verifies the producer's signed DHT records |
+| `Verification using PRODUCER_SIGNING_PUBKEY: <full hex>` | The complete, copyable key used to verify the producer's signed DHT records |
 | `Mode: SWARM (continuous polling every Ns)` | Running as long-lived daemon |
 | `libtorrent session started, listening on port 6881` | BitTorrent engine ready |
 
@@ -291,7 +291,7 @@ DHT bootstrap can take 5–15 minutes on a cold start, especially behind NAT. Th
 
 ### "No peers"
 
-`Attempting connection to seed peer ...` means libtorrent queued an asynchronous
+`Attempting seed-peer connection: ...` means libtorrent queued an asynchronous
 connection request. It does not confirm a TCP connection or BitTorrent handshake.
 `No peers` is based on torrent status and means that no usable torrent peer has
 connected yet while the download is incomplete. The mirror queues another

@@ -163,7 +163,7 @@ composition contract, including the hybrid hashes and magnet URI.
 
 Expected publish output:
 ```
-Producer signing public key (PRODUCER_SIGNING_PUBKEY): <64-char hex>
+Verification using PRODUCER_SIGNING_PUBKEY: <64-char hex>
 DHT mutable-item target ID (SHA-1): <short target>...
 Publishing snapshot: publisher status sequence=1, torrent v2 info hash=<short hash>...
 Value size: N bytes

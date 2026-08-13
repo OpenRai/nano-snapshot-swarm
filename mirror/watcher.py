@@ -99,7 +99,7 @@ class MirrorWatcher:
         logger.info("=" * 60)
         logger.info("Nano P2P Mirror Service Starting")
         logger.info(
-            "Producer signing public key (PRODUCER_SIGNING_PUBKEY): %s",
+            "Verification using PRODUCER_SIGNING_PUBKEY: %s",
             self.producer_signing_pubkey_hex,
         )
         logger.info(f"Data directory: {self.data_dir}")
