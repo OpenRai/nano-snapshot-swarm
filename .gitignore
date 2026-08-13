@@ -18,6 +18,7 @@ venv/
 .idea/
 *.swp
 *.swo
+.playwright-mcp/
 
 # OS
 .DS_Store
