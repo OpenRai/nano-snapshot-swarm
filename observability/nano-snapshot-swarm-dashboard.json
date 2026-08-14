@@ -9,6 +9,39 @@
       "pluginName": "Prometheus"
     }
   ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "13.2.0-31683987170"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": "13.2.0-31683987170"
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": "13.2.0-31683987170"
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": "13.2.0-31683987170"
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -124,5 +157,5 @@
   "timezone": "utc",
   "title": "Nano Snapshot Swarm",
   "uid": "nano-snapshot-swarm",
-  "version": 5
+  "version": 6
 }
