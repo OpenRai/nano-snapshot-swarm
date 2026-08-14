@@ -318,13 +318,16 @@ Producer read-back requires libtorrent's authoritative mutable-item response.
 The first signed response from a DHT lookup may be an older network view, so it
 must not be used to confirm a new publication.
 
-The daily pipeline restarts an active `nano-seed.service` to load the canonical
-torrent. This is safe even if the service is still bootstrapping; graceful
-shutdown saves its DHT and resume state, while retained swarms stay on disk. If
-the seeder is stopped, the pipeline starts it. The normal pipeline creates the
-torrent first and defers the only DHT put to that long-lived seeder. The seeder
-updates `publisher_state.json` only after authoritative verification, so the
-dashboard cannot be advanced by a separate short-lived publisher race.
+The daily pipeline reloads an active `nano-seed.service` to load the canonical
+torrent. `ExecReload` sends `SIGHUP` to the running seeder, so it keeps its DHT
+session and retained swarms while reloading the canonical torrent. If the
+seeder is stopped, the pipeline starts it. An unchanged upstream snapshot does
+not interrupt the seeder or force a DHT publication: its 30-minute republish
+loop maintains the mutable item and the hourly status-push timer keeps the
+dashboard current. The normal pipeline creates the torrent first and defers
+the only DHT put to that long-lived seeder. The seeder updates
+`publisher_state.json` only after authoritative verification, so the dashboard
+cannot be advanced by a separate short-lived publisher race.
 
 `seeder-stats.json` also exposes `dht_direct_acknowledgements`,
 `dht_publish_attempt`, `dht_last_error`, and `seeder_ready`. The acknowledgement

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Seed the latest nano-ledger-snapshot.7z torrent via libtorrent.
 
-Intended to run as a long-lived systemd service. On restart (e.g. after
+Intended to run as a long-lived systemd service. On reload (e.g. after
 a new snapshot is published), it picks up the latest .torrent file and
 begins seeding immediately.
 
@@ -318,6 +318,25 @@ def main() -> None:
     metrics = SnapshotMetrics("producer")
     metrics.start_http_server(int(os.environ.get("METRICS_PORT", "9108")))
 
+    # Graceful shutdown on SIGTERM/SIGINT; SIGHUP reloads the canonical torrent
+    # without destroying the DHT session or the retained swarms. Install this
+    # before DHT bootstrap so systemd reload is safe throughout startup.
+    running = True
+    reload_requested = threading.Event()
+
+    def on_signal(signum, _frame):
+        nonlocal running
+        if signum == signal.SIGHUP:
+            logger.info("Received SIGHUP; scheduling canonical torrent reload")
+            reload_requested.set()
+        else:
+            logger.info(f"Received signal {signum}, shutting down...")
+            running = False
+
+    signal.signal(signal.SIGTERM, on_signal)
+    signal.signal(signal.SIGINT, on_signal)
+    signal.signal(signal.SIGHUP, on_signal)
+
     # Wait for DHT bootstrap alert before the first publication.
     bootstrapped = session.wait_for_dht_bootstrap(timeout=120)
     if not bootstrapped:
@@ -339,24 +358,6 @@ def main() -> None:
                 "Retained torrent added for seeding: v2 info hash=%s...",
                 retained_info_hash[:16],
             )
-
-    # Graceful shutdown on SIGTERM/SIGINT; SIGHUP reloads the canonical torrent
-    # without destroying the DHT session or the retained swarms.
-    running = True
-    reload_requested = threading.Event()
-
-    def on_signal(signum, _frame):
-        nonlocal running
-        if signum == signal.SIGHUP:
-            logger.info("Received SIGHUP; scheduling canonical torrent reload")
-            reload_requested.set()
-        else:
-            logger.info(f"Received signal {signum}, shutting down...")
-            running = False
-
-    signal.signal(signal.SIGTERM, on_signal)
-    signal.signal(signal.SIGINT, on_signal)
-    signal.signal(signal.SIGHUP, on_signal)
 
     # Stats file path
     stats_path = Path(data_dir) / "seeder-stats.json"
@@ -407,6 +408,12 @@ def main() -> None:
     except Exception as exc:
         dht_verified = False
         logger.error("Initial DHT publication is not verified: %s", exc)
+
+    # A reload received during startup is satisfied by loading and publishing
+    # the current canonical torrent above; avoid a redundant immediate put.
+    if reload_requested.is_set():
+        reload_requested.clear()
+        logger.info("Startup completed a pending canonical torrent reload")
 
     # Periodic status logging + stats file + DHT publishing
     while running:

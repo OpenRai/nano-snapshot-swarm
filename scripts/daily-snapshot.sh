@@ -40,13 +40,8 @@ wait_for_authoritative_seeder() {
     fi
 
     if systemctl --user is-active nano-seed.service &>/dev/null; then
-        # A direct SIGHUP is only safe after producer.seeder has installed its
-        # handler. During DHT bootstrap the default action terminates Python,
-        # and Restart=on-failure does not recover a clean HUP exit. Restarting
-        # is safe at every lifecycle point and saves the DHT/resume state on a
-        # graceful stop before loading the canonical torrent again.
-        log "Restarting nano-seed.service to load the updated torrent"
-        systemctl --user restart nano-seed.service
+        log "Requesting nano-seed.service reload to load the updated torrent"
+        systemctl --user reload nano-seed.service
     else
         log "Starting nano-seed.service to seed updated snapshot"
         systemctl --user start nano-seed.service
@@ -146,8 +141,9 @@ done
 # Use .partial file for download, then atomically rename on success
 PARTIAL_FILE="${TARGET_FILE}.partial"
 
-# --- Early exit: if metadata says this filename is already fully processed, refresh DHT through seeder ---
-# DHT entries expire after a few hours, so we must re-publish even when snapshot is unchanged.
+# --- Early exit: an unchanged canonical torrent needs no seeder interruption ---
+# The long-lived seeder republishes the mutable item every 30 minutes, and the
+# separate hourly status-push timer keeps the dashboard current.
 if [ -f "$META_FILE" ] && [ -f "$STABLE_FILE" ] && [ -s "$STABLE_FILE" ]; then
     readarray -t PREVIOUS_METADATA < <(python3 - "$META_FILE" <<'PY'
 import json
@@ -165,24 +161,8 @@ PY
     PREV_TORRENT="${PREVIOUS_METADATA[1]:-}"
     PREV_TORRENT_FORMAT_VERSION="${PREVIOUS_METADATA[2]:-}"
     if [ "$PREV_FILENAME" = "$FILENAME" ] && [ -n "$PREV_TORRENT" ] && [ "$PREV_TORRENT_FORMAT_VERSION" = "$TORRENT_FORMAT_VERSION" ]; then
-        log "Snapshot unchanged (${FILENAME}, torrent ${PREV_TORRENT}) — re-publishing to DHT"
-
-        cd "$REPO_DIR"
-        source .venv/bin/activate
-        if [ -z "${DHT_PRIVATE_KEY:-}" ] && [ -f "$HOME/.env" ]; then
-            source "$HOME/.env"
-        fi
-
-        # Re-publish through the long-lived seeder; it owns the DHT session.
-        wait_for_authoritative_seeder "$PREV_TORRENT"
-
-        # --- Step 7: Push status to API (re-publish path) ---
-        if [ -n "${STATUS_API_URL:-}" ]; then
-            log "Pushing status to ${STATUS_API_URL}"
-            "${REPO_DIR}/scripts/push-snapshot-status.sh" || log "WARNING: Status push failed (non-fatal)"
-        fi
-
-        log "=== Daily snapshot pipeline complete (re-publish only) ==="
+        log "Snapshot unchanged (${FILENAME}, torrent ${PREV_TORRENT}) — no seeder reload or DHT publication requested"
+        log "=== Daily snapshot pipeline complete (unchanged snapshot) ==="
         exit 0
     fi
     # Metadata matches but publish didn't complete — ensure TARGET_FILE exists so we skip download
@@ -404,10 +384,9 @@ PY
     log "Updated metadata with torrent hash: $TORRENT_HASH"
 fi
 
-# --- Step 6: Restart the long-lived seeder and publish the new torrent ---
-# Restarting is safe even while the seeder is still bootstrapping. It preserves
-# retained swarm files and writes libtorrent state during graceful shutdown.
-# The seeder writes publisher_state.json only after authoritative verification.
+# --- Step 6: Reload the long-lived seeder and publish the new torrent ---
+# A reload keeps its DHT session and existing retained swarms alive. The seeder
+# writes publisher_state.json only after authoritative verification.
 wait_for_authoritative_seeder "$TORRENT_HASH"
 
 # --- Step 7: Push status to API ---
