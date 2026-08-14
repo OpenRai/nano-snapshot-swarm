@@ -37,8 +37,8 @@ snapshot is observed; no high-churn transfer metric is labeled by info hash.
 
 ## Producer collection with Grafana Cloud
 
-1. In Grafana Cloud, create a Prometheus remote-write API key and obtain its
-   URL, numeric user/instance ID, and token.
+1. In Grafana Cloud, create an Access Policy token scoped to `metrics:write`
+   and obtain its Remote Write Endpoint, Username / Instance ID, and token.
 2. Install the Grafana Alloy binary on the producer host following Grafana’s
    current installation instructions. The committed user-level unit expects it
    at `/usr/bin/alloy`.
@@ -57,6 +57,10 @@ snapshot is observed; no high-churn transfer metric is labeled by info hash.
    GRAFANA_CLOUD_PROMETHEUS_INSTANCE_ID=...
    GRAFANA_CLOUD_PROMETHEUS_WRITE_TOKEN=...
    ```
+
+   If `GRAFANA_CLOUD_PROMETHEUS_REMOTE_WRITE_URL` is unset or empty, the
+   optional Grafana Alloy service is completely bypassed. The producer’s local
+   `127.0.0.1:9108/metrics` endpoint remains available.
 
 5. Symlink `systemd/nano-observability.service` into
    `~/.config/systemd/user/`, then reload and start it:

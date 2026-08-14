@@ -6,6 +6,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=-%h/.env
+# A non-zero ExecCondition skips this optional unit without running Alloy.
+ExecCondition=/usr/bin/test -n ${GRAFANA_CLOUD_PROMETHEUS_REMOTE_WRITE_URL}
 ExecStart=/usr/bin/alloy run %h/nano-snapshot-swarm/observability/nano-snapshot-swarm.alloy --storage.path=%h/.local/state/nano-alloy
 WorkingDirectory=%h/nano-snapshot-swarm
 Restart=on-failure
