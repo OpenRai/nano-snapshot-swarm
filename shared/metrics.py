@@ -10,7 +10,7 @@ import logging
 import os
 from typing import Literal
 
-from prometheus_client import CollectorRegistry, Counter, Gauge, Info, start_http_server
+from prometheus_client import CollectorRegistry, Counter, Gauge, start_http_server
 
 logger = logging.getLogger("shared.metrics")
 
@@ -52,9 +52,10 @@ class SnapshotMetrics:
             ["service"],
             registry=self.registry,
         )
-        self.generation = Info(
-            "nano_snapshot_generation",
+        self.generation = Gauge(
+            "nano_snapshot_generation_info",
             "The active snapshot generation. This is the only metric with an info hash label.",
+            ["service", "info_hash", "sequence"],
             registry=self.registry,
         )
         self.swarm_peers = Gauge(
@@ -78,9 +79,10 @@ class SnapshotMetrics:
             "Whether this service is ready for its current role (1 ready, 0 not ready).",
             registry=self.registry,
         )
-        self.state = Info(
+        self.state = Gauge(
             "nano_snapshot_state",
             "Current service state.",
+            ["service", "state"],
             registry=self.registry,
         )
         self._last_uploaded = 0
@@ -108,7 +110,12 @@ class SnapshotMetrics:
         size_bytes: int | None = None,
     ) -> None:
         self.dht_sequence.labels(service=self.service).set(sequence)
-        self.generation.info({"info_hash": info_hash, "sequence": str(sequence)})
+        self.generation.clear()
+        self.generation.labels(
+            service=self.service,
+            info_hash=info_hash,
+            sequence=str(sequence),
+        ).set(1)
         if size_bytes is not None:
             self.snapshot_size.labels(service=self.service).set(size_bytes)
 
@@ -134,5 +141,6 @@ class SnapshotMetrics:
         self.connections.set(connections)
 
     def observe_state(self, state: str, *, ready: bool) -> None:
-        self.state.info({"state": state, "service": self.service})
+        self.state.clear()
+        self.state.labels(service=self.service, state=state).set(1)
         self.ready.set(1 if ready else 0)
