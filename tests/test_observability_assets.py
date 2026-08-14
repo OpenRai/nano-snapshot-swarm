@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -18,3 +19,18 @@ def test_environment_template_documents_optional_alloy_collection() -> None:
     assert "GRAFANA_CLOUD_PROMETHEUS_INSTANCE_ID=" in template
     assert "GRAFANA_CLOUD_PROMETHEUS_WRITE_TOKEN=" in template
     assert "completely bypass" in template
+
+
+def test_dashboard_preserves_the_public_panel_optimizations() -> None:
+    dashboard = json.loads(
+        (PROJECT_ROOT / "observability/nano-snapshot-swarm-dashboard.json").read_text()
+    )
+    panels = {panel["id"]: panel for panel in dashboard["panels"]}
+
+    assert dashboard["schemaVersion"] == 42
+    assert dashboard["version"] == 4
+    assert panels[1]["fieldConfig"]["defaults"]["mappings"][0]["options"]["1"]["text"] == "Ready"
+    assert panels[5]["options"]["legend"]["displayMode"] == "table"
+    assert panels[5]["options"]["legend"]["calcs"] == ["mean", "max", "lastNotNull"]
+    assert panels[6]["fieldConfig"]["overrides"][0]["matcher"]["options"] == "connections"
+    assert panels[7]["transformations"][1]["id"] == "organize"
