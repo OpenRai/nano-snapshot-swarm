@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
 import pytest
 
@@ -308,6 +310,107 @@ class TestPush:
         assert client.post("/api/push", json=malformed_signature).status_code == 422
         malformed_base64 = {**payload, "torrent_file_b64": "%%%"}
         assert client.post("/api/push", json=malformed_base64).status_code == 422
+
+    def test_concurrent_higher_then_lower_push_cannot_roll_back_state(
+        self, sample_push_payload, monkeypatch
+    ):
+        import app.main as main_module
+
+        from producer.push_status import sign_push
+
+        payload, pubkey_hex = sample_push_payload
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        original_save = main_module._save_state
+        high_save_started = Event()
+        release_high_save = Event()
+
+        def blocking_save(status, torrent_bytes):
+            if status["sequence"] == 43:
+                high_save_started.set()
+                assert release_high_save.wait(timeout=5)
+            original_save(status, torrent_bytes)
+
+        def signed_push(sequence):
+            candidate = {**payload, "sequence": sequence}
+            candidate["signature"] = sign_push(
+                "e06d3183d14159228433ed599221b80bd0a5ce8352e4bdf0262f76786ef1c74d",
+                candidate,
+            )
+            return main_module.PushRequest.model_validate(candidate)
+
+        def invoke(request):
+            try:
+                return main_module.push(request).status_code
+            except main_module.HTTPException as exc:
+                return exc.status_code
+
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        monkeypatch.setattr(main_module, "_save_state", blocking_save)
+        try:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                high = executor.submit(invoke, signed_push(43))
+                assert high_save_started.wait(timeout=5)
+                low = executor.submit(invoke, signed_push(42))
+                assert not low.done()
+                release_high_save.set()
+
+                assert high.result() == 200
+                assert low.result() == 409
+
+            assert main_module._current_status["sequence"] == 43
+            assert main_module._torrent_bytes == b"fake-torrent-data"
+            assert main_module.STATUS_FILE.exists()
+            assert main_module.TORRENT_FILE.read_bytes() == b"fake-torrent-data"
+            named_path = (
+                main_module.TORRENTS_DIR / ("ab" * 32) / "nano-ledger-snapshot.7z.torrent"
+            )
+            assert named_path.read_bytes() == b"fake-torrent-data"
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
+
+    def test_concurrent_identical_retries_serialize_persistence(
+        self, sample_push_payload, monkeypatch
+    ):
+        import app.main as main_module
+
+        payload, pubkey_hex = sample_push_payload
+        original_pubkey = main_module.PRODUCER_SIGNING_PUBKEY
+        original_save = main_module._save_state
+        first_save_started = Event()
+        second_save_started = Event()
+        release_first_save = Event()
+
+        def blocking_save(status, torrent_bytes):
+            if not first_save_started.is_set():
+                first_save_started.set()
+                assert release_first_save.wait(timeout=5)
+            else:
+                second_save_started.set()
+            original_save(status, torrent_bytes)
+
+        main_module.PRODUCER_SIGNING_PUBKEY = pubkey_hex
+        monkeypatch.setattr(main_module, "_save_state", blocking_save)
+        try:
+            request = main_module.PushRequest.model_validate(payload)
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                first = executor.submit(main_module.push, request)
+                assert first_save_started.wait(timeout=5)
+                second = executor.submit(main_module.push, request)
+                assert not second_save_started.wait(timeout=0.2)
+                release_first_save.set()
+
+                assert first.result().status_code == 200
+                assert second.result().status_code == 200
+
+            assert main_module._current_status["payload_digest"]
+            assert main_module.TORRENT_FILE.read_bytes() == b"fake-torrent-data"
+            assert main_module.STATUS_FILE.exists()
+            named_path = (
+                main_module.TORRENTS_DIR / ("ab" * 32) / "nano-ledger-snapshot.7z.torrent"
+            )
+            assert named_path.read_bytes() == b"fake-torrent-data"
+        finally:
+            main_module.PRODUCER_SIGNING_PUBKEY = original_pubkey
 
 
 class TestGetEndpoints:

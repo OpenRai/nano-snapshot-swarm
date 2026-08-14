@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import tempfile
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -54,6 +55,7 @@ JINJA = Environment(
 # Store current state in memory (reloaded from disk on startup)
 _current_status: dict | None = None
 _torrent_bytes: bytes = b""
+_state_lock = threading.RLock()
 
 
 def _named_torrent_path(info_hash: str, torrent_name: str) -> Path:
@@ -66,29 +68,30 @@ def _named_torrent_path(info_hash: str, torrent_name: str) -> Path:
 
 def _load_state() -> None:
     global _current_status, _torrent_bytes
-    if STATUS_FILE.exists():
-        try:
-            _current_status = json.loads(STATUS_FILE.read_text())
-        except (json.JSONDecodeError, OSError):
+    with _state_lock:
+        if STATUS_FILE.exists():
+            try:
+                _current_status = json.loads(STATUS_FILE.read_text())
+            except (json.JSONDecodeError, OSError):
+                _current_status = None
+        else:
             _current_status = None
-    else:
-        _current_status = None
-    if TORRENT_FILE.exists():
-        try:
-            _torrent_bytes = TORRENT_FILE.read_bytes()
-        except OSError:
+        if TORRENT_FILE.exists():
+            try:
+                _torrent_bytes = TORRENT_FILE.read_bytes()
+            except OSError:
+                _torrent_bytes = b""
+        else:
             _torrent_bytes = b""
-    else:
-        _torrent_bytes = b""
-    if _current_status and _torrent_bytes:
-        old_pubkey_field = _current_status.pop("authority_pubkey", None)
-        if old_pubkey_field is not None:
-            _current_status["producer_signing_pubkey"] = PRODUCER_SIGNING_PUBKEY
-        named_path = _named_torrent_path(
-            _current_status["info_hash"], _current_status["torrent_name"]
-        )
-        if old_pubkey_field is not None or not named_path.exists():
-            _save_state(_current_status, _torrent_bytes)
+        if _current_status and _torrent_bytes:
+            old_pubkey_field = _current_status.pop("authority_pubkey", None)
+            if old_pubkey_field is not None:
+                _current_status["producer_signing_pubkey"] = PRODUCER_SIGNING_PUBKEY
+            named_path = _named_torrent_path(
+                _current_status["info_hash"], _current_status["torrent_name"]
+            )
+            if old_pubkey_field is not None or not named_path.exists():
+                _save_state(_current_status, _torrent_bytes)
 
 
 @asynccontextmanager
@@ -208,67 +211,74 @@ def push(payload: PushRequest) -> JSONResponse:
 
     torrent_bytes = _decode_torrent(payload)
     payload_digest = hashlib.sha256(canonical_push_payload(payload)).hexdigest()
-    current_seq = _current_status.get("sequence", 0) if _current_status else 0
-    if payload.sequence < current_seq:
-        raise HTTPException(
-            status_code=409, detail=f"Replay rejected (seq {payload.sequence} < {current_seq})"
-        )
+    with _state_lock:
+        current_seq = _current_status.get("sequence", 0) if _current_status else 0
+        if payload.sequence < current_seq:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Replay rejected (seq {payload.sequence} < {current_seq})",
+            )
 
-    if payload.sequence == current_seq and _current_status is not None:
-        if (
-            _current_status.get("payload_digest") == payload_digest
-            and torrent_bytes == _torrent_bytes
-        ):
-            return JSONResponse({"ok": True, "sequence": payload.sequence})
-        if not _same_snapshot_identity(payload, torrent_bytes):
-            raise HTTPException(status_code=409, detail="Conflicting payload for existing sequence")
+        if payload.sequence == current_seq and _current_status is not None:
+            if (
+                _current_status.get("payload_digest") == payload_digest
+                and torrent_bytes == _torrent_bytes
+            ):
+                return JSONResponse({"ok": True, "sequence": payload.sequence})
+            if not _same_snapshot_identity(payload, torrent_bytes):
+                raise HTTPException(
+                    status_code=409, detail="Conflicting payload for existing sequence"
+                )
 
-    magnet = _build_magnet(payload.info_hash, payload.torrent_name, payload.info_hash_v1)
+        magnet = _build_magnet(payload.info_hash, payload.torrent_name, payload.info_hash_v1)
 
-    status = {
-        "sequence": payload.sequence,
-        "info_hash": payload.info_hash,
-        "info_hash_v1": payload.info_hash_v1,
-        "torrent_name": payload.torrent_name,
-        "magnet": magnet,
-        "torrent_download_url": "/api/torrent",
-        "named_torrent_download_url": (
-            f"/api/torrents/{payload.info_hash}/{quote(payload.torrent_name)}.torrent"
-        ),
-        "snapshot_size_bytes": payload.snapshot_size_bytes,
-        "piece_size": payload.piece_size,
-        "producer_signing_pubkey": PRODUCER_SIGNING_PUBKEY,
-        "dht_salt": DHT_SALT,
-        "verified": True,
-        "timestamp": payload.timestamp,
-        "archive_listing": payload.archive_listing,
-        "payload_digest": payload_digest,
-    }
+        status = {
+            "sequence": payload.sequence,
+            "info_hash": payload.info_hash,
+            "info_hash_v1": payload.info_hash_v1,
+            "torrent_name": payload.torrent_name,
+            "magnet": magnet,
+            "torrent_download_url": "/api/torrent",
+            "named_torrent_download_url": (
+                f"/api/torrents/{payload.info_hash}/{quote(payload.torrent_name)}.torrent"
+            ),
+            "snapshot_size_bytes": payload.snapshot_size_bytes,
+            "piece_size": payload.piece_size,
+            "producer_signing_pubkey": PRODUCER_SIGNING_PUBKEY,
+            "dht_salt": DHT_SALT,
+            "verified": True,
+            "timestamp": payload.timestamp,
+            "archive_listing": payload.archive_listing,
+            "payload_digest": payload_digest,
+        }
 
-    _save_state(status, torrent_bytes)
-    _current_status = status
-    _torrent_bytes = torrent_bytes
+        _save_state(status, torrent_bytes)
+        _current_status = status
+        _torrent_bytes = torrent_bytes
 
     return JSONResponse({"ok": True, "sequence": payload.sequence})
 
 
 @app.get("/api/status")
 def get_status() -> JSONResponse:
-    if _current_status is None:
-        raise HTTPException(status_code=404, detail="No status available yet")
-    headers = {"Cache-Control": "no-store"}
-    return JSONResponse(_current_status, headers=headers)
+    with _state_lock:
+        if _current_status is None:
+            raise HTTPException(status_code=404, detail="No status available yet")
+        headers = {"Cache-Control": "no-store"}
+        return JSONResponse(_current_status, headers=headers)
 
 
 def _render_fragment() -> str:
-    status = {**_current_status, "torrent_name": _current_status["torrent_name"] + ".torrent"}
-    return JINJA.get_template("status_fragment.html").render(**status)
+    with _state_lock:
+        status = {**_current_status, "torrent_name": _current_status["torrent_name"] + ".torrent"}
+        return JINJA.get_template("status_fragment.html").render(**status)
 
 
 @app.get("/api/status-fragment")
 def get_status_fragment() -> Response:
-    if _current_status is None:
-        raise HTTPException(status_code=404, detail="No status available yet")
+    with _state_lock:
+        if _current_status is None:
+            raise HTTPException(status_code=404, detail="No status available yet")
     rendered = _render_fragment()
     headers = {
         "Content-Type": "text/html",
@@ -280,10 +290,11 @@ def get_status_fragment() -> Response:
 
 @app.get("/api/torrent")
 def get_torrent() -> Response:
-    if _current_status is None or not _torrent_bytes:
-        raise HTTPException(status_code=404, detail="No torrent available yet")
-    url = _current_status["named_torrent_download_url"] + f"?v={_current_status['info_hash']}"
-    return RedirectResponse(url=url, status_code=307, headers={"Cache-Control": "no-store"})
+    with _state_lock:
+        if _current_status is None or not _torrent_bytes:
+            raise HTTPException(status_code=404, detail="No torrent available yet")
+        url = _current_status["named_torrent_download_url"] + f"?v={_current_status['info_hash']}"
+        return RedirectResponse(url=url, status_code=307, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/torrents/{info_hash}/{torrent_name}.torrent")
@@ -301,13 +312,14 @@ def get_named_torrent(info_hash: str, torrent_name: str) -> Response:
 
 @app.get("/api/latest.magnet")
 def get_latest_magnet() -> Response:
-    if _current_status is None:
-        raise HTTPException(status_code=404, detail="No status available yet")
-    return Response(
-        content=_current_status["magnet"],
-        media_type="text/plain",
-        headers={"Cache-Control": "no-store"},
-    )
+    with _state_lock:
+        if _current_status is None:
+            raise HTTPException(status_code=404, detail="No status available yet")
+        return Response(
+            content=_current_status["magnet"],
+            media_type="text/plain",
+            headers={"Cache-Control": "no-store"},
+        )
 
 
 @app.get("/nano-snapshot-swarm.producer-signing-pubkey.txt")
@@ -322,20 +334,22 @@ def get_public_key() -> Response:
 
 @app.get("/")
 def index() -> Response:
-    if _current_status is None:
-        html = JINJA.get_template("index.html").render(status_fragment="")
-        return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
+    with _state_lock:
+        if _current_status is None:
+            html = JINJA.get_template("index.html").render(status_fragment="")
+            return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
-    fragment = _render_fragment()
-    html = JINJA.get_template("index.html").render(status_fragment=fragment)
-    return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
+        fragment = _render_fragment()
+        html = JINJA.get_template("index.html").render(status_fragment=fragment)
+        return HTMLResponse(content=html, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/health")
 def health() -> JSONResponse:
-    body = {
-        "status": "ok",
-        "sequence": _current_status.get("sequence", 0) if _current_status else 0,
-        "updated_at": _current_status.get("timestamp", "") if _current_status else "",
-    }
-    return JSONResponse(body, headers={"Cache-Control": "no-store"})
+    with _state_lock:
+        body = {
+            "status": "ok",
+            "sequence": _current_status.get("sequence", 0) if _current_status else 0,
+            "updated_at": _current_status.get("timestamp", "") if _current_status else "",
+        }
+        return JSONResponse(body, headers={"Cache-Control": "no-store"})
