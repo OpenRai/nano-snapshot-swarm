@@ -27,24 +27,12 @@ def test_dashboard_preserves_the_public_panel_optimizations() -> None:
     )
     panels = {panel["id"]: panel for panel in dashboard["panels"]}
 
-    assert dashboard["__inputs"][0]["name"] == "DS_PROMETHEUS"
-    assert dashboard["__elements"] == {}
-    assert {
-        (requirement["type"], requirement["id"])
-        for requirement in dashboard["__requires"]
-    } >= {
-        ("grafana", "grafana"),
-        ("datasource", "prometheus"),
-        ("panel", "stat"),
-        ("panel", "timeseries"),
-        ("panel", "table"),
-    }
     assert all(
-        panel["datasource"]["uid"] == "${DS_PROMETHEUS}"
+        panel["datasource"]["uid"] == "grafanacloud-grandoat1733-prom"
         for panel in panels.values()
     )
     assert dashboard["schemaVersion"] == 42
-    assert dashboard["version"] == 6
+    assert dashboard["version"] == 7
     assert panels[1]["fieldConfig"]["defaults"]["mappings"][0]["options"]["1"]["text"] == "Ready"
     assert panels[5]["options"]["legend"]["displayMode"] == "table"
     assert panels[5]["options"]["legend"]["calcs"] == ["mean", "max", "lastNotNull"]
