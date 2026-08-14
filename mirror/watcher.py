@@ -93,6 +93,7 @@ class MirrorWatcher:
         self._active_started_at: Optional[float] = None
         self._once_mode = False
         self._running = False
+        self._shutdown_event = threading.Event()
         self._monitor_thread: Optional[threading.Thread] = None
         self._discovery_thread: Optional[threading.Thread] = None
         self._stop_reason: Optional[DownloadStatus] = None
@@ -137,13 +138,15 @@ class MirrorWatcher:
 
         self._running = True
         self._stop_reason = None
+        self._shutdown_event.clear()
 
         signal.signal(signal.SIGTERM, self._handle_signal)
         signal.signal(signal.SIGINT, self._handle_signal)
 
         if once:
-            logger.info("Waiting 30s for DHT to bootstrap (leech mode)...")
-            time.sleep(30)
+            if not self._wait_for_bootstrap("leech"):
+                self.stop()
+                return
             self.state.set_phase("discovering")
             try:
                 self._run_once()
@@ -153,8 +156,9 @@ class MirrorWatcher:
             finally:
                 self.stop()
         else:
-            logger.info("Waiting 30s for DHT to bootstrap (swarm mode)...")
-            time.sleep(30)
+            if not self._wait_for_bootstrap("swarm"):
+                self.stop()
+                return
             try:
                 self._run_loop()
             except Exception:
@@ -163,9 +167,18 @@ class MirrorWatcher:
             finally:
                 self.stop()
 
+    def _wait_for_bootstrap(self, mode: str) -> bool:
+        """Wait for the initial DHT grace period unless shutdown was requested."""
+        logger.info("Waiting 30s for DHT to bootstrap (%s mode)...", mode)
+        if self._shutdown_event.wait(timeout=30):
+            logger.info("DHT bootstrap wait interrupted by shutdown")
+            return False
+        return True
+
     def stop(self) -> None:
         logger.info("Shutting down mirror service...")
         self._running = False
+        self._shutdown_event.set()
         self._reconcile_event.set()
         if self._discovery_thread and self._discovery_thread.is_alive():
             self._discovery_thread.join(timeout=5)
@@ -179,6 +192,7 @@ class MirrorWatcher:
     def _handle_signal(self, signum: int, frame) -> None:
         logger.info(f"Received signal {signum}, initiating graceful shutdown")
         self._running = False
+        self._shutdown_event.set()
         self._reconcile_event.set()
 
     def _load_desired_snapshot(self) -> Optional[DesiredSnapshot]:

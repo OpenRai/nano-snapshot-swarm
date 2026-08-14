@@ -83,6 +83,16 @@ def test_higher_dht_sequence_for_same_torrent_continues_transfer(tmp_path, caplo
     assert "New snapshot detected" not in caplog.text
 
 
+def test_shutdown_interrupts_initial_dht_bootstrap_wait(tmp_path) -> None:
+    sys.modules.setdefault("libtorrent", SimpleNamespace())
+    from mirror.watcher import MirrorWatcher
+
+    watcher = MirrorWatcher(producer_signing_pubkey_hex="ab" * 32, data_dir=str(tmp_path))
+    watcher._shutdown_event.set()
+
+    assert watcher._wait_for_bootstrap("swarm") is False
+
+
 def test_swarm_mode_keeps_monitoring_after_seeding(tmp_path, monkeypatch) -> None:
     sys.modules.setdefault("libtorrent", SimpleNamespace())
     import mirror.watcher as watcher_module
