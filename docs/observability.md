@@ -76,6 +76,9 @@ producer labels.
 
 ## Public dashboard
 
+The live externally shared dashboard is
+[Nano Snapshot Swarm](https://grandoat1733.grafana.net/public-dashboards/67d611ed1e1849a2abf21284747d4776).
+
 Import
 [`observability/nano-snapshot-swarm-dashboard.json`](../observability/nano-snapshot-swarm-dashboard.json)
 into Grafana Cloud and select the Cloud Prometheus data source. It has a

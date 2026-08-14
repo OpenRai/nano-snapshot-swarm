@@ -21,6 +21,15 @@ def test_environment_template_documents_optional_alloy_collection() -> None:
     assert "completely bypass" in template
 
 
+def test_observability_guide_links_the_live_public_dashboard() -> None:
+    guide = (PROJECT_ROOT / "docs/observability.md").read_text()
+
+    assert (
+        "https://grandoat1733.grafana.net/public-dashboards/"
+        "67d611ed1e1849a2abf21284747d4776"
+    ) in guide
+
+
 def test_dashboard_preserves_the_public_panel_optimizations() -> None:
     dashboard = json.loads(
         (PROJECT_ROOT / "observability/nano-snapshot-swarm-dashboard.json").read_text()
