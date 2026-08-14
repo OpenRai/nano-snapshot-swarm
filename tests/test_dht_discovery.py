@@ -1,3 +1,4 @@
+import logging
 from types import SimpleNamespace
 
 from mirror.dht_discovery import _process_mutable_item_snapshot, discover_latest_snapshot
@@ -111,6 +112,26 @@ def test_discovery_uses_highest_signed_response_before_authoritative_completion(
     assert result.sequence == 11
     assert result.info_hash_hex == "cd" * 32
     assert session.get_calls == 1
+
+
+def test_discovery_logs_selected_candidate_once_for_duplicate_dht_replies(caplog):
+    caplog.set_level(logging.INFO, logger="mirror.discovery")
+    first, public_key = signed_snapshot(value=bytes.fromhex("cd" * 32), sequence=11)
+    second, _ = signed_snapshot(value=bytes.fromhex("cd" * 32), sequence=11)
+
+    class FakeSession:
+        def lookup_dht_mutable_item(self, pubkey: bytes, salt: str, timeout: float):
+            return [first, second]
+
+    result = discover_latest_snapshot(FakeSession(), public_key.hex())
+
+    assert result is not None
+    discovered = [
+        record
+        for record in caplog.records
+        if record.message.startswith("Discovered DHT mutable item:")
+    ]
+    assert len(discovered) == 1
 
 
 def test_discovery_rejects_conflicting_highest_signed_candidates(monkeypatch):

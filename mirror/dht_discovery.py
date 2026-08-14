@@ -73,6 +73,13 @@ def discover_latest_snapshot(
                     continue
                 result = highest[0]
                 if result.sequence >= min_sequence:
+                    logger.info(
+                        "Discovered DHT mutable item: sequence=%s, torrent v2 info hash=%s..., "
+                        "signature verified=%s",
+                        result.sequence,
+                        result.info_hash_hex[:16],
+                        result.verified,
+                    )
                     return result
                 logger.warning(
                     "Ignoring stale DHT item: sequence=%d is below stored sequence=%d; "
@@ -171,14 +178,6 @@ def _process_mutable_item_snapshot(
                 f"{value_bytes[:64].hex()}"
             )
             return None
-
-        logger.info(
-            "Discovered DHT mutable item: sequence=%s, torrent v2 info hash=%s..., "
-            "signature verified=%s",
-            seq,
-            info_hash_hex[:16],
-            verified,
-        )
 
         return DHTDiscoveryResult(
             info_hash_hex=info_hash_hex,
