@@ -344,6 +344,11 @@ class MirrorWatcher:
             self.metrics.observe_generation(
                 info_hash=result.info_hash_hex,
                 sequence=result.sequence,
+                original_filename=(
+                    self.snapshot_meta.data.get("original_filename")
+                    if self.snapshot_meta.data.get("torrent_info_hash") == result.info_hash_hex
+                    else None
+                ),
             )
 
             if (
@@ -489,6 +494,16 @@ class MirrorWatcher:
         self.snapshot_meta.update(
             original_filename=meta.get("original_filename"),
         )
+
+        if self._last_discovery and self._last_discovery.info_hash_hex == self._active_info_hash:
+            original_filename = meta.get("original_filename")
+            self.metrics.observe_generation(
+                info_hash=self._last_discovery.info_hash_hex,
+                sequence=self._last_discovery.sequence,
+                original_filename=(
+                    original_filename if isinstance(original_filename, str) else None
+                ),
+            )
 
         parts = []
         if "original_filename" in meta:

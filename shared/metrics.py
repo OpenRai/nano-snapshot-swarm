@@ -31,9 +31,10 @@ def _boolean_from_env(name: str, default: bool) -> bool:
 class SnapshotMetrics:
     """Metrics for one producer or mirror process.
 
-    Info-hash labels are deliberately confined to ``generation_info``.  They
-    are cleared before a new generation is recorded, keeping the live scrape
-    bounded even though a new torrent is created for each snapshot.
+    Info-hash and original-filename labels are deliberately confined to
+    ``generation_info``. They are cleared before a new generation is recorded,
+    keeping the live scrape bounded even though a new torrent is created for
+    each snapshot.
     """
 
     def __init__(self, service: Literal["producer", "mirror"]):
@@ -63,8 +64,9 @@ class SnapshotMetrics:
         )
         self.generation = Gauge(
             "nano_snapshot_generation_info",
-            "The active snapshot generation. This is the only metric with an info hash label.",
-            ["service", "info_hash", "sequence"],
+            "The active snapshot generation. This is the only metric with info hash "
+            "and original filename labels.",
+            ["service", "info_hash", "sequence", "original_filename"],
             registry=self.registry,
         )
         self.swarm_peers = Gauge(
@@ -117,6 +119,7 @@ class SnapshotMetrics:
         info_hash: str,
         sequence: int,
         size_bytes: int | None = None,
+        original_filename: str | None = None,
     ) -> None:
         self.dht_sequence.labels(service=self.service).set(sequence)
         self.generation.clear()
@@ -124,6 +127,7 @@ class SnapshotMetrics:
             service=self.service,
             info_hash=info_hash,
             sequence=str(sequence),
+            original_filename=original_filename or "",
         ).set(1)
         if size_bytes is not None:
             self.snapshot_size.labels(service=self.service).set(size_bytes)

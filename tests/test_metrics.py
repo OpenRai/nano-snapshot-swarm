@@ -28,7 +28,12 @@ def test_metrics_expose_exact_generation_and_bounded_transfer_labels() -> None:
     metrics = SnapshotMetrics("producer")
     info_hash = "ab" * 32
 
-    metrics.observe_generation(info_hash=info_hash, sequence=1370, size_bytes=128)
+    metrics.observe_generation(
+        info_hash=info_hash,
+        sequence=1370,
+        size_bytes=128,
+        original_filename="snapshot-2026-08-14.7z",
+    )
     metrics.observe_transfer(
         total_upload=100,
         total_download=200,
@@ -49,6 +54,7 @@ def test_metrics_expose_exact_generation_and_bounded_transfer_labels() -> None:
 
     assert 'nano_snapshot_generation_info{info_hash="' + info_hash in rendered
     assert 'sequence="1370"' in rendered
+    assert 'original_filename="snapshot-2026-08-14.7z"' in rendered
     assert 'nano_snapshot_dht_sequence{service="producer"} 1370.0' in rendered
     assert 'nano_snapshot_size_bytes{service="producer"} 128.0' in rendered
     assert "nano_snapshot_bytes_uploaded_total 150.0" in rendered

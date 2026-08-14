@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -10,6 +11,7 @@ pytest.importorskip("libtorrent")
 from producer.retention import SNAPSHOT_NAME, retain_current_snapshot  # noqa: E402
 from producer.seeder import (  # noqa: E402
     _load_current_torrent,
+    _load_original_filename,
     _record_verified_publication,
     _should_log_seeding_status,
 )
@@ -21,6 +23,7 @@ class _FakeSession:
         self.active = set(active or ())
         self.added: list[tuple[str, str]] = []
         self.removed: list[str] = []
+        self.snapshot_meta: dict[str, str] | None = None
 
     def has_torrent(self, info_hash: str) -> bool:
         return info_hash in self.active
@@ -39,6 +42,11 @@ class _FakeSession:
 
     def get_handle(self, info_hash: str) -> object | None:
         return object() if info_hash in self.active else None
+
+    def torrent_metadata(self, info_hash: str) -> object | None:
+        if info_hash not in self.active or self.snapshot_meta is None:
+            return None
+        return SimpleNamespace(snapshot_meta=self.snapshot_meta)
 
 
 def test_seeder_records_dashboard_state_only_after_verified_publication(tmp_path: Path) -> None:
@@ -63,6 +71,17 @@ def test_seeder_records_dashboard_state_only_after_verified_publication(tmp_path
         "last_dht_seq": 41,
         "last_dht_info_hash": "cd" * 32,
     }
+
+
+def test_seeder_reports_original_filename_from_torrent_metadata(tmp_path: Path) -> None:
+    info_hash = "ab" * 32
+    (tmp_path / "snapshot-meta.json").write_text(
+        json.dumps({"original_filename": "fallback.7z"})
+    )
+    session = _FakeSession(info_hash, {info_hash})
+    session.snapshot_meta = {"original_filename": "from-torrent.7z"}
+
+    assert _load_original_filename(session, str(tmp_path), info_hash) == "from-torrent.7z"
 
 
 def test_seeder_restart_does_not_increment_dashboard_sequence(tmp_path: Path) -> None:

@@ -126,6 +126,30 @@ def _load_info_hash(data_dir: str) -> str | None:
         return None
 
 
+def _load_original_filename(
+    session: LibtorrentSession, data_dir: str, info_hash: str
+) -> str | None:
+    """Read the upstream filename embedded in the active torrent metadata."""
+    try:
+        metadata = session.torrent_metadata(info_hash)
+        if metadata and metadata.snapshot_meta:
+            original_filename = metadata.snapshot_meta.get("original_filename")
+            if isinstance(original_filename, str) and original_filename:
+                return original_filename
+    except Exception as exc:
+        logger.debug("Could not read original filename from torrent metadata: %s", exc)
+
+    # snapshot-meta.json is written alongside the canonical torrent before the
+    # seeder reloads it, so retain it as a startup/recovery fallback.
+    try:
+        value = json.loads((Path(data_dir) / "snapshot-meta.json").read_text()).get(
+            "original_filename"
+        )
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return None
+    return value if isinstance(value, str) and value else None
+
+
 def _dht_publish(
     session: LibtorrentSession,
     privkey_64: bytes,
@@ -346,6 +370,9 @@ def main() -> None:
     current_info_hash, handle, snapshot_size = _load_current_torrent(
         session, data_dir, None
     )
+    current_original_filename = _load_original_filename(
+        session, data_dir, current_info_hash
+    )
     logger.info("Canonical torrent added, seeding...")
     for archive_path, retained_torrent in retained_torrent_pairs(data_dir):
         retained_info_hash = retained_torrent.parent.name
@@ -429,6 +456,9 @@ def main() -> None:
                 current_info_hash = new_info_hash
                 handle = new_handle
                 snapshot_size = new_snapshot_size
+                current_original_filename = _load_original_filename(
+                    session, data_dir, current_info_hash
+                )
                 dht_verified = False
                 logger.info(
                     "Canonical torrent reload complete: v2 info hash=%s...",
@@ -460,6 +490,7 @@ def main() -> None:
                     info_hash=current_info_hash,
                     sequence=last_dht_sequence,
                     size_bytes=snapshot_size,
+                    original_filename=current_original_filename,
                 )
             else:
                 metrics.snapshot_size.labels(service="producer").set(snapshot_size)

@@ -100,7 +100,7 @@
       "pluginVersion": "13.2.0-31683987170",
       "targets": [{ "expr": "nano_snapshot_generation_info", "format": "table", "instant": true, "refId": "A" }],
       "title": "Active snapshot generation",
-      "transformations": [{ "id": "labelsToFields", "options": { "valueLabel": "Value" } }, { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "instance": true, "job": true }, "renameByName": { "environment": "Environment", "info_hash": "Snapshot Hash", "sequence": "Sequence", "service": "Service" } } }],
+      "transformations": [{ "id": "labelsToFields", "options": { "valueLabel": "Value" } }, { "id": "organize", "options": { "excludeByName": { "Time": true, "Value": true, "__name__": true, "instance": true, "job": true }, "renameByName": { "environment": "Environment", "info_hash": "Snapshot Hash", "original_filename": "Original filename", "sequence": "Sequence", "service": "Service" } } }],
       "type": "table"
     }
   ],
@@ -114,5 +114,5 @@
   "timezone": "utc",
   "title": "Nano Snapshot Swarm",
   "uid": "nano-snapshot-swarm",
-  "version": 4
+  "version": 5
 }

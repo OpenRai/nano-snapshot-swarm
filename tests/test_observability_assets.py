@@ -28,9 +28,13 @@ def test_dashboard_preserves_the_public_panel_optimizations() -> None:
     panels = {panel["id"]: panel for panel in dashboard["panels"]}
 
     assert dashboard["schemaVersion"] == 42
-    assert dashboard["version"] == 4
+    assert dashboard["version"] == 5
     assert panels[1]["fieldConfig"]["defaults"]["mappings"][0]["options"]["1"]["text"] == "Ready"
     assert panels[5]["options"]["legend"]["displayMode"] == "table"
     assert panels[5]["options"]["legend"]["calcs"] == ["mean", "max", "lastNotNull"]
     assert panels[6]["fieldConfig"]["overrides"][0]["matcher"]["options"] == "connections"
     assert panels[7]["transformations"][1]["id"] == "organize"
+    assert (
+        panels[7]["transformations"][1]["options"]["renameByName"]["original_filename"]
+        == "Original filename"
+    )
