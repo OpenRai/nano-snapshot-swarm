@@ -16,7 +16,7 @@
   "graphTooltip": 1,
   "panels": [
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-grandoat1733-prom" },
       "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
       "gridPos": { "h": 5, "w": 4, "x": 0, "y": 0 },
       "id": 1,
@@ -26,7 +26,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-grandoat1733-prom" },
       "fieldConfig": { "defaults": { "decimals": 0, "unit": "none" }, "overrides": [] },
       "gridPos": { "h": 5, "w": 4, "x": 4, "y": 0 },
       "id": 2,
@@ -36,7 +36,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-grandoat1733-prom" },
       "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
       "gridPos": { "h": 5, "w": 4, "x": 8, "y": 0 },
       "id": 3,
@@ -46,7 +46,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-grandoat1733-prom" },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "gridPos": { "h": 5, "w": 4, "x": 12, "y": 0 },
       "id": 4,
@@ -56,7 +56,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-grandoat1733-prom" },
       "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
       "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
       "id": 5,
@@ -69,7 +69,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-grandoat1733-prom" },
       "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
       "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
       "id": 6,
@@ -83,7 +83,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "grafanacloud-grandoat1733-prom" },
       "fieldConfig": { "defaults": { "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
       "gridPos": { "h": 7, "w": 24, "x": 0, "y": 14 },
       "id": 7,
@@ -97,23 +97,10 @@
   "refresh": "1m",
   "schemaVersion": 41,
   "tags": ["nano", "snapshot", "public"],
-  "templating": {
-    "list": [
-      {
-        "current": {},
-        "includeAll": false,
-        "label": "Prometheus data source",
-        "name": "DS_PROMETHEUS",
-        "options": [],
-        "query": "prometheus",
-        "refresh": 1,
-        "type": "datasource"
-      }
-    ]
-  },
+  "templating": { "list": [] },
   "time": { "from": "now-6h", "to": "now" },
   "timezone": "utc",
   "title": "Nano Snapshot Swarm",
   "uid": "nano-snapshot-swarm",
-  "version": 2
+  "version": 3
 }
