@@ -28,11 +28,11 @@ def test_dashboard_preserves_the_public_panel_optimizations() -> None:
     panels = {panel["id"]: panel for panel in dashboard["panels"]}
 
     assert all(
-        panel["datasource"]["uid"] == "grafanacloud-grandoat1733-prom"
+        panel["datasource"]["uid"] == "grafanacloud-prom"
         for panel in panels.values()
     )
     assert dashboard["schemaVersion"] == 42
-    assert dashboard["version"] == 8
+    assert dashboard["version"] == 9
     assert panels[1]["fieldConfig"]["defaults"]["mappings"][0]["options"]["1"]["text"] == "Ready"
     assert panels[5]["options"]["legend"]["displayMode"] == "table"
     assert panels[5]["options"]["legend"]["calcs"] == ["mean", "max", "lastNotNull"]
