@@ -1,0 +1,29 @@
+// Grafana Alloy scrapes only the producer's loopback endpoint, then sends it
+// to Grafana Cloud. Keep the three GRAFANA_CLOUD_* values in the host's .env.
+
+prometheus.remote_write "grafana_cloud" {
+  external_labels = {
+    service     = "nano-snapshot-producer",
+    environment = "production",
+  }
+
+  endpoint {
+    url = sys.env("GRAFANA_CLOUD_PROM_URL")
+
+    basic_auth {
+      username = sys.env("GRAFANA_CLOUD_PROM_USER")
+      password = sys.env("GRAFANA_CLOUD_PROM_API_KEY")
+    }
+  }
+}
+
+prometheus.scrape "producer" {
+  targets = [
+    {
+      "__address__" = "127.0.0.1:9108",
+      "job"         = "nano-snapshot-producer",
+    },
+  ]
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}

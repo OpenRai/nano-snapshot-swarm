@@ -1,0 +1,18 @@
+[Unit]
+Description=Nano Snapshot Swarm Grafana Alloy collector
+After=network-online.target nano-seed.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.env
+ExecStart=/usr/bin/alloy run %h/nano-snapshot-swarm/observability/nano-snapshot-swarm.alloy --storage.path=%h/.local/state/nano-alloy
+WorkingDirectory=%h/nano-snapshot-swarm
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nano-observability
+
+[Install]
+WantedBy=default.target

@@ -91,3 +91,4 @@ headroom. The required size changes with the published snapshot.
 | [docs/configuration.md](docs/configuration.md) | All environment variables, CLI flags, docker-compose reference |
 | [docs/public-beta-runbook.md](docs/public-beta-runbook.md) | Operating and troubleshooting a beta mirror |
 | [docs/release-checklist.md](docs/release-checklist.md) | Evidence required before a public beta announcement |
+| [docs/observability.md](docs/observability.md) | Prometheus metrics, Grafana Cloud collection, and the public dashboard |

@@ -29,6 +29,9 @@ done
 echo "=== Pulling latest from git ==="
 cd "$REPO_DIR" && git pull
 
+echo "=== Syncing Python environment ==="
+uv sync --extra dev
+
 echo "=== Reloading systemd ==="
 systemctl --user daemon-reload
 

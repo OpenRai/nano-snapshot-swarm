@@ -20,6 +20,7 @@ from mirror.libtorrent_session import (
 )
 from mirror.reconcile import DesiredSnapshot, ReconcileDecision, reconcile_snapshot
 from mirror.state import MirrorState, SnapshotMetadata
+from shared.metrics import SnapshotMetrics
 
 logger = logging.getLogger("mirror.watcher")
 
@@ -101,6 +102,7 @@ class MirrorWatcher:
         self._recheck_after_metadata: Optional[str] = None
         self._recheck_started = False
         self._recheck_checking_observed = False
+        self.metrics = SnapshotMetrics("mirror")
 
     def start(self, *, once: bool = False) -> None:
         self._once_mode = once
@@ -130,6 +132,7 @@ class MirrorWatcher:
             listen_port=6881,
         )
         self.session.start()
+        self.metrics.start_http_server(int(os.environ.get("METRICS_PORT", "9109")))
         self.state.set_phase("bootstrapping_dht")
 
         self._running = True
@@ -337,6 +340,11 @@ class MirrorWatcher:
                     self.state.last_seq,
                 )
                 return
+
+            self.metrics.observe_generation(
+                info_hash=result.info_hash_hex,
+                sequence=result.sequence,
+            )
 
             if (
                 result.info_hash_hex == self.state.last_info_hash
@@ -554,6 +562,17 @@ class MirrorWatcher:
                 if status is None:
                     time.sleep(1)
                     continue
+
+                self.metrics.observe_transfer(
+                    total_upload=status.total_upload,
+                    total_download=status.total_download,
+                    peers=status.num_peers,
+                    seeds=status.num_seeds,
+                    connections=status.num_connections,
+                )
+                dht_node_count = getattr(self.session, "dht_node_count", lambda: 0)
+                self.metrics.dht_nodes.set(dht_node_count())
+                self.metrics.observe_state(status.state, ready=status.is_seeding)
 
                 self._resume_after_recheck(info_hash, status.state)
 

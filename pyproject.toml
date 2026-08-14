@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "pynacl>=1.5",
     "bencodepy>=0.3",
+    "prometheus-client>=0.21",
 ]
 
 [project.optional-dependencies]

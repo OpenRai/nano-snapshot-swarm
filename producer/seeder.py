@@ -29,6 +29,7 @@ from producer.dht_put import publish_with_highest_sequence  # noqa: E402
 from producer.publish import _wait_for_verified_snapshot  # noqa: E402
 from producer.retention import retained_torrent_pairs  # noqa: E402
 from shared.bep46 import build_dht_value  # noqa: E402
+from shared.metrics import SnapshotMetrics  # noqa: E402
 from shared.nano_identity import compute_bep46_target_id  # noqa: E402
 
 logger = logging.getLogger("producer.seeder")
@@ -314,6 +315,8 @@ def main() -> None:
         load_dht_state=False,
     )
     session.start()
+    metrics = SnapshotMetrics("producer")
+    metrics.start_http_server(int(os.environ.get("METRICS_PORT", "9108")))
 
     # Wait for DHT bootstrap alert before the first publication.
     bootstrapped = session.wait_for_dht_bootstrap(timeout=120)
@@ -444,6 +447,26 @@ def main() -> None:
 
         try:
             status = handle.status()
+            if last_dht_sequence is not None:
+                metrics.observe_generation(
+                    info_hash=current_info_hash,
+                    sequence=last_dht_sequence,
+                    size_bytes=snapshot_size,
+                )
+            else:
+                metrics.snapshot_size.labels(service="producer").set(snapshot_size)
+            metrics.observe_transfer(
+                total_upload=status.total_upload,
+                total_download=status.total_download,
+                peers=status.num_peers,
+                seeds=getattr(status, "num_seeds", 0),
+                connections=getattr(status, "num_connections", status.num_peers),
+            )
+            metrics.dht_nodes.set(session.dht_node_count())
+            metrics.observe_state(
+                "seeding" if status.is_seeding else str(status.state),
+                ready=bool(status.is_seeding and dht_verified),
+            )
             stats = {
                 "state": "seeding" if status.is_seeding else str(status.state),
                 "progress_pct": round(status.progress * 100, 1),

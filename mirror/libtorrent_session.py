@@ -40,6 +40,7 @@ class TorrentStatusSnapshot:
     upload_rate: int
     is_seeding: bool
     total_upload: int = 0
+    total_download: int = 0
     error: str = ""
     num_seeds: int = 0
     num_connections: int = 0
@@ -400,6 +401,7 @@ class LibtorrentSession:
             upload_rate=status.upload_rate,
             is_seeding=status.is_seeding,
             total_upload=status.total_upload,
+            total_download=status.total_download,
             error=str(getattr(status, "errc", "") or ""),
             num_seeds=getattr(status, "num_seeds", 0),
             num_connections=getattr(status, "num_connections", 0),

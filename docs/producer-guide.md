@@ -206,6 +206,10 @@ Snapshots run automatically via a **user-level** systemd timer on the producer s
 
 **Credentials:** The service reads `/home/openrai/.env` (EnvironmentFile), so keys are never in the unit file itself.
 
+After pulling a release that changes Python dependencies, run `uv sync --extra dev`
+from the repository before restarting a service. `scripts/nano-snapshot-restart.sh`
+does this automatically.
+
 **Pipeline steps:** The timer invokes `/opt/nano-snapshot-swarm/scripts/daily-snapshot.sh`, which retrieves the latest upstream `.7z` archive, validates it, writes local publisher metadata, and publishes the torrent v2 info-hash to DHT. The upstream URL is not distributed to mirrors or embedded in the torrent. Set `SNAPSHOT_RETENTION=N` to retain and seed the last `N` prior canonical archive-plus-torrent pairs; the default `0` keeps only the current snapshot.
 
 ```bash

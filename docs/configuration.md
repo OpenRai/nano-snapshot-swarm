@@ -16,6 +16,9 @@ The default OpenRAI mirror stream is baked into the published Docker image and s
 | `POLL_INTERVAL` | `600` | No | DHT poll interval in seconds (swarm mode only) |
 | `SEED_PEERS` | `bandwidth-martyr.openrai.org:6881` in the public image | No | Comma-separated explicit P2P peers for initial connection |
 | `LOG_LEVEL` | `INFO` | No | Python log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `METRICS_ENABLED` | `1` | No | Set to `0` to disable the local Prometheus endpoint |
+| `METRICS_PORT` | `9109` | No | Local Prometheus endpoint port |
+| `METRICS_BIND` | `127.0.0.1` | No | Local Prometheus bind address; do not expose without authentication |
 
 ---
 
@@ -98,6 +101,9 @@ docker run --rm \
 | `SNAPSHOT_RETENTION` | `0` | No | Number of prior archive-plus-torrent pairs to retain and seed; `0` retains only the current snapshot |
 | `USE_PLACEHOLDER_SNAPSHOT` | `0` | No | Set to `1` to replace the upstream download with a fresh timestamped 128 MiB test payload while retaining the normal publication path |
 | `STATUS_API_URL` | _(empty)_ | No | URL used by the producer to push snapshot metadata (use `https://nano-snapshot-hub.fly.dev` unless Cloudflare permits `/api/push`; public dashboard: `https://nano-snapshots.openrai.org`) |
+| `METRICS_ENABLED` | `1` | No | Set to `0` to disable the local Prometheus endpoint |
+| `METRICS_PORT` | `9108` | No | Local Prometheus endpoint port |
+| `METRICS_BIND` | `127.0.0.1` | No | Local Prometheus bind address; do not expose without authentication |
 
 ---
 
