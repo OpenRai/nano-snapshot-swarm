@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -45,6 +46,134 @@ def test_daily_pipeline_waits_for_the_full_cold_seeder_publication_budget() -> N
     script = Path("scripts/daily-snapshot.sh").read_text()
 
     assert "seq 1 360" in script
+
+
+def test_daily_pipeline_uses_authoritative_aria2_progress() -> None:
+    script = Path("scripts/daily-snapshot.sh").read_text()
+    rpc_helpers = Path("scripts/aria2-rpc.sh").read_text()
+
+    progress_start = script.index("# Progress poller:")
+    progress_end = script.index("# Collect aria2c exit code", progress_start)
+    progress = script[progress_start:progress_end]
+
+    assert 'source "$REPO_DIR/scripts/aria2-rpc.sh"' in script
+    assert "aria2.tellStatus" in script
+    assert '"completedLength"' in script
+    assert '"downloadSpeed"' in script
+    assert "--enable-rpc=true" in script
+    assert "--rpc-listen-all=false" in script
+    assert '"token:${ARIA2_RPC_SECRET}"' in script
+    assert 'method: "aria2.shutdown"' in script
+    assert "stat -c%s" not in progress
+    assert 'if ! kill -0 "$ARIA_PID"' in progress
+    assert 'ARIA_TERMINAL_STATUS=complete' in progress
+    assert "shutdown_aria2" in progress
+    assert "RPC_FAILURE_LIMIT=3" in progress
+    assert "query_aria2_status" in rpc_helpers
+    assert "shutdown_aria2" in rpc_helpers
+
+
+def _query_aria2_fixture(payload: dict[str, object]) -> subprocess.CompletedProcess[str]:
+    command = r'''
+source scripts/aria2-rpc.sh
+call_aria2_rpc() { printf '%s' "$ARIA2_TEST_RESPONSE"; }
+ARIA2_STATUS_REQUEST='{}'
+if query_aria2_status; then
+    printf '%s\n' "$ARIA2_STATUS" "$ARIA2_TOTAL_LENGTH" \
+        "$ARIA2_COMPLETED_LENGTH" "$ARIA2_DOWNLOAD_SPEED" \
+        "$ARIA2_ERROR_CODE" "$ARIA2_ERROR_MESSAGE"
+else
+    exit 1
+fi
+'''
+    environment = os.environ.copy()
+    environment["ARIA2_TEST_RESPONSE"] = json.dumps(payload)
+    return subprocess.run(
+        ["bash", "-c", command],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+
+def test_aria2_rpc_status_parses_active_and_complete_results() -> None:
+    for status, completed in (("active", "524288"), ("complete", "1048576")):
+        result = _query_aria2_fixture(
+            {
+                "jsonrpc": "2.0",
+                "id": "progress",
+                "result": {
+                    "status": status,
+                    "totalLength": "1048576",
+                    "completedLength": completed,
+                    "downloadSpeed": "262144",
+                },
+            }
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.splitlines()[:4] == [
+            status,
+            "1048576",
+            completed,
+            "262144",
+        ]
+
+
+def test_aria2_rpc_status_preserves_terminal_error_details() -> None:
+    result = _query_aria2_fixture(
+        {
+            "jsonrpc": "2.0",
+            "id": "progress",
+            "result": {
+                "status": "error",
+                "totalLength": "1048576",
+                "completedLength": "524288",
+                "downloadSpeed": "0",
+                "errorCode": "3",
+                "errorMessage": "resource not found",
+            },
+        }
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        "error",
+        "1048576",
+        "524288",
+        "0",
+        "3",
+        "resource not found",
+    ]
+
+
+def test_aria2_rpc_status_rejects_malformed_or_rpc_error_results() -> None:
+    malformed = _query_aria2_fixture({"result": {"status": "active"}})
+    rpc_error = _query_aria2_fixture(
+        {"jsonrpc": "2.0", "id": "progress", "error": {"message": "not found"}}
+    )
+
+    assert malformed.returncode == 1
+    assert rpc_error.returncode == 1
+
+
+def test_aria2_rpc_shutdown_accepts_ok_response() -> None:
+    command = r'''
+source scripts/aria2-rpc.sh
+call_aria2_rpc() { printf '%s' '{"jsonrpc":"2.0","id":"shutdown","result":"OK"}'; }
+ARIA2_SHUTDOWN_REQUEST='{}'
+shutdown_aria2
+'''
+
+    subprocess.run(["bash", "-c", command], check=True)
+
+
+def test_daily_pipeline_keeps_content_length_as_final_validation() -> None:
+    script = Path("scripts/daily-snapshot.sh").read_text()
+
+    assert 'if [ "$DOWNLOADED_SIZE" -ne "$EXPECTED_SIZE" ]' in script
+    assert 'Size verified: $(numfmt --to=iec-i --suffix=B "$DOWNLOADED_SIZE")' in script
 
 
 def test_producer_unit_builds_explicit_sequence_helper_before_start() -> None:

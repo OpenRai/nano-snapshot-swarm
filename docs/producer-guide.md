@@ -7,9 +7,15 @@ Notes for running the authority side: generating keys, publishing snapshots, and
 ## Prerequisites
 
 - `aria2c` — resumable upstream archive download
+- `jq` — authoritative aria2 JSON-RPC progress monitoring
 - `7z` — archive inspection for the status push and optional validation fixtures
 - Python 3.12+
 - `uv` — [Astral uv](https://github.com/astral-sh/uv) package manager
+
+The snapshot pipeline listens for aria2 JSON-RPC status on loopback port `6800`
+while an upstream archive is downloading. Set `ARIA2_RPC_PORT` in `~/.env` only
+if another local process already uses that port; the listener is never exposed
+outside the producer host.
 
 ```bash
 # Install uv (macOS/Linux)

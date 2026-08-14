@@ -3,10 +3,12 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_DIR/scripts/runtime-config.sh"
+source "$REPO_DIR/scripts/aria2-rpc.sh"
 OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
 UPSTREAM_SNAPSHOT_INDEX_URL="${UPSTREAM_SNAPSHOT_INDEX_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
 TORRENT_FORMAT_VERSION=3
 SNAPSHOT_RETENTION_COUNT="${SNAPSHOT_RETENTION_COUNT:-0}"
+ARIA2_RPC_PORT="${ARIA2_RPC_PORT:-6800}"
 if ! USE_PLACEHOLDER_SNAPSHOT="$(parse_boolean_env USE_PLACEHOLDER_SNAPSHOT false)"; then
     exit 1
 fi
@@ -21,6 +23,11 @@ mkdir -p "$WORK_DIR"
 
 if ! [[ "$SNAPSHOT_RETENTION_COUNT" =~ ^[0-9]+$ ]]; then
     log "ERROR: SNAPSHOT_RETENTION_COUNT must be a non-negative integer"
+    exit 1
+fi
+if ! [[ "$ARIA2_RPC_PORT" =~ ^[0-9]+$ ]] || \
+   [ "$ARIA2_RPC_PORT" -lt 1024 ] || [ "$ARIA2_RPC_PORT" -gt 65535 ]; then
+    log "ERROR: ARIA2_RPC_PORT must be an integer from 1024 through 65535"
     exit 1
 fi
 
@@ -194,7 +201,39 @@ else
     # curl -C - which is a dumb byte-offset append with no corruption detection.
     # --file-allocation=none avoids pre-allocating 60GB (important on low-RAM systems).
     # --quiet suppresses ALL stdout (progress bar + summaries) to avoid flooding journald.
-    # We run aria2c in the background and poll the file size every 20s for clean progress logs.
+    # JSON-RPC reports completed bytes accurately even when split downloads write the
+    # final range before earlier ranges and the partial file already has its final size.
+    if ! command -v jq >/dev/null 2>&1; then
+        log "ERROR: jq is required to monitor aria2c download progress"
+        exit 1
+    fi
+    ARIA2_RPC_SECRET=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+    if [ -z "$ARIA2_RPC_SECRET" ]; then
+        log "ERROR: Could not generate an aria2c RPC secret"
+        exit 1
+    fi
+    ARIA2_GID="${ARIA2_RPC_SECRET:0:16}"
+    ARIA2_RPC_URL="http://127.0.0.1:${ARIA2_RPC_PORT}/jsonrpc"
+    ARIA2_STATUS_REQUEST=$(jq -cn \
+        --arg token "token:${ARIA2_RPC_SECRET}" \
+        --arg gid "$ARIA2_GID" \
+        '{
+            jsonrpc: "2.0",
+            id: "progress",
+            method: "aria2.tellStatus",
+            params: [$token, $gid, [
+                "status",
+                "totalLength",
+                "completedLength",
+                "downloadSpeed",
+                "errorCode",
+                "errorMessage"
+            ]]
+        }')
+    ARIA2_SHUTDOWN_REQUEST=$(jq -cn \
+        --arg token "token:${ARIA2_RPC_SECRET}" \
+        '{jsonrpc: "2.0", id: "shutdown", method: "aria2.shutdown", params: [$token]}')
+
     log "Downloading with aria2c (4 connections, auto-resume)"
     aria2c \
         --user-agent="$AGENT" \
@@ -211,48 +250,125 @@ else
         --lowest-speed-limit=100K \
         --file-allocation=none \
         --quiet=true \
+        --enable-rpc=true \
+        --rpc-listen-all=false \
+        --rpc-listen-port="$ARIA2_RPC_PORT" \
+        --rpc-secret="$ARIA2_RPC_SECRET" \
+        --gid="$ARIA2_GID" \
         --dir="$WORK_DIR" \
         --out="$(basename "$PARTIAL_FILE")" \
         "$LATEST_URL" &
     ARIA_PID=$!
 
-    # Progress poller: log size/speed/ETA every 20 seconds while aria2c runs
+    # Wait briefly for the loopback RPC listener and command-line download to register.
+    ARIA2_RPC_READY=false
+    for _ in $(seq 1 20); do
+        if ! kill -0 "$ARIA_PID" 2>/dev/null; then
+            break
+        fi
+        if query_aria2_status; then
+            ARIA2_RPC_READY=true
+            break
+        fi
+        sleep 0.5
+    done
+    if [ "$ARIA2_RPC_READY" != true ]; then
+        log "ERROR: aria2c RPC status did not become available on 127.0.0.1:${ARIA2_RPC_PORT}"
+        kill "$ARIA_PID" 2>/dev/null || true
+        wait "$ARIA_PID" 2>/dev/null || true
+        exit 1
+    fi
+
+    # Progress poller: preserve the existing 20-second log cadence, but use
+    # aria2's completedLength rather than the partial file's logical size.
     POLL_INTERVAL=20
-    PREV_SIZE=$(stat -c%s "$PARTIAL_FILE" 2>/dev/null || echo 0)
+    RPC_FAILURES=0
+    RPC_FAILURE_LIMIT=3
+    ARIA_TERMINAL_STATUS=""
+    ARIA_MONITOR_FAILED=false
+    PREV_COMPLETED=$ARIA2_COMPLETED_LENGTH
     PREV_TIME=$(date +%s)
     while kill -0 "$ARIA_PID" 2>/dev/null; do
         sleep "$POLL_INTERVAL"
-        NOW_SIZE=$(stat -c%s "$PARTIAL_FILE" 2>/dev/null || echo 0)
+        # aria2c may have exited during sleep. Do not emit one stale final update.
+        if ! kill -0 "$ARIA_PID" 2>/dev/null; then
+            break
+        fi
+
+        if ! query_aria2_status; then
+            RPC_FAILURES=$((RPC_FAILURES + 1))
+            log "WARNING: aria2c progress unavailable (${RPC_FAILURES}/${RPC_FAILURE_LIMIT}); download process is still running"
+            if [ "$RPC_FAILURES" -ge "$RPC_FAILURE_LIMIT" ]; then
+                log "ERROR: aria2c progress unavailable for three consecutive checks; stopping so the download can resume safely"
+                ARIA_MONITOR_FAILED=true
+                kill "$ARIA_PID" 2>/dev/null || true
+                break
+            fi
+            continue
+        fi
+        RPC_FAILURES=0
+
         NOW_TIME=$(date +%s)
         ELAPSED=$((NOW_TIME - PREV_TIME))
         if [ "$ELAPSED" -gt 0 ]; then
-            SPEED_BPS=$(( (NOW_SIZE - PREV_SIZE) / ELAPSED ))
+            SPEED_BPS=$(( (ARIA2_COMPLETED_LENGTH - PREV_COMPLETED) / ELAPSED ))
         else
+            SPEED_BPS=$ARIA2_DOWNLOAD_SPEED
+        fi
+        if [ "$SPEED_BPS" -lt 0 ]; then
             SPEED_BPS=0
         fi
         SPEED_HUMAN=$(numfmt --to=iec-i --suffix=B "$SPEED_BPS" 2>/dev/null || echo "${SPEED_BPS}B")
-        SIZE_HUMAN=$(numfmt --to=iec-i --suffix=B "$NOW_SIZE" 2>/dev/null || echo "${NOW_SIZE}B")
-        if [ -n "${EXPECTED_SIZE:-}" ] && [ "$EXPECTED_SIZE" -gt 0 ] 2>/dev/null && [ "$NOW_SIZE" -gt 0 ]; then
-            PCT=$(( NOW_SIZE * 100 / EXPECTED_SIZE ))
-            REMAINING=$((EXPECTED_SIZE - NOW_SIZE))
+        SIZE_HUMAN=$(numfmt --to=iec-i --suffix=B "$ARIA2_COMPLETED_LENGTH" 2>/dev/null || echo "${ARIA2_COMPLETED_LENGTH}B")
+        TOTAL_HUMAN=$(numfmt --to=iec-i --suffix=B "$ARIA2_TOTAL_LENGTH" 2>/dev/null || echo "${ARIA2_TOTAL_LENGTH}B")
+
+        case "$ARIA2_STATUS" in
+            complete)
+                log "Progress: ${SIZE_HUMAN} / ${TOTAL_HUMAN} (100%) complete"
+                ARIA_TERMINAL_STATUS=complete
+                if ! shutdown_aria2; then
+                    log "ERROR: aria2c completed but its RPC server did not shut down cleanly"
+                    ARIA_MONITOR_FAILED=true
+                    kill "$ARIA_PID" 2>/dev/null || true
+                fi
+                break
+                ;;
+            error|removed)
+                log "ERROR: aria2c reported ${ARIA2_STATUS} (code=${ARIA2_ERROR_CODE:-unknown}): ${ARIA2_ERROR_MESSAGE:-no error message}"
+                ARIA_TERMINAL_STATUS="$ARIA2_STATUS"
+                if ! shutdown_aria2; then
+                    kill "$ARIA_PID" 2>/dev/null || true
+                fi
+                break
+                ;;
+        esac
+
+        if [ "$ARIA2_TOTAL_LENGTH" -gt 0 ] && [ "$ARIA2_COMPLETED_LENGTH" -gt 0 ]; then
+            PCT=$(( ARIA2_COMPLETED_LENGTH * 100 / ARIA2_TOTAL_LENGTH ))
+            REMAINING=$((ARIA2_TOTAL_LENGTH - ARIA2_COMPLETED_LENGTH))
             if [ "$SPEED_BPS" -gt 0 ]; then
                 ETA_SECS=$((REMAINING / SPEED_BPS))
                 ETA_MIN=$((ETA_SECS / 60))
                 ETA_SEC=$((ETA_SECS % 60))
-                log "Progress: ${SIZE_HUMAN} / $(numfmt --to=iec-i --suffix=B "$EXPECTED_SIZE") (${PCT}%) ${SPEED_HUMAN}/s ETA ${ETA_MIN}m${ETA_SEC}s"
+                log "Progress: ${SIZE_HUMAN} / ${TOTAL_HUMAN} (${PCT}%) ${SPEED_HUMAN}/s ETA ${ETA_MIN}m${ETA_SEC}s"
             else
-                log "Progress: ${SIZE_HUMAN} / $(numfmt --to=iec-i --suffix=B "$EXPECTED_SIZE") (${PCT}%) stalled"
+                log "Progress: ${SIZE_HUMAN} / ${TOTAL_HUMAN} (${PCT}%) stalled"
             fi
         else
             log "Progress: ${SIZE_HUMAN} ${SPEED_HUMAN}/s"
         fi
-        PREV_SIZE=$NOW_SIZE
+        PREV_COMPLETED=$ARIA2_COMPLETED_LENGTH
         PREV_TIME=$NOW_TIME
     done
 
     # Collect aria2c exit code
     ARIA_EXIT=0
     wait "$ARIA_PID" || ARIA_EXIT=$?
+    if [ "$ARIA_MONITOR_FAILED" = true ] || \
+       [ "$ARIA_TERMINAL_STATUS" = error ] || \
+       [ "$ARIA_TERMINAL_STATUS" = removed ]; then
+        ARIA_EXIT=1
+    fi
 
     if [ "$ARIA_EXIT" -ne 0 ]; then
         PARTIAL_SIZE=$(stat -c%s "$PARTIAL_FILE" 2>/dev/null || echo 0)
