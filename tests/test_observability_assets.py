@@ -27,6 +27,11 @@ def test_dashboard_preserves_the_public_panel_optimizations() -> None:
     )
     panels = {panel["id"]: panel for panel in dashboard["panels"]}
 
+    assert dashboard["__inputs"][0]["name"] == "DS_PROMETHEUS"
+    assert all(
+        panel["datasource"]["uid"] == "${DS_PROMETHEUS}"
+        for panel in panels.values()
+    )
     assert dashboard["schemaVersion"] == 42
     assert dashboard["version"] == 5
     assert panels[1]["fieldConfig"]["defaults"]["mappings"][0]["options"]["1"]["text"] == "Ready"
