@@ -58,9 +58,9 @@ def test_producer_unit_builds_explicit_sequence_helper_before_start() -> None:
 def test_seeder_accepts_reload_before_dht_bootstrap() -> None:
     seeder = Path("producer/seeder.py").read_text()
 
-    assert seeder.index("signal.signal(signal.SIGHUP, on_signal)") < seeder.index(
-        "session.wait_for_dht_bootstrap(timeout=120)"
-    )
+    hup_registration = seeder.index("signal.signal(signal.SIGHUP, on_signal)")
+    assert hup_registration < seeder.index("session = LibtorrentSession(")
+    assert hup_registration < seeder.index("session.wait_for_dht_bootstrap(timeout=120)")
 
 
 def test_shell_special_filename_stays_data_when_passed_as_an_argument(tmp_path) -> None:

@@ -309,18 +309,10 @@ def main() -> None:
     logger.info(f"Seeding: {snapshot_path} ({snapshot_size / (1024**3):.1f} GiB)")
     logger.info(f"Torrent: {torrent_path}")
 
-    session = LibtorrentSession(
-        data_dir=data_dir,
-        listen_port=6881,
-        load_dht_state=False,
-    )
-    session.start()
-    metrics = SnapshotMetrics("producer")
-    metrics.start_http_server(int(os.environ.get("METRICS_PORT", "9108")))
-
     # Graceful shutdown on SIGTERM/SIGINT; SIGHUP reloads the canonical torrent
     # without destroying the DHT session or the retained swarms. Install this
-    # before DHT bootstrap so systemd reload is safe throughout startup.
+    # before session and metrics startup so systemd reload is safe throughout
+    # the entire process startup.
     running = True
     reload_requested = threading.Event()
 
@@ -336,6 +328,15 @@ def main() -> None:
     signal.signal(signal.SIGTERM, on_signal)
     signal.signal(signal.SIGINT, on_signal)
     signal.signal(signal.SIGHUP, on_signal)
+
+    session = LibtorrentSession(
+        data_dir=data_dir,
+        listen_port=6881,
+        load_dht_state=False,
+    )
+    session.start()
+    metrics = SnapshotMetrics("producer")
+    metrics.start_http_server(int(os.environ.get("METRICS_PORT", "9108")))
 
     # Wait for DHT bootstrap alert before the first publication.
     bootstrapped = session.wait_for_dht_bootstrap(timeout=120)
