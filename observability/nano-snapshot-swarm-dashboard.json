@@ -70,8 +70,8 @@
       "options": { "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "hideZeros": false, "mode": "multi", "sort": "none" } },
       "pluginVersion": "13.2.0-31683987170",
       "targets": [
-        { "expr": "rate(nano_snapshot_bytes_uploaded_total[$__rate_interval])", "legendFormat": "upload", "refId": "A" },
-        { "expr": "rate(nano_snapshot_bytes_downloaded_total[$__rate_interval])", "legendFormat": "download", "refId": "B" }
+        { "expr": "rate(nano_snapshot_bytes_uploaded_total[5m])", "legendFormat": "upload", "refId": "A" },
+        { "expr": "rate(nano_snapshot_bytes_downloaded_total[5m])", "legendFormat": "download", "refId": "B" }
       ],
       "title": "BitTorrent transfer rate",
       "type": "timeseries"
@@ -114,5 +114,5 @@
   "timezone": "utc",
   "title": "Nano Snapshot Swarm",
   "uid": "nano-snapshot-swarm",
-  "version": 7
+  "version": 8
 }

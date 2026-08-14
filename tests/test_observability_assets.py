@@ -32,10 +32,14 @@ def test_dashboard_preserves_the_public_panel_optimizations() -> None:
         for panel in panels.values()
     )
     assert dashboard["schemaVersion"] == 42
-    assert dashboard["version"] == 7
+    assert dashboard["version"] == 8
     assert panels[1]["fieldConfig"]["defaults"]["mappings"][0]["options"]["1"]["text"] == "Ready"
     assert panels[5]["options"]["legend"]["displayMode"] == "table"
     assert panels[5]["options"]["legend"]["calcs"] == ["mean", "max", "lastNotNull"]
+    assert [target["expr"] for target in panels[5]["targets"]] == [
+        "rate(nano_snapshot_bytes_uploaded_total[5m])",
+        "rate(nano_snapshot_bytes_downloaded_total[5m])",
+    ]
     assert panels[6]["fieldConfig"]["overrides"][0]["matcher"]["options"] == "connections"
     assert panels[7]["transformations"][1]["id"] == "organize"
     assert (
