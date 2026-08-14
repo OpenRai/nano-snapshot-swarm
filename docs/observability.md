@@ -10,7 +10,8 @@ OpenRAI. A mirror can be scraped locally by its operator.
 
 ## Local endpoint
 
-Metrics start automatically unless `METRICS_ENABLED=0`.
+Metrics start automatically unless `METRICS_ENABLED=false`. The value is a
+strict case-insensitive boolean; unset or empty uses the default `true`.
 
 | Service | Default endpoint | Override |
 |---|---|---|

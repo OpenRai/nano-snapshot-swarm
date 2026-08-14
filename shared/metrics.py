@@ -15,8 +15,17 @@ from prometheus_client import CollectorRegistry, Counter, Gauge, start_http_serv
 logger = logging.getLogger("shared.metrics")
 
 
-def _enabled_from_env() -> bool:
-    return os.environ.get("METRICS_ENABLED", "1").strip().lower() not in {"0", "false", "no"}
+def _boolean_from_env(name: str, default: bool) -> bool:
+    """Read a strict boolean while treating an unset or empty value as default."""
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return default
+    normalized = value.casefold()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise ValueError(f"{name} must be true or false (case-insensitive); got {value!r}")
 
 
 class SnapshotMetrics:
@@ -90,7 +99,7 @@ class SnapshotMetrics:
 
     def start_http_server(self, port: int) -> None:
         """Expose this registry on loopback, unless metrics are disabled."""
-        if not _enabled_from_env():
+        if not _boolean_from_env("METRICS_ENABLED", default=True):
             logger.info("Prometheus metrics disabled by METRICS_ENABLED")
             return
         address = os.environ.get("METRICS_BIND", "127.0.0.1")

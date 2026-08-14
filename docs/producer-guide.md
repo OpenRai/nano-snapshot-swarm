@@ -117,7 +117,7 @@ downloading the full upstream archive. Add this temporary setting to
 `/home/openrai/.env`:
 
 ```
-USE_PLACEHOLDER_SNAPSHOT=1
+USE_PLACEHOLDER_SNAPSHOT=true
 ```
 
 Then trigger one normal user service run:
@@ -133,7 +133,7 @@ continues through torrent creation, verified signed DHT publication, seeder relo
 status push. The payload is intentionally not a valid 7z archive; this mode
 tests transfer, mutation, recheck, and seeding behavior.
 
-Remove the setting, or change it to `USE_PLACEHOLDER_SNAPSHOT=0`, immediately
+Remove the setting, or change it to `USE_PLACEHOLDER_SNAPSHOT=false`, immediately
 after testing so the hourly timer returns to downloading real snapshots.
 
 For the mirror acceptance test, run one mirror container in swarm mode with a
@@ -210,7 +210,7 @@ After pulling a release that changes Python dependencies, run `uv sync --extra d
 from the repository before restarting a service. `scripts/nano-snapshot-restart.sh`
 does this automatically.
 
-**Pipeline steps:** The timer invokes `/opt/nano-snapshot-swarm/scripts/daily-snapshot.sh`, which retrieves the latest upstream `.7z` archive, validates it, writes local publisher metadata, and publishes the torrent v2 info-hash to DHT. The upstream URL is not distributed to mirrors or embedded in the torrent. Set `SNAPSHOT_RETENTION=N` to retain and seed the last `N` prior canonical archive-plus-torrent pairs; the default `0` keeps only the current snapshot.
+**Pipeline steps:** The timer invokes `/opt/nano-snapshot-swarm/scripts/daily-snapshot.sh`, which retrieves the latest upstream `.7z` archive, validates it, writes local publisher metadata, and publishes the torrent v2 info-hash to DHT. The upstream URL is not distributed to mirrors or embedded in the torrent. Set `SNAPSHOT_RETENTION_COUNT=N` to retain and seed the last `N` prior canonical archive-plus-torrent pairs; the default `0` keeps only the current snapshot.
 
 ```bash
 # Check timer status

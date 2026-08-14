@@ -2,7 +2,26 @@ from __future__ import annotations
 
 from prometheus_client import generate_latest
 
-from shared.metrics import SnapshotMetrics
+from shared.metrics import SnapshotMetrics, _boolean_from_env
+
+
+def test_boolean_environment_defaults_and_rejects_invalid_values(monkeypatch) -> None:
+    monkeypatch.delenv("METRICS_ENABLED", raising=False)
+    assert _boolean_from_env("METRICS_ENABLED", default=True) is True
+
+    monkeypatch.setenv("METRICS_ENABLED", "")
+    assert _boolean_from_env("METRICS_ENABLED", default=True) is True
+
+    monkeypatch.setenv("METRICS_ENABLED", "FALSE")
+    assert _boolean_from_env("METRICS_ENABLED", default=True) is False
+
+    monkeypatch.setenv("METRICS_ENABLED", "no")
+    try:
+        _boolean_from_env("METRICS_ENABLED", default=True)
+    except ValueError as exc:
+        assert "METRICS_ENABLED must be true or false" in str(exc)
+    else:
+        raise AssertionError("expected METRICS_ENABLED=no to fail")
 
 
 def test_metrics_expose_exact_generation_and_bounded_transfer_labels() -> None:

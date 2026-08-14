@@ -46,8 +46,9 @@ def test_placeholder_script_avoids_same_second_name_collision(tmp_path) -> None:
 def test_daily_pipeline_gates_upstream_download_and_archive_validation() -> None:
     script = Path("scripts/daily-snapshot.sh").read_text()
 
-    assert 'USE_PLACEHOLDER_SNAPSHOT="${USE_PLACEHOLDER_SNAPSHOT:-0}"' in script
-    assert 'if [[ "$USE_PLACEHOLDER_SNAPSHOT" == 1 ]]; then' in script
+    assert 'SNAPSHOT_RETENTION_COUNT="${SNAPSHOT_RETENTION_COUNT:-0}"' in script
+    assert 'parse_boolean_env USE_PLACEHOLDER_SNAPSHOT false' in script
+    assert 'if [[ "$USE_PLACEHOLDER_SNAPSHOT" == true ]]; then' in script
     assert 'create-placeholder-snapshot.sh' in script
     assert "aria2c" in script
     assert 'if [ "$MAGIC" != "377abcaf271c" ]; then' in script

@@ -12,7 +12,7 @@ Treat this as an operator procedure, not a turnkey test command.
 
 On an isolated host or temporary checkout, create a separate output directory
 and start a separate `producer.seeder` process. Give that process the same
-signing key, `DHT_SALT=validation`, `USE_PLACEHOLDER_SNAPSHOT=1`, and its own
+signing key, `DHT_SALT=validation`, `USE_PLACEHOLDER_SNAPSHOT=true`, and its own
 `OUTPUT_DIR`. Keep it separate from the production `nano-seed.service`.
 
 The normal `nano-snapshot.service` is not a validation harness. It signals the

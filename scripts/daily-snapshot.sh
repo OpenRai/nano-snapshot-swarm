@@ -2,11 +2,14 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_DIR/scripts/runtime-config.sh"
 OUTPUT_DIR="${OUTPUT_DIR:-$HOME/nano-snapshots}"
 UPSTREAM_SNAPSHOT_INDEX_URL="${UPSTREAM_SNAPSHOT_INDEX_URL:-https://s3.us-east-2.amazonaws.com/repo.nano.org/snapshots/latest}"
 TORRENT_FORMAT_VERSION=3
-SNAPSHOT_RETENTION="${SNAPSHOT_RETENTION:-0}"
-USE_PLACEHOLDER_SNAPSHOT="${USE_PLACEHOLDER_SNAPSHOT:-0}"
+SNAPSHOT_RETENTION_COUNT="${SNAPSHOT_RETENTION_COUNT:-0}"
+if ! USE_PLACEHOLDER_SNAPSHOT="$(parse_boolean_env USE_PLACEHOLDER_SNAPSHOT false)"; then
+    exit 1
+fi
 AGENT="nano-snapshot-swarm/1.0"
 
 log() {
@@ -16,18 +19,10 @@ log() {
 WORK_DIR="${OUTPUT_DIR}/tmp"
 mkdir -p "$WORK_DIR"
 
-if ! [[ "$SNAPSHOT_RETENTION" =~ ^[0-9]+$ ]]; then
-    log "ERROR: SNAPSHOT_RETENTION must be a non-negative integer"
+if ! [[ "$SNAPSHOT_RETENTION_COUNT" =~ ^[0-9]+$ ]]; then
+    log "ERROR: SNAPSHOT_RETENTION_COUNT must be a non-negative integer"
     exit 1
 fi
-
-case "$USE_PLACEHOLDER_SNAPSHOT" in
-    0|1) ;;
-    *)
-        log "ERROR: USE_PLACEHOLDER_SNAPSHOT must be 0 or 1"
-        exit 1
-        ;;
-esac
 
 # --- Lockfile: prevent concurrent script instances (Bug 7 fix) ---
 LOCKFILE="${OUTPUT_DIR}/.snapshot.lock"
@@ -94,8 +89,8 @@ PY
 }
 
 # --- Step 1: Resolve or create the latest snapshot ---
-if [[ "$USE_PLACEHOLDER_SNAPSHOT" == 1 ]]; then
-    log "USE_PLACEHOLDER_SNAPSHOT=1 — creating a local 128 MiB placeholder"
+if [[ "$USE_PLACEHOLDER_SNAPSHOT" == true ]]; then
+    log "USE_PLACEHOLDER_SNAPSHOT=true — creating a local 128 MiB placeholder"
     PLACEHOLDER_FILE=$(bash "$REPO_DIR/scripts/create-placeholder-snapshot.sh" "$WORK_DIR")
     FILENAME=$(basename "$PLACEHOLDER_FILE")
     TARGET_FILE="$PLACEHOLDER_FILE"
@@ -334,7 +329,7 @@ PY
     if [ -n "$PREVIOUS_TORRENT" ]; then
         cd "$REPO_DIR"
         source .venv/bin/activate
-        python - "$OUTPUT_DIR" "$PREVIOUS_TORRENT" "$SNAPSHOT_RETENTION" <<'PY'
+        python - "$OUTPUT_DIR" "$PREVIOUS_TORRENT" "$SNAPSHOT_RETENTION_COUNT" <<'PY'
 import sys
 
 from producer.retention import retain_current_snapshot
