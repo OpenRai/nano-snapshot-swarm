@@ -36,34 +36,20 @@ Counters reset when their process restarts. Prometheus handles counter resets in
 `rate()` queries. The active-generation info metric is replaced when a new
 snapshot is observed; no high-churn transfer metric is labeled by info hash.
 
-## Producer collection with Grafana Cloud
+## Provision a producer host with Grafana Cloud
 
-1. In Grafana Cloud, create an Access Policy token scoped to `metrics:write`
-   and obtain its Remote Write Endpoint, Username / Instance ID, and token.
-2. Install the Grafana Alloy binary on the producer host following Grafana’s
-   current installation instructions. The committed user-level unit expects it
-   at `/usr/bin/alloy`.
-3. After pulling this release, sync the producer environment so it includes
-   `prometheus-client`:
+For a new producer host:
 
-   ```sh
-   cd /opt/nano-snapshot-swarm
-   uv sync --extra dev
-   ```
-
-4. Add these secrets to the producer user’s `~/.env`:
-
-   ```sh
-   GRAFANA_CLOUD_PROMETHEUS_REMOTE_WRITE_URL=https://prometheus-.../api/prom/push
-   GRAFANA_CLOUD_PROMETHEUS_INSTANCE_ID=...
-   GRAFANA_CLOUD_PROMETHEUS_WRITE_TOKEN=...
-   ```
-
-   If `GRAFANA_CLOUD_PROMETHEUS_REMOTE_WRITE_URL` is unset or empty, the
-   optional Grafana Alloy service is completely bypassed. The producer’s local
-   `127.0.0.1:9108/metrics` endpoint remains available.
-
-5. Symlink `systemd/nano-observability.service` into
+1. Install Grafana Alloy using Grafana’s current Linux instructions. The
+   committed user-level unit uses `/usr/bin/alloy`.
+2. Put the Grafana Cloud **Remote Write Endpoint**, **Username / Instance ID**,
+   and a `metrics:write` Access Policy token in the producer user’s `~/.env`,
+   using the three `GRAFANA_CLOUD_PROMETHEUS_*` names in
+   [`.env.example`](../.env.example). Do not put these credentials in the
+   repository or the Alloy file.
+3. Pull the repository and run `uv sync` so the producer metrics endpoint is
+   available.
+4. Symlink `systemd/nano-observability.service` into
    `~/.config/systemd/user/`, then reload and start it:
 
    ```sh
@@ -72,12 +58,16 @@ snapshot is observed; no high-churn transfer metric is labeled by info hash.
    journalctl --user -u nano-observability.service -f
    ```
 
-6. Verify both ends before using the dashboard:
+5. Verify both ends before using the dashboard:
 
    ```sh
    curl --fail http://127.0.0.1:9108/metrics | rg nano_snapshot
    systemctl --user status nano-observability.service
    ```
+
+If `GRAFANA_CLOUD_PROMETHEUS_REMOTE_WRITE_URL` is unset or empty, the optional
+Alloy service is bypassed. The producer’s loopback metrics endpoint remains
+available.
 
 The Alloy template at
 [`observability/nano-snapshot-swarm.alloy`](../observability/nano-snapshot-swarm.alloy)
