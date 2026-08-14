@@ -221,7 +221,7 @@ class MirrorWatcher:
 
         logger.info(
             "Leecher discovered snapshot: DHT mutable-item sequence=%s, "
-            "torrent v2 info hash=%s...",
+            "info_hash=%s...",
             result.sequence,
             result.info_hash_hex[:16],
         )
@@ -380,7 +380,7 @@ class MirrorWatcher:
             if result.sequence > self.state.last_seq and same_torrent:
                 logger.info(
                     "DHT mutable-item sequence advanced from %s to %s for the current "
-                    "torrent; continuing existing transfer: torrent v2 info hash=%s...",
+                    "torrent; continuing existing transfer: info_hash=%s...",
                     self.state.last_seq,
                     result.sequence,
                     result.info_hash_hex[:16],
@@ -388,7 +388,7 @@ class MirrorWatcher:
             elif result.sequence > self.state.last_seq:
                 logger.info(
                     "New snapshot detected: DHT mutable-item sequence=%s "
-                    "(was %s), torrent v2 info hash=%s...",
+                    "(was %s), info_hash=%s...",
                     result.sequence,
                     self.state.last_seq,
                     result.info_hash_hex[:16],
@@ -443,7 +443,7 @@ class MirrorWatcher:
                 if decision.should_recheck:
                     self.state.set_phase("resuming")
                     logger.info(
-                        "Resuming torrent from previous session: v2 info hash=%s...",
+                        "Resuming torrent from previous session: info_hash=%s...",
                         target.info_hash[:16],
                     )
                 else:
@@ -480,7 +480,7 @@ class MirrorWatcher:
                 f"Failed to activate torrent for {target.info_hash[:16]}...",
             )
             logger.exception(
-                "Failed to activate torrent with v2 info hash %s...",
+                "Failed to activate torrent with info_hash=%s...",
                 target.info_hash[:16],
             )
             self._stop_reason = DownloadStatus.ERROR
@@ -708,7 +708,7 @@ class MirrorWatcher:
             self.state.set_phase("seeding")
             if status.state != last_state:
                 logger.info(
-                    "Snapshot download complete; now seeding torrent v2 info hash=%s...",
+                    "Snapshot download complete; now seeding info_hash=%s...",
                     info_hash[:16],
                 )
 

@@ -75,8 +75,8 @@ def cmd_publish(args: argparse.Namespace) -> None:
         snapshot_meta=snapshot_meta_json,
     )
     print(f"Torrent created: {torrent_path}")
-    print(f"Info-hash (v1): {hashes.v1}")
-    print(f"Info-hash (v2): {hashes.v2}")
+    print(f"info_hash_v1={hashes.v1}")
+    print(f"info_hash={hashes.v2}")
 
     if getattr(args, "defer_dht_publish", False):
         print("DHT publication deferred to the long-lived producer seeder")

@@ -74,7 +74,7 @@ def discover_latest_snapshot(
                 result = highest[0]
                 if result.sequence >= min_sequence:
                     logger.info(
-                        "Discovered DHT mutable item: sequence=%s, torrent v2 info hash=%s..., "
+                        "Discovered DHT mutable item: sequence=%s, info_hash=%s..., "
                         "signature verified=%s",
                         result.sequence,
                         result.info_hash_hex[:16],

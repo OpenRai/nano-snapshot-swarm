@@ -73,7 +73,7 @@ def _record_verified_publication(
     logger.info(
         "Publisher state updated after authoritative DHT verification: "
         "local snapshot revision=%s, DHT mutable-item sequence=%s, "
-        "torrent v2 info hash=%s...",
+        "info_hash=%s...",
         state.get("last_seq", 0),
         dht_sequence,
         info_hash_hex[:16],
@@ -215,7 +215,7 @@ def _dht_publish(
             else:
                 logger.info(
                     "DHT mutable item verified: sequence=%s, "
-                    "torrent v2 info hash=%s...",
+                    "info_hash=%s...",
                     verified_sequence,
                     info_hash_hex[:16],
                 )
@@ -239,7 +239,7 @@ def _dht_publish(
             time.sleep(5)
 
     raise RuntimeError(
-        f"DHT publication was not verified for torrent v2 info hash "
+        f"DHT publication was not verified for info_hash "
         f"{info_hash_hex[:16]}... (target ID (SHA-1)={target.hex()[:16]}..., {last_error})"
     )
 
@@ -255,7 +255,7 @@ def _load_current_torrent(
     snapshot_path = data_path / SNAPSHOT_NAME
     info_hash = _load_info_hash(data_dir)
     if not info_hash:
-        raise RuntimeError("snapshot-meta.json has no torrent v2 info hash")
+        raise RuntimeError("snapshot-meta.json has no info_hash")
     if not snapshot_path.exists() or not torrent_path.exists():
         raise RuntimeError("canonical snapshot or torrent is missing")
 
@@ -272,13 +272,13 @@ def _load_current_torrent(
                     )
                     logger.info(
                         "Previous torrent reloaded for continued seeding: "
-                        "v2 info hash=%s...",
+                        "info_hash=%s...",
                         current_info_hash[:16],
                     )
                 else:
                     logger.info(
                         "Previous torrent remains active for continued seeding: "
-                        "v2 info hash=%s...",
+                        "info_hash=%s...",
                         current_info_hash[:16],
                     )
                 break
@@ -291,7 +291,7 @@ def _load_current_torrent(
             save_path=data_dir,
             torrent_file=str(torrent_path),
         )
-        logger.info("Canonical torrent loaded for seeding: v2 info hash=%s...", info_hash[:16])
+        logger.info("Canonical torrent loaded for seeding: info_hash=%s...", info_hash[:16])
     handle = session.get_handle(info_hash)
     if handle is None:
         raise RuntimeError(f"canonical torrent handle unavailable: {info_hash[:16]}...")
@@ -383,7 +383,7 @@ def main() -> None:
                 torrent_file=str(retained_torrent),
             )
             logger.info(
-                "Retained torrent added for seeding: v2 info hash=%s...",
+                "Retained torrent added for seeding: info_hash=%s...",
                 retained_info_hash[:16],
             )
 
@@ -461,7 +461,7 @@ def main() -> None:
                 )
                 dht_verified = False
                 logger.info(
-                    "Canonical torrent reload complete: v2 info hash=%s...",
+                "Canonical torrent reload complete: info_hash=%s...",
                     current_info_hash[:16],
                 )
                 try:

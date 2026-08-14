@@ -119,7 +119,7 @@ def main() -> None:
     torrent_path, hashes = create_torrent(filepath, output_path=output_path)
     print(f"torrent={torrent_path}")
     print(f"info_hash_v1={hashes.v1}")
-    print(f"info_hash_v2={hashes.v2}")
+    print(f"info_hash={hashes.v2}")
 
 
 if __name__ == "__main__":

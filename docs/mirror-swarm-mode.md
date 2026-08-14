@@ -82,7 +82,7 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 | Log | Meaning |
 |---|---|
 | `DHT get_mutable_item requested` | Querying DHT for latest snapshot |
-| `Discovered DHT mutable item: sequence=N, torrent v2 info hash=<short hash>` | Found a published snapshot |
+| `Discovered DHT mutable item: sequence=N, info_hash=<short hash>` | Found a published snapshot |
 | `DHT mutable-item sequence N <= stored sequence N; no update needed` | Already have the latest, nothing to do |
 | `New snapshot detected: DHT mutable-item sequence=N` | Newer snapshot found, will download |
 | `No snapshot discovered from DHT` | DHT query returned nothing (item expired or not yet published) |
@@ -94,7 +94,7 @@ The mirror goes through distinct phases. Here's what to look for at each stage:
 | `Force recheck on existing data...` | Hashing local file to find reusable pieces |
 | `State transition: downloading → checking_files` | Mirror phase changed |
 | `Download: 45.2% \| State: downloading \| DL: 1234.5 KB/s \| Peers: 2 (Seeds: 1) \| Connections: 3` | Active transfer with progress; seeds are connected peers with the complete torrent |
-| `Snapshot download complete; now seeding torrent v2 info hash=<short hash>` | Download finished, now seeding to others |
+| `Snapshot download complete; now seeding info_hash=<short hash>` | Download finished, now seeding to others |
 | `Download: 0.0% ... Peers: 0 (Seeds: 0) \| Connections: 0` | No connected download sources — check connectivity |
 
 **Seeding (steady state):**

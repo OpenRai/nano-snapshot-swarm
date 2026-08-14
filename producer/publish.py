@@ -123,7 +123,7 @@ def _select_verified_snapshot(
     if info_hash != expected_info_hash:
         logger.warning(
             "Highest verified DHT mutable-item candidate does not match the requested "
-            "torrent: sequence=%s, torrent v2 info hash=%s...",
+            "torrent: sequence=%s, info_hash=%s...",
             highest_sequence,
             info_hash[:16],
         )
@@ -178,7 +178,7 @@ def publish_to_dht(
     print(f"DHT mutable-item target ID (SHA-1): {target_id.hex()[:16]}...")
     print(
         "Publishing snapshot: "
-        f"publisher status sequence={seq}, torrent v2 info hash={info_hash_hex[:16]}..., "
+        f"publisher status sequence={seq}, info_hash={info_hash_hex[:16]}..., "
         f"salt='{salt}'"
     )
 
@@ -254,7 +254,7 @@ def publish_to_dht(
                     save_state(state, state_path)
                     print(
                         "DHT mutable item verified: "
-                        f"sequence={dht_sequence}, torrent v2 info hash={verified_hash[:16]}..."
+                        f"sequence={dht_sequence}, info_hash={verified_hash[:16]}..."
                     )
                     return {
                         "seq": seq,

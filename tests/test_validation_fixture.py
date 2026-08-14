@@ -64,4 +64,6 @@ def test_validation_publish_dry_run_creates_torrent_for_noncanonical_archive(
     assert not (tmp_path / "SHOULD_NOT_RUN").exists()
     output = capsys.readouterr().out
     assert '"dry_run": true' in output
-    assert "Info-hash (v2): " + "22" * 32 in output
+    assert "info_hash_v1=" + "11" * 20 in output
+    assert "info_hash=" + "22" * 32 in output
+    assert "info_hash_v2=" not in output

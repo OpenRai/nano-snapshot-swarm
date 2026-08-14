@@ -35,7 +35,7 @@ there are no peers. `Peers` means established BitTorrent peers; a queued
 seed-peer connection is not an established peer.
 
 The full producer signing public key is copyable. Routine DHT target IDs and
-torrent v2 info hashes are internal diagnostic IDs and are abbreviated in logs;
+`info_hash` values are internal diagnostic IDs and are abbreviated in logs;
 the complete values remain in JSON state and dashboard responses.
 
 ## Updates and restarts
@@ -70,7 +70,7 @@ can progress with `Peers: 0` when `Seeds` is greater than zero.
 2. The mirror is listening on both TCP and UDP 6881.
 3. The configured producer seed peer is reachable from the mirror network.
 4. The mirror's `progress` is changing or the producer has upload activity.
-5. The producer and dashboard advertise the same torrent v2 info hash.
+5. The producer and dashboard advertise the same `info_hash`.
 
 Queued connection messages only mean that libtorrent accepted an asynchronous
 request. Look for `Connections: K` followed by a non-zero `Peers` or `Seeds`

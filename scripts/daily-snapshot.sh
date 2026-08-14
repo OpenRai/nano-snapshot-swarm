@@ -367,8 +367,8 @@ PUBLISH_OUTPUT=$(python -m producer.cli publish \
 echo "$PUBLISH_OUTPUT"
 
 # Extract info hash and update metadata so future runs skip
-TORRENT_HASH=$(echo "$PUBLISH_OUTPUT" | grep -oP '(?<=Info-hash \(v2\): ).*' || true)
-TORRENT_HASH_V1=$(echo "$PUBLISH_OUTPUT" | grep -oP '(?<=Info-hash \(v1\): ).*' || true)
+TORRENT_HASH=$(echo "$PUBLISH_OUTPUT" | sed -n 's/^info_hash=//p' || true)
+TORRENT_HASH_V1=$(echo "$PUBLISH_OUTPUT" | sed -n 's/^info_hash_v1=//p' || true)
 if [ -n "$TORRENT_HASH" ]; then
     python3 - "$META_FILE" "$TORRENT_HASH" "$TORRENT_HASH_V1" <<'PY'
 import json

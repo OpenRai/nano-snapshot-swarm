@@ -239,10 +239,10 @@ class LibtorrentSession:
         if resume_path.exists():
             try:
                 resume_params = lt.read_resume_data(resume_path.read_bytes())
-                logger.info("Loaded saved resume data: v2 info hash=%s...", handle_key[:16])
+                logger.info("Loaded saved resume data: info_hash=%s...", handle_key[:16])
             except Exception as exc:
                 logger.warning(
-                    "Ignoring invalid resume data for v2 info hash=%s...: %s",
+                    "Ignoring invalid resume data for info_hash=%s...: %s",
                     handle_key[:16],
                     exc,
                 )
@@ -284,7 +284,7 @@ class LibtorrentSession:
             handle = self._session.add_torrent(params)
 
         self._handles[handle_key] = handle
-        logger.info("Added torrent: v2 info hash=%s...", handle_key[:16])
+        logger.info("Added torrent: info_hash=%s...", handle_key[:16])
         return handle
 
     def _resume_path(self, info_hash: str) -> Path:
@@ -303,7 +303,7 @@ class LibtorrentSession:
                 handle.save_resume_data(lt.save_resume_flags_t.save_info_dict)
             except Exception as exc:
                 logger.warning(
-                    "Could not request resume data for v2 info hash=%s...: %s",
+                    "Could not request resume data for info_hash=%s...: %s",
                     info_hash[:16],
                     exc,
                 )
@@ -316,22 +316,22 @@ class LibtorrentSession:
             )
             if alert is None:
                 logger.warning(
-                    "Resume data was not saved for v2 info hash=%s...", info_hash[:16]
+                    "Resume data was not saved for info_hash=%s...", info_hash[:16]
                 )
                 continue
             resume_data = alert.extra.get("resume_data")
             if resume_data is None:
-                logger.warning("Resume alert had no data for v2 info hash=%s...", info_hash[:16])
+                logger.warning("Resume alert had no data for info_hash=%s...", info_hash[:16])
                 continue
             temporary = resume_dir / f".{info_hash}.fastresume.tmp"
             try:
                 temporary.write_bytes(lt.bencode(resume_data))
                 temporary.replace(self._resume_path(info_hash))
-                logger.info("Saved resume data: v2 info hash=%s...", info_hash[:16])
+                logger.info("Saved resume data: info_hash=%s...", info_hash[:16])
             except Exception as exc:
                 temporary.unlink(missing_ok=True)
                 logger.warning(
-                    "Could not write resume data for v2 info hash=%s...: %s",
+                    "Could not write resume data for info_hash=%s...: %s",
                     info_hash[:16],
                     exc,
                 )
@@ -340,7 +340,7 @@ class LibtorrentSession:
         handle = self._handles.pop(info_hash, None)
         if handle and self._session:
             self._session.remove_torrent(handle)
-            logger.info("Removed torrent: v2 info hash=%s...", info_hash[:16])
+            logger.info("Removed torrent: info_hash=%s...", info_hash[:16])
 
     def has_torrent(self, info_hash: str) -> bool:
         return info_hash in self._handles
@@ -363,19 +363,19 @@ class LibtorrentSession:
         handle = self._handles.get(info_hash)
         if handle:
             handle.pause()
-            logger.info("Paused torrent: v2 info hash=%s...", info_hash[:16])
+            logger.info("Paused torrent: info_hash=%s...", info_hash[:16])
 
     def resume_torrent(self, info_hash: str) -> None:
         handle = self._handles.get(info_hash)
         if handle:
             handle.resume()
-            logger.info("Resumed torrent: v2 info hash=%s...", info_hash[:16])
+            logger.info("Resumed torrent: info_hash=%s...", info_hash[:16])
 
     def force_recheck(self, info_hash: str) -> None:
         handle = self._handles.get(info_hash)
         if handle:
             handle.force_recheck()
-            logger.info("Force recheck started: torrent v2 info hash=%s...", info_hash[:16])
+            logger.info("Force recheck started: info_hash=%s...", info_hash[:16])
 
     def get_handle(self, info_hash: str) -> Optional[lt.torrent_handle]:
         return self._handles.get(info_hash)
@@ -607,7 +607,7 @@ class LibtorrentSession:
                             logger.debug("Peer disconnected: %s", snap.message)
                         elif snap.type_name == "fastresume_rejected_alert":
                             logger.warning(
-                                "Resume data rejected for v2 info hash=%s...: %s",
+                                "Resume data rejected for info_hash=%s...: %s",
                                 snap.extra.get("info_hash", "unknown")[:16],
                                 snap.extra.get("error", snap.message),
                             )

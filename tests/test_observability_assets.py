@@ -55,3 +55,7 @@ def test_dashboard_preserves_the_public_panel_optimizations() -> None:
         panels[7]["transformations"][1]["options"]["renameByName"]["original_filename"]
         == "Original filename"
     )
+    assert (
+        panels[7]["transformations"][1]["options"]["renameByName"]["info_hash"]
+        == "Info Hash"
+    )

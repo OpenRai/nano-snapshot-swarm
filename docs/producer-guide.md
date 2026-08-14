@@ -165,11 +165,11 @@ Expected publish output:
 ```
 Verification using PRODUCER_SIGNING_PUBKEY: <64-char hex>
 DHT mutable-item target ID (SHA-1): <short target>...
-Publishing snapshot: publisher status sequence=1, torrent v2 info hash=<short hash>...
+Publishing snapshot: publisher status sequence=1, info_hash=<short hash>...
 Value size: N bytes
 Waiting for DHT to bootstrap...
 DHT mutable-item put completed: sequence=N, direct acknowledgements=N
-DHT mutable item verified: sequence=N, torrent v2 info hash=<short hash>...
+DHT mutable item verified: sequence=N, info_hash=<short hash>...
 ```
 
 ---
@@ -210,7 +210,7 @@ After pulling a release that changes Python dependencies, run `uv sync --extra d
 from the repository before restarting a service. `scripts/nano-snapshot-restart.sh`
 does this automatically.
 
-**Pipeline steps:** The timer invokes `/opt/nano-snapshot-swarm/scripts/daily-snapshot.sh`, which retrieves the latest upstream `.7z` archive, validates it, writes local publisher metadata, and publishes the torrent v2 info-hash to DHT. The upstream URL is not distributed to mirrors or embedded in the torrent. Set `SNAPSHOT_RETENTION_COUNT=N` to retain and seed the last `N` prior canonical archive-plus-torrent pairs; the default `0` keeps only the current snapshot.
+**Pipeline steps:** The timer invokes `/opt/nano-snapshot-swarm/scripts/daily-snapshot.sh`, which retrieves the latest upstream `.7z` archive, validates it, writes local publisher metadata, and publishes the `info_hash` to DHT. The upstream URL is not distributed to mirrors or embedded in the torrent. Set `SNAPSHOT_RETENTION_COUNT=N` to retain and seed the last `N` prior canonical archive-plus-torrent pairs; the default `0` keeps only the current snapshot.
 
 ```bash
 # Check timer status

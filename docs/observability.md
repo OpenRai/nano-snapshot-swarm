@@ -26,7 +26,7 @@ The important metrics are:
 | Metric | Meaning |
 |---|---|
 | `nano_snapshot_dht_sequence` | Exact active BEP-46 mutable-item sequence. |
-| `nano_snapshot_generation_info` | Current torrent v2 info hash, DHT sequence, and the original upstream snapshot filename from `x-snapshot`; the only metric that labels a generation. |
+| `nano_snapshot_generation_info` | Current `info_hash`, DHT sequence, and the original upstream snapshot filename from `x-snapshot`; the only metric that labels a generation. |
 | `nano_snapshot_size_bytes` | Active archive size. |
 | `nano_snapshot_bytes_uploaded_total`, `nano_snapshot_bytes_downloaded_total` | Process-lifetime BitTorrent transfer counters. Use `rate(...[5m])` for throughput. |
 | `nano_snapshot_swarm_peers`, `nano_snapshot_swarm_connections` | Current connected swarm participants. |

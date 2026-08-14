@@ -20,7 +20,7 @@ production service name and uses the production output directory. Do not run it
 after changing only `DHT_SALT`.
 
 Create and publish a placeholder through the isolated producer path. Record the
-published DHT sequence and v2 info hash. Confirm that the temporary seeder logs
+published DHT sequence and `info_hash`. Confirm that the temporary seeder logs
 an authoritative DHT verification before starting the mirror.
 
 The validation output directory must contain a fresh timestamped placeholder, the
