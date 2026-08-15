@@ -677,6 +677,7 @@ class TestGetEndpoints:
         assert 'data-tab="compose"' not in one_shot
         assert "./nano-data:/data" in one_shot
         assert "aria2c" in native_aria2
+        assert 'href="https://aria2.github.io/">aria2c</a>' in native_aria2
         assert "--file-allocation=none" in native_aria2
         assert "--seed-time=0" in native_aria2
         assert "https://nano-snapshot-hub.fly.dev/api/latest.magnet" in native_aria2
