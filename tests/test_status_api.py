@@ -662,6 +662,9 @@ class TestGetEndpoints:
         response = client.get("/")
         assert response.status_code == 200
 
+        native_aria2 = response.text.split('<section id="native-aria2">', 1)[1].split(
+            "<h2>Run with Docker</h2>", 1
+        )[0]
         one_shot = response.text.split('<section id="one-shot">', 1)[1].split(
             '<section id="seed"', 1
         )[0]
@@ -673,6 +676,10 @@ class TestGetEndpoints:
         assert 'data-tab="podman"' in one_shot
         assert 'data-tab="compose"' not in one_shot
         assert "./nano-data:/data" in one_shot
+        assert "aria2c" in native_aria2
+        assert "--file-allocation=none" in native_aria2
+        assert "--seed-time=0" in native_aria2
+        assert "https://nano-snapshot-hub.fly.dev/api/latest.magnet" in native_aria2
         assert 'data-tab="compose"' in seed
         assert "./nano-data:/data" in seed
         assert "nano-data:/data" not in seed.replace("./nano-data:/data", "")

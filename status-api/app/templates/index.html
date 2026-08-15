@@ -118,6 +118,17 @@
     </noscript>
 
     <section id="download-options">
+        <section id="native-aria2">
+            <h2>Download with aria2c</h2>
+            <p style="color: var(--muted); margin-bottom: 1rem;">For a one-time native download, fetch the current magnet and let aria2c save the archive locally. This does not follow later snapshot updates or seed after completion.</p>
+            <div class="copyable"><pre><code>mkdir -p nano-data
+aria2c \
+  --dir=./nano-data \
+  --file-allocation=none \
+  --seed-time=0 \
+  "$(curl -fsSL https://nano-snapshot-hub.fly.dev/api/latest.magnet)"</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
+        </section>
+
         <h2>Run with Docker</h2>
         <p style="color: var(--muted); margin-bottom: 1.5rem;">Pre-built Docker images let you download and seed the snapshot without configuring BitTorrent clients manually. Works on any system that runs Docker or Podman.</p>
 
