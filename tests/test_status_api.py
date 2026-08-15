@@ -680,6 +680,7 @@ class TestGetEndpoints:
         assert "--file-allocation=none" in native_aria2
         assert "--seed-time=0" in native_aria2
         assert "https://nano-snapshot-hub.fly.dev/api/latest.magnet" in native_aria2
+        assert "Run a permanent snapshot mirror — contribute to the Nano network" in seed
         assert 'data-tab="compose"' in seed
         assert "./nano-data:/data" in seed
         assert "nano-data:/data" not in seed.replace("./nano-data:/data", "")
