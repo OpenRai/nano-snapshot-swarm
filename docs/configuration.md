@@ -71,6 +71,15 @@ services:
 
 ```
 
+Before starting this Compose service, create its bind-mounted data directory so
+the non-root container (UID 1000) can write to it:
+
+```bash
+mkdir -p ./nano-data
+chmod 0777 ./nano-data
+docker compose up -d
+```
+
 ### Override POLL_INTERVAL via CLI
 
 ```bash

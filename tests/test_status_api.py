@@ -676,6 +676,8 @@ class TestGetEndpoints:
         assert 'data-tab="podman"' in one_shot
         assert 'data-tab="compose"' not in one_shot
         assert "./nano-data:/data" in one_shot
+        assert "mkdir -p ./nano-data" in one_shot
+        assert "chmod 0777 ./nano-data" in one_shot
         assert "aria2c" in native_aria2
         assert 'href="https://aria2.github.io/">aria2c</a>' in native_aria2
         assert "--file-allocation=none" in native_aria2
@@ -685,6 +687,8 @@ class TestGetEndpoints:
         assert 'data-tab="compose"' in seed
         assert "./nano-data:/data" in seed
         assert "nano-data:/data" not in seed.replace("./nano-data:/data", "")
+        assert "mkdir -p ./nano-data" in seed
+        assert "chmod 0777 ./nano-data" in seed
         assert 'role="tablist"' in one_shot
         assert 'role="tab"' in one_shot
         assert 'aria-selected="true"' in one_shot

@@ -44,6 +44,8 @@ Use leech mode when you just want the newest snapshot archive or extracted ledge
 PRODUCER_SIGNING_PUBKEY="$(<PRODUCER_SIGNING_PUBKEY)" uvx --from . nano-mirror --once --extract --data-dir ./nano-data
 
 # or, with Docker: no PRODUCER_SIGNING_PUBKEY needed for the default stream
+mkdir -p ./nano-data
+chmod 0777 ./nano-data
 docker run --rm \
   -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
@@ -64,6 +66,8 @@ headroom. Check the current archive size before starting an extraction.
 Use swarm mode when you want to contribute bandwidth and keep the latest snapshot flowing through the network. The published image and repo `docker-compose.yml` already target the default OpenRAI snapshot stream.
 
 ```bash
+mkdir -p ./nano-data
+chmod 0777 ./nano-data
 docker compose up -d
 docker compose logs -f nano-mirror
 ```

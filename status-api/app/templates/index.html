@@ -141,12 +141,16 @@ aria2c \
             </div>
 
             <div id="one-shot-panel-docker" class="tab-content active" role="tabpanel" aria-labelledby="one-shot-tab-docker" data-group="one-shot" data-id="docker">
-                <div class="copyable"><pre><code>docker run --rm -it \
+                <div class="copyable"><pre><code>mkdir -p ./nano-data
+chmod 0777 ./nano-data
+docker run --rm -it \
   -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest --once</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
             <div id="one-shot-panel-podman" class="tab-content" role="tabpanel" aria-labelledby="one-shot-tab-podman" hidden data-group="one-shot" data-id="podman">
-                <div class="copyable"><pre><code>podman run --rm -it \
+                <div class="copyable"><pre><code>mkdir -p ./nano-data
+chmod 0777 ./nano-data
+podman run --rm -it \
   -v ./nano-data:/data:Z \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest --once</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
@@ -162,20 +166,25 @@ aria2c \
             </div>
 
             <div id="seed-panel-docker" class="tab-content active" role="tabpanel" aria-labelledby="seed-tab-docker" data-group="seed" data-id="docker">
-                <div class="copyable"><pre><code>docker run -d --name nano-seed \
+                <div class="copyable"><pre><code>mkdir -p ./nano-data
+chmod 0777 ./nano-data
+docker run -d --name nano-seed \
   -p 6881:6881/tcp -p 6881:6881/udp \
   -v ./nano-data:/data \
   --restart unless-stopped \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
             <div id="seed-panel-podman" class="tab-content" role="tabpanel" aria-labelledby="seed-tab-podman" hidden data-group="seed" data-id="podman">
-                <div class="copyable"><pre><code>podman run -d --name nano-seed \
+                <div class="copyable"><pre><code>mkdir -p ./nano-data
+chmod 0777 ./nano-data
+podman run -d --name nano-seed \
   -p 6881:6881/tcp -p 6881:6881/udp \
   -v ./nano-data:/data:Z \
   --restart unless-stopped \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest</code></pre><button class="copy-btn" type="button" aria-label="Copy to clipboard" data-copy-target="code"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg></button></div>
             </div>
             <div id="seed-panel-compose" class="tab-content" role="tabpanel" aria-labelledby="seed-tab-compose" hidden data-group="seed" data-id="compose">
+                <p style="color: var(--muted); margin-bottom: 0.75rem;">Before <code>docker compose up -d</code>, run <code>mkdir -p ./nano-data &amp;&amp; chmod 0777 ./nano-data</code>.</p>
                 <div class="copyable"><pre><code>services:
   seed:
     image: ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest

@@ -11,6 +11,8 @@ The published Docker image already targets the default OpenRAI producer stream. 
 ### Docker Compose
 
 ```bash
+mkdir -p ./nano-data
+chmod 0777 ./nano-data
 docker compose up -d
 ```
 
@@ -19,6 +21,8 @@ This is the fire-and-forget path for anyone with spare disk and bandwidth. The c
 ### Docker Run
 
 ```bash
+mkdir -p ./nano-data
+chmod 0777 ./nano-data
 docker run -d \
   --name nano-mirror \
   -p 6881:6881/tcp -p 6881:6881/udp \

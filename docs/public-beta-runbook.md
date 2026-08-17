@@ -11,6 +11,7 @@ salt baked in, so the normal command needs no secret environment variables:
 
 ```bash
 mkdir -p ./nano-data
+chmod 0777 ./nano-data
 docker run -d --name nano-mirror \
   -p 6881:6881/tcp -p 6881:6881/udp \
   -v "$PWD/nano-data:/data" \

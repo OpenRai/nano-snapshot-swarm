@@ -15,6 +15,8 @@ The published Docker image already has the current OpenRAI producer public key b
 ### Docker Run (recommended)
 
 ```bash
+mkdir -p ./nano-data
+chmod 0777 ./nano-data
 docker run --rm \
   -v ./nano-data:/data \
   ghcr.io/openrai/nano-snapshot-swarm/nano-p2p-mirror:latest \
