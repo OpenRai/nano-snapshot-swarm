@@ -43,7 +43,7 @@
         #status dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         #status dt { color: var(--muted); }
         #status dd { margin: 0; font-family: ui-monospace, monospace; font-size: 0.8125rem; word-break: break-all; }
-        .heartbeat-copy { color: var(--muted); font-size: 0.875rem; margin: 0; }
+        .heartbeat-copy { border-top: 1px solid var(--border); color: var(--muted); font-size: 0.875rem; margin: 1rem 0 0; padding-top: 0.75rem; }
         .heartbeat-copy time, #heartbeat-age { font-family: ui-monospace, monospace; }
         .archive-listing { margin-top: 1rem; }
         .archive-listing summary { cursor: pointer; color: var(--muted); font-size: 0.875rem; }
@@ -294,19 +294,30 @@ podman run -d --name nano-seed \
         });
 
         // Relative time for the seeder heartbeat
+        function formatHeartbeatTime(date) {
+            return date.toLocaleString(undefined, {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: 'numeric', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short'
+            });
+        }
+
         function updateHeartbeatAge() {
             const tsEl = document.getElementById('_push-ts');
             if (!tsEl) return;
             const pushedAt = tsEl.dataset.ts;
             if (!pushedAt) return;
-            const diff = Math.floor((new Date().getTime() - Date.parse(pushedAt)) / 1000);
+            const heartbeatTime = new Date(pushedAt);
+            const diff = Math.floor((new Date().getTime() - heartbeatTime.getTime()) / 1000);
             const stale = diff > 7200;
-            let label;
-            if (diff < 5) label = "BitTorrent seeder stats synced just now";
-            else if (diff < 60) label = `BitTorrent seeder stats synced ${diff}s ago`;
-            else label = `BitTorrent seeder stats synced ${Math.floor(diff/60)}m ago`;
+            let age;
+            if (diff < 5) age = "just now";
+            else if (diff < 60) age = `${diff}s ago`;
+            else age = `${Math.floor(diff/60)}m ago`;
+            const label = `BitTorrent seeder stats synced ${age}`;
             const ageEl = document.getElementById('heartbeat-age');
-            if (ageEl) ageEl.textContent = label;
+            if (ageEl) ageEl.textContent = age;
+            const timeEl = document.getElementById('heartbeat-time');
+            if (timeEl) timeEl.textContent = formatHeartbeatTime(heartbeatTime);
             document.title = stale ? "⚠️ " + label : label;
         }
         updateHeartbeatAge();
