@@ -608,7 +608,10 @@ class TestGetEndpoints:
             client.post("/api/push", json=payload)
             resp = client.get("/api/status-fragment")
             assert resp.status_code == 200
-            assert "Status updated" in resp.text
+            assert "Seeder heartbeat" in resp.text
+            assert "Last confirmed" in resp.text
+            assert 'id="heartbeat-age"' in resp.text
+            assert '<dt>Status updated</dt>' not in resp.text
             assert "Snapshot Created" not in resp.text
             # payload['info_hash'] is 'ab' * 32, so first 16 chars is 'abababababababab'
             expected_short_hash = payload["info_hash"][:16]

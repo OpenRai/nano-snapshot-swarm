@@ -43,6 +43,8 @@
         #status dl { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
         #status dt { color: var(--muted); }
         #status dd { margin: 0; font-family: ui-monospace, monospace; font-size: 0.8125rem; word-break: break-all; }
+        .heartbeat-copy { color: var(--muted); font-size: 0.875rem; margin: 0; }
+        .heartbeat-copy time, #heartbeat-age { font-family: ui-monospace, monospace; }
         .archive-listing { margin-top: 1rem; }
         .archive-listing summary { cursor: pointer; color: var(--muted); font-size: 0.875rem; }
         .archive-listing summary:hover { color: var(--fg); }
@@ -291,8 +293,8 @@ podman run -d --name nano-seed \
             });
         });
 
-        // Relative time for data age
-        setInterval(() => {
+        // Relative time for the seeder heartbeat
+        function updateHeartbeatAge() {
             const tsEl = document.getElementById('_push-ts');
             if (!tsEl) return;
             const pushedAt = tsEl.dataset.ts;
@@ -303,8 +305,12 @@ podman run -d --name nano-seed \
             if (diff < 5) label = "BitTorrent seeder stats synced just now";
             else if (diff < 60) label = `BitTorrent seeder stats synced ${diff}s ago`;
             else label = `BitTorrent seeder stats synced ${Math.floor(diff/60)}m ago`;
+            const ageEl = document.getElementById('heartbeat-age');
+            if (ageEl) ageEl.textContent = label;
             document.title = stale ? "⚠️ " + label : label;
-        }, 5000);
+        }
+        updateHeartbeatAge();
+        setInterval(updateHeartbeatAge, 5000);
 
         // Unified copy-to-clipboard for all .copy-btn elements
         const CHECK_SVG = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,8 6,12 14,4"/></svg>`;

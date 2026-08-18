@@ -4,11 +4,16 @@
     <dt>Name</dt><dd>{{ torrent_name }}</dd>
     <dt>DHT sequence</dt><dd>{{ sequence }}</dd>
     <dt>Info Hash</dt><dd>{{ info_hash }}</dd>
-    <dt>Status updated</dt>
-    <dd>
-      <span id="ts-render">{{ timestamp }}</span>
-    </dd>
   </dl>
+</section>
+<section id="seeder-heartbeat" aria-labelledby="seeder-heartbeat-heading">
+  <h2 id="seeder-heartbeat-heading">Seeder heartbeat</h2>
+  <p class="heartbeat-copy">
+    Last confirmed <time datetime="{{ timestamp }}">{{ timestamp }}</time>
+    (<span id="heartbeat-age" aria-live="polite">waiting for age</span>)
+  </p>
+</section>
+<section id="snapshot-contents">
   <details class="archive-listing"{% if not archive_listing %} hidden{% endif %}>
     <summary>Peek inside the archive</summary>
     <pre><code>{{ archive_listing }}</code></pre>
