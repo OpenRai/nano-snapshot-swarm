@@ -49,12 +49,15 @@ For a new producer host:
    repository or the Alloy file.
 3. Pull the repository and run `uv sync` so the producer metrics endpoint is
    available.
-4. Symlink `systemd/nano-observability.service` into
-   `~/.config/systemd/user/`, then reload and start it:
+4. Symlink `systemd/nano-observability.service`,
+   `systemd/nano-observability-watchdog.service`, and
+   `systemd/nano-observability-watchdog.timer` into
+   `~/.config/systemd/user/`, then reload and start the collector and timer:
 
    ```sh
    systemctl --user daemon-reload
    systemctl --user enable --now nano-observability.service
+   systemctl --user enable --now nano-observability-watchdog.timer
    journalctl --user -u nano-observability.service -f
    ```
 
@@ -73,6 +76,17 @@ The Alloy template at
 [`observability/nano-snapshot-swarm.alloy`](../observability/nano-snapshot-swarm.alloy)
 scrapes only `127.0.0.1:9108` every 30 seconds and remote-writes it with fixed
 producer labels.
+
+The watchdog runs every five minutes. It fails visibly rather than restarting
+when the producer endpoint is unavailable or `/` has less than 5 GiB free. If
+the producer is scrapeable but Alloy's remote-write success timestamp is more
+than 10 minutes old, it performs at most one collector restart per hour. Tune
+those three limits with the `OBSERVABILITY_*` values in `.env`. Check it with:
+
+```sh
+systemctl --user status nano-observability-watchdog.timer
+journalctl --user -u nano-observability-watchdog.service -n 30 --no-pager
+```
 
 ## Public dashboard
 

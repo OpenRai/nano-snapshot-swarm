@@ -1,0 +1,13 @@
+[Unit]
+Description=Nano Snapshot Swarm Alloy remote-write watchdog
+After=nano-observability.service nano-seed.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.env
+ExecCondition=/usr/bin/test -n ${GRAFANA_CLOUD_PROMETHEUS_REMOTE_WRITE_URL}
+ExecStart=%h/nano-snapshot-swarm/scripts/check-observability.sh
+WorkingDirectory=%h/nano-snapshot-swarm
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nano-observability-watchdog
