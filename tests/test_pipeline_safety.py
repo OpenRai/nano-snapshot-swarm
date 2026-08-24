@@ -174,6 +174,8 @@ def test_daily_pipeline_keeps_content_length_as_final_validation() -> None:
 
     assert 'if [ "$DOWNLOADED_SIZE" -ne "$EXPECTED_SIZE" ]' in script
     assert 'Size verified: $(numfmt --to=iec-i --suffix=B "$DOWNLOADED_SIZE")' in script
+    assert "check-snapshot-disk-budget.sh" in script
+    assert "SNAPSHOT_UNKNOWN_SIZE_RESERVE_BYTES" in script
 
 
 def test_producer_unit_builds_explicit_sequence_helper_before_start() -> None:

@@ -9,6 +9,7 @@ UPSTREAM_SNAPSHOT_INDEX_URL="${UPSTREAM_SNAPSHOT_INDEX_URL:-https://s3.us-east-2
 TORRENT_FORMAT_VERSION=3
 SNAPSHOT_RETENTION_COUNT="${SNAPSHOT_RETENTION_COUNT:-0}"
 ARIA2_RPC_PORT="${ARIA2_RPC_PORT:-6800}"
+SNAPSHOT_UNKNOWN_SIZE_RESERVE_BYTES="${SNAPSHOT_UNKNOWN_SIZE_RESERVE_BYTES:-75161927680}"
 if ! USE_PLACEHOLDER_SNAPSHOT="$(parse_boolean_env USE_PLACEHOLDER_SNAPSHOT false)"; then
     exit 1
 fi
@@ -28,6 +29,11 @@ fi
 if ! [[ "$ARIA2_RPC_PORT" =~ ^[0-9]+$ ]] || \
    [ "$ARIA2_RPC_PORT" -lt 1024 ] || [ "$ARIA2_RPC_PORT" -gt 65535 ]; then
     log "ERROR: ARIA2_RPC_PORT must be an integer from 1024 through 65535"
+    exit 1
+fi
+if ! [[ "$SNAPSHOT_UNKNOWN_SIZE_RESERVE_BYTES" =~ ^[0-9]+$ ]] || \
+   [ "$SNAPSHOT_UNKNOWN_SIZE_RESERVE_BYTES" -eq 0 ]; then
+    log "ERROR: SNAPSHOT_UNKNOWN_SIZE_RESERVE_BYTES must be a positive integer"
     exit 1
 fi
 
@@ -196,6 +202,17 @@ else
     if [ -n "$EXPECTED_SIZE" ]; then
         log "Expected size: $(numfmt --to=iec-i --suffix=B "$EXPECTED_SIZE")"
     fi
+
+    CURRENT_PARTIAL_SIZE=$(stat -c%s "$PARTIAL_FILE" 2>/dev/null || echo 0)
+    BUDGET_INCOMING_SIZE="${EXPECTED_SIZE:-$SNAPSHOT_UNKNOWN_SIZE_RESERVE_BYTES}"
+    if [ -z "$EXPECTED_SIZE" ]; then
+        log "WARNING: upstream did not provide Content-Length; reserving $(numfmt --to=iec-i --suffix=B "$BUDGET_INCOMING_SIZE") for disk admission"
+    fi
+    "$REPO_DIR/scripts/check-snapshot-disk-budget.sh" \
+        --output-dir "$OUTPUT_DIR" \
+        --incoming-bytes "$BUDGET_INCOMING_SIZE" \
+        --partial-bytes "$CURRENT_PARTIAL_SIZE" \
+        --retention-count "$SNAPSHOT_RETENTION_COUNT"
 
     # aria2c handles resume via its .aria2 control file — far more reliable than
     # curl -C - which is a dumb byte-offset append with no corruption detection.

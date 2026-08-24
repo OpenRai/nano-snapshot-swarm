@@ -212,6 +212,11 @@ Snapshots run automatically via a **user-level** systemd timer on the producer s
 
 **Credentials:** The service reads `/home/openrai/.env` (EnvironmentFile), so keys are never in the unit file itself.
 
+The pipeline checks that the filesystem containing `OUTPUT_DIR` can hold the
+remaining incoming archive plus `SNAPSHOT_DISK_SAFETY_BYTES` before it starts a
+download. Retained archives are hard-linked within that same filesystem, so
+retention does not allocate a second archive-sized copy during rotation.
+
 After pulling a release that changes Python dependencies, run `uv sync --extra dev`
 from the repository before restarting a service. `scripts/nano-snapshot-restart.sh`
 does this automatically.
@@ -236,6 +241,21 @@ systemctl --user start nano-snapshot.service
 The pipeline unit allows 12 hours to start and finish. Its stop timeout is five
 minutes. Do not stop it during an archive download unless you intend to resume
 that download later.
+
+### Seeder recovery watchdog
+
+Symlink `systemd/nano-seed-recovery-watchdog.service` and `.timer` into
+`~/.config/systemd/user/`, then enable the timer:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now nano-seed-recovery-watchdog.timer
+```
+
+Every five minutes it checks the seeder's persisted state. Fresh
+`checking_files` is normal and never triggers a restart. A sustained unhealthy
+or stale state restarts the active seeder only after disk space is above the
+configured threshold; once `seeder_ready=true`, it triggers the status push.
 
 ---
 

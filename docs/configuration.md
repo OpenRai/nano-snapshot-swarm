@@ -108,11 +108,17 @@ docker run --rm \
 | `DHT_PRIVATE_KEY` | — | **Yes** | Ed25519 private key (hex, 64 chars) |
 | `DHT_SALT` | `daily` | No | DHT salt namespace |
 | `SNAPSHOT_RETENTION_COUNT` | `0` | No | Non-negative count of prior archive-plus-torrent pairs to retain and seed; `0` retains only the current snapshot |
+| `SNAPSHOT_DISK_SAFETY_BYTES` | `5368709120` | No | Free-space reserve required in addition to the remaining upstream download before the pipeline starts aria2c |
+| `SNAPSHOT_UNKNOWN_SIZE_RESERVE_BYTES` | `75161927680` | No | Conservative incoming-size reservation when upstream does not provide `Content-Length` |
 | `USE_PLACEHOLDER_SNAPSHOT` | `false` | No | Strict boolean; unset/empty uses `false`, `true` replaces the upstream download with a fresh timestamped 128 MiB test payload while retaining the normal publication path |
 | `STATUS_API_URL` | _(empty)_ | No | URL used by the producer to push snapshot metadata (use `https://nano-snapshot-hub.fly.dev` unless Cloudflare permits `/api/push`; public dashboard: `https://nano-snapshots.openrai.org`) |
 | `METRICS_ENABLED` | `true` | No | Strict boolean; unset/empty uses the default, `false` disables the local Prometheus endpoint |
 | `METRICS_PORT` | `9108` | No | Local Prometheus endpoint port |
 | `METRICS_BIND` | `127.0.0.1` | No | Local Prometheus bind address; do not expose without authentication |
+| `PRODUCER_RECOVERY_MIN_FREE_BYTES` | `5368709120` | No | Minimum free bytes before the seeder recovery watchdog may restart an unhealthy seeder |
+| `PRODUCER_RECOVERY_UNHEALTHY_SECONDS` | `900` | No | Continuous unhealthy duration before the watchdog restarts an active seeder |
+| `PRODUCER_RECOVERY_STALE_STATS_SECONDS` | `600` | No | Maximum age of `seeder-stats.json`; fresh `checking_files` remains healthy |
+| `PRODUCER_RECOVERY_RESTART_COOLDOWN_SECONDS` | `3600` | No | Minimum interval between automatic seeder recovery restarts |
 
 ---
 

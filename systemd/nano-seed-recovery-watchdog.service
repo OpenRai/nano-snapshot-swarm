@@ -1,0 +1,13 @@
+[Unit]
+Description=Recover an unhealthy Nano P2P Snapshot Seeder after disk recovery
+After=network-online.target nano-seed.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.env
+ExecStart=%h/nano-snapshot-swarm/scripts/check-seeder-recovery.sh
+WorkingDirectory=%h/nano-snapshot-swarm
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nano-seed-recovery-watchdog

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Nano P2P Snapshot Seeder recovery watchdog
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=5m
+Persistent=true
+Unit=nano-seed-recovery-watchdog.service
+
+[Install]
+WantedBy=timers.target

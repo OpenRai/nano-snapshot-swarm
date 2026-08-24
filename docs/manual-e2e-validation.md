@@ -15,6 +15,16 @@ and start a separate `producer.seeder` process. Give that process the same
 signing key, `DHT_SALT=validation`, `USE_PLACEHOLDER_SNAPSHOT=true`, and its own
 `OUTPUT_DIR`. Keep it separate from the production `nano-seed.service`.
 
+Create the validation directory with `mktemp -d` and register cleanup before
+starting the test, so an interrupted run cannot leave a large archive or resume
+data behind:
+
+```bash
+VALIDATION_DIR="$(mktemp -d /tmp/nano-validation-e2e.XXXXXX)"
+trap 'rm -rf "$VALIDATION_DIR"' EXIT INT TERM
+df -h "$VALIDATION_DIR"
+```
+
 The normal `nano-snapshot.service` is not a validation harness. It signals the
 production service name and uses the production output directory. Do not run it
 after changing only `DHT_SALT`.
@@ -63,7 +73,8 @@ upload activity.
 
 Stop the temporary producer process and remove its temporary output directory
 after collecting evidence. Do not change the production DHT salt to clean up a
-validation run.
+validation run. Before closing the validation session, run `df -h` and confirm
+the validation directory no longer exists after the cleanup trap runs.
 
 The hub's **Status updated** time is the time its signed status payload was
 pushed. It is not the timestamp embedded in the archive or a claim that the
